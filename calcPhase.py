@@ -4,6 +4,8 @@
 # this script can manage glitches, wave functions and the frequency and its derivatives
 # up to F12; it does not accomodate IFUNC, binary systems, proper motion, or parallax.
 # These will be implemented in future versions, likely in that respective order
+#
+# Testing git branches and merging!
 ####################################################################################
 
 import sys
