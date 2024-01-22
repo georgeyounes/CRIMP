@@ -7,12 +7,12 @@
 # with proper motion, parallax, or IFUNC
 ####################################################################################
 
-import os
 import sys
 import argparse
 import numpy as np
 
 sys.dont_write_bytecode = True
+
 
 ##################################
 # Script that reads a .par file ##
@@ -20,18 +20,12 @@ sys.dont_write_bytecode = True
 
 # Reading timing model
 def readTimMod(timMod):
-
     ###############################
     # Parsing the .par timing model
-    data_file = open(timMod,'r+')
-    
-    ###################
-    # Ephemerides epoch
-    blockt0 = ""
-    
+    data_file = open(timMod, 'r+')
+
     #######################################
     # Reading frequency and its derivatives
-    blockF0 = ""
     blockF1 = ""
     blockF2 = ""
     blockF3 = ""
@@ -43,14 +37,13 @@ def readTimMod(timMod):
     blockF9 = ""
     blockF10 = ""
     blockF11 = ""
-    blockF11 = ""
     blockF12 = ""
 
     # Reading lines in the .par file
     for line in data_file:
         # Stripping lines vertically to create a list of characters
-        li=line.lstrip()
-        
+        li = line.lstrip()
+
         if li.startswith("F0"):
             blockF0 = line
             F0 = np.float64((" ".join(blockF0.split('F0')[1].split())).split(' ')[0])
@@ -58,10 +51,10 @@ def readTimMod(timMod):
         elif li.startswith("PEPOCH"):
             blockt0 = line
             PEPOCH = np.float64((" ".join(blockt0.split('PEPOCH')[1].split())).split(' ')[0])
-            
-        elif li.startswith(("F1 ","F1\t")): # Necessary to be more specific to distinguish it from F10+
+
+        elif li.startswith(("F1 ", "F1\t")):  # Necessary to be more specific to distinguish it from F10+
             blockF1 = line
-            
+
         elif li.startswith("F2"):
             blockF2 = line
 
@@ -73,22 +66,22 @@ def readTimMod(timMod):
 
         elif li.startswith("F5"):
             blockF5 = line
-            
+
         elif li.startswith("F6"):
             blockF6 = line
-            
+
         elif li.startswith("F7"):
             blockF7 = line
-            
+
         elif li.startswith("F8"):
             blockF8 = line
-            
+
         elif li.startswith("F9"):
             blockF9 = line
-            
+
         elif li.startswith("F10"):
             blockF10 = line
-            
+
         elif li.startswith("F11"):
             blockF11 = line
 
@@ -100,7 +93,7 @@ def readTimMod(timMod):
         F1 = 0
     else:
         F1 = np.float64((" ".join(blockF1.split('F1')[1].split())).split(' ')[0])
-        
+
     if not blockF2:
         F2 = 0
     else:
@@ -155,69 +148,68 @@ def readTimMod(timMod):
         F12 = 0
     else:
         F12 = np.float64((" ".join(blockF12.split('F12')[1].split())).split(' ')[0])
-            
-    timModParam = {'PEPOCH':PEPOCH, 'F0':F0, 'F1':F1, 'F2':F2, 'F3':F3, 'F4':F4,
-                       'F5':F5, 'F6':F6, 'F7':F7, 'F8':F8, 'F9':F9,
-                       'F10':F10, 'F11':F11, 'F12':F12}
-        
+
+    timModParam = {'PEPOCH': PEPOCH, 'F0': F0, 'F1': F1, 'F2': F2, 'F3': F3, 'F4': F4,
+                   'F5': F5, 'F6': F6, 'F7': F7, 'F8': F8, 'F9': F9,
+                   'F10': F10, 'F11': F11, 'F12': F12}
+
     data_file.seek(0)
-    
+
     ###############################
     # Now reading glitch parameters
     # First let's determine how many glitches we have
     nmbrOfGlitches = np.array([])
     for line in data_file:
         # Stripping lines vertically to create a list of characters
-        li=line.lstrip()
+        li = line.lstrip()
         # Glitch parameters
         if li.startswith("GLEP"):
             blockglep = line
             nmbrOfGlitches = np.append(nmbrOfGlitches, blockglep.split('_')[1].split(' ')[0])
-    
+
     # We now loop over all glitches and add them to the dictionary
     for jj in nmbrOfGlitches:
         data_file.seek(0)
 
         # Glitch parameters
-        blockglep = ""
-        blockglph = ""
-        blockglf0 = ""
+        # no need to define glep (blockglep), glph (blockglph), and glf0 (blockglf0)
+        # These are mandatory for any glitch
         blockglf1 = ""
         blockglf2 = ""
         blockglf0d = ""
         blockgltd = ""
-        
+
         for line in data_file:
-            
-            li=line.lstrip()
+
+            li = line.lstrip()
             # Glitch parameters
-            if li.startswith("GLEP_"+jj):
+            if li.startswith("GLEP_" + jj):
                 blockglep = line
-                glep = np.float64((" ".join(blockglep.split("GLEP_"+jj)[1].split())).split(' ')[0])
+                glep = np.float64((" ".join(blockglep.split("GLEP_" + jj)[1].split())).split(' ')[0])
 
-            elif li.startswith("GLPH_"+jj):
+            elif li.startswith("GLPH_" + jj):
                 blockglph = line
-                glph = np.float64((" ".join(blockglph.split("GLPH_"+jj)[1].split())).split(' ')[0])
-                
-            elif li.startswith("GLF0_"+jj):
+                glph = np.float64((" ".join(blockglph.split("GLPH_" + jj)[1].split())).split(' ')[0])
+
+            elif li.startswith("GLF0_" + jj):
                 blockglf0 = line
-                glf0 = np.float64((" ".join(blockglf0.split("GLF0_"+jj)[1].split())).split(' ')[0])
+                glf0 = np.float64((" ".join(blockglf0.split("GLF0_" + jj)[1].split())).split(' ')[0])
 
-            elif li.startswith("GLF1_"+jj):
+            elif li.startswith("GLF1_" + jj):
                 blockglf1 = line
-                glf1 = np.float64((" ".join(blockglf1.split("GLF1_"+jj)[1].split())).split(' ')[0])
+                glf1 = np.float64((" ".join(blockglf1.split("GLF1_" + jj)[1].split())).split(' ')[0])
 
-            elif li.startswith("GLF2_"+jj):
+            elif li.startswith("GLF2_" + jj):
                 blockglf2 = line
-                glf2 = np.float64((" ".join(blockglf2.split("GLF2_"+jj)[1].split())).split(' ')[0])
+                glf2 = np.float64((" ".join(blockglf2.split("GLF2_" + jj)[1].split())).split(' ')[0])
 
-            elif li.startswith("GLF0D_"+jj):
+            elif li.startswith("GLF0D_" + jj):
                 blockglf0d = line
-                glf0d = np.float64((" ".join(blockglf0d.split("GLF0D_"+jj)[1].split())).split(' ')[0])
+                glf0d = np.float64((" ".join(blockglf0d.split("GLF0D_" + jj)[1].split())).split(' ')[0])
 
-            elif li.startswith("GLTD_"+jj):
+            elif li.startswith("GLTD_" + jj):
                 blockgltd = line
-                gltd = np.float64((" ".join(blockgltd.split("GLTD_"+jj)[1].split())).split(' ')[0])
+                gltd = np.float64((" ".join(blockgltd.split("GLTD_" + jj)[1].split())).split(' ')[0])
 
             # Setting to 0 glitch parameters that are not mandatory, and are not in the glitch model in the .par file
             if not blockglf1:
@@ -230,16 +222,16 @@ def readTimMod(timMod):
                 glf0d = 0
 
             if not blockgltd:
-                gltd = 1 # to avoid a devide by 0
+                gltd = 1  # to avoid a devide by 0
 
-        timModParam["GLEP_"+jj] = glep
-        timModParam["GLPH_"+jj] = glph
-        timModParam["GLF0_"+jj] = glf0
-        timModParam["GLF1_"+jj] = glf1
-        timModParam["GLF2_"+jj] = glf2
-        timModParam["GLF0D_"+jj] = glf0d
-        timModParam["GLTD_"+jj] = gltd
-            
+        timModParam["GLEP_" + jj] = glep
+        timModParam["GLPH_" + jj] = glph
+        timModParam["GLF0_" + jj] = glf0
+        timModParam["GLF1_" + jj] = glf1
+        timModParam["GLF2_" + jj] = glf2
+        timModParam["GLF0D_" + jj] = glf0d
+        timModParam["GLTD_" + jj] = gltd
+
     data_file.seek(0)
 
     #######################################################
@@ -248,7 +240,7 @@ def readTimMod(timMod):
     waveHarms = np.array([])
     for line in data_file:
         # Stripping lines vertically to create a list of characters
-        li=line.lstrip()
+        li = line.lstrip()
         # Wave parameters
         if li.startswith("WAVE"):
             waveHarms = np.append(waveHarms, line.split('WAVE')[1].split(' ')[0])
@@ -257,50 +249,50 @@ def readTimMod(timMod):
     # If waves exist in the .par file, we first read the epoch and frequency
     if waveHarms.size:
         for line in data_file:
-            li=line.lstrip()
+            li = line.lstrip()
             # Wave parameters
             if li.startswith("WAVEEPOCH "):
                 waveEpoch = np.float64((" ".join(line.split("WAVEEPOCH ")[1].split())).split(' ')[0])
-                
+
             elif li.startswith("WAVE_OM "):
                 waveFreq = np.float64((" ".join(line.split("WAVE_OM ")[1].split())).split(' ')[0])
 
         timModParam["WAVEEPOCH"] = waveEpoch
         timModParam["WAVE_OM"] = waveFreq
-                
-        # Now we loop through the rest of the wave parameters, i.e., the harmonics
-        for jj in range (1, len(waveHarms)-1):
-            data_file.seek(0)
-        
-            for line in data_file:
-                li=line.lstrip()
-                # Wave parameters
-                if li.startswith(("WAVE"+str(jj)+" ","WAVE"+str(jj)+"\t")):
-                    waveHarmA = np.float64((" ".join(line.split("WAVE"+str(jj))[1].split())).split(' ')[0])
-                    waveHarmB = np.float64((" ".join(line.split("WAVE"+str(jj))[1].split())).split(' ')[1])
-                    waveHarmAmp = {"A" : waveHarmA, "B" : waveHarmB}
-                    timModParam["WAVE"+str(jj)] = waveHarmAmp
 
+        # Now we loop through the rest of the wave parameters, i.e., the harmonics
+        for jj in range(1, len(waveHarms) - 1):
+            data_file.seek(0)
+
+            for line in data_file:
+                li = line.lstrip()
+                # Wave parameters
+                if li.startswith(("WAVE" + str(jj) + " ", "WAVE" + str(jj) + "\t")):
+                    waveHarmA = np.float64((" ".join(line.split("WAVE" + str(jj))[1].split())).split(' ')[0])
+                    waveHarmB = np.float64((" ".join(line.split("WAVE" + str(jj))[1].split())).split(' ')[1])
+                    waveHarmAmp = {"A": waveHarmA, "B": waveHarmB}
+                    timModParam["WAVE" + str(jj)] = waveHarmAmp
 
     # Returning timing model parameters
     # Reminder that this scripts reads in taylor series expansion up to F12 (beyond which you start losing accuracy),
-                    # glitch parameters for any number of glitches, and wave parameters for timing noise
-                    # Things that are not read in and not taken into account are IFUNC, binary modulation, proper motion, parallax, 
-                    # Non-relativistic binary modulation, proper motion, parallax, and (especially) IFUNC might be added in later versions
-    return timModParam    
-            
-################
-## End Script ##
-################
+    # glitch parameters for any number of glitches, and wave parameters for timing noise
+    # Things that are not read in and not taken into account are IFUNC, binary modulation, proper motion, parallax,
+    # Non-relativistic binary modulation, proper motion, parallax, and (especially) IFUNC might be added in later versions
+    return timModParam
+
+
+##############
+# End Script #
+##############
 
 if __name__ == '__main__':
+    ###########################
+    # Parsing input arguments #
+    ###########################
 
-    #############################
-    ## Parsing input arguments ##
-    #############################
-    
-    parser = argparse.ArgumentParser(description="Simple script to read in a .par timing model (compatible with TEMPO2)")
-    parser.add_argument("timMod", help="Timing model in text format. A tempo2 .par file should work.",type=str)
+    parser = argparse.ArgumentParser(
+        description="Simple script to read in a .par timing model (compatible with TEMPO2)")
+    parser.add_argument("timMod", help="Timing model in text format. A tempo2 .par file should work.", type=str)
     args = parser.parse_args()
 
     readTimMod(args.timMod)

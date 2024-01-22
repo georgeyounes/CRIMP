@@ -1,0 +1,42 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "crimp"
+version = "0.0.1"
+dependencies = [
+  "lmfit",
+  "plotly",
+]
+requires-python = ">=3.8"
+authors = [
+  {name = "George Younes", email = "george.a.younes@nasa.gov"},
+]
+maintainers = [
+  {name = "George Younes", email = "george.a.younes@nasa.gov"}
+]
+description = "Code for Rotational analysis of Isolated Magnetars and Pulsars"
+readme = "README.md"
+license = {file = "LICENSE.txt"}
+keywords = ["pulsar", "magnetar", "timing", "toa", "pulse"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Programming Language :: Python"
+]
+
+#[project.urls]
+#Homepage = "https://example.com"
+#Documentation = "https://readthedocs.org"
+#Repository = "https://github.com/me/spam.git"
+#"Bug Tracker" = "https://github.com/me/spam/issues"
+#Changelog = "https://github.com/me/spam/blob/master/CHANGELOG.md"
+
+[project.scripts]
+createTimeIntervalsForToAs = "src.crtTimeIntForToAs:main"
+createPulseProfile = "src.pulseProfileOps:main"
+buildToAs = "src.measToAs:main"
+diagnoseToAs = "src.diagnoseToAs:main"
+
+[project.entry-points."spam.magical"]
+tomatoes = "spam:main_tomatoes"

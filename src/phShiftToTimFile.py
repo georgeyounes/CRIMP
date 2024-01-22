@@ -14,65 +14,61 @@
 # outputs:
 # 1- .tim file as pandas table
 ####################################################################
+import argparse
 
 import numpy as np
-import matplotlib.pyplot as plt
-import sys
-import time
 import pandas as pd
 
 # Custom scripts
 from ephemeridesAtTmjd import ephemeridesAtTmjd
+
 
 ######################################################################################
 # Script that converts phaseShift .txt file to .tim file compatible with Tempo2/PINT #
 ######################################################################################
 
 def phShiftToTimFile(ToAs, timMod, timFile='residuals', tempModPP='ppTemplateMod', flag='Xray'):
-
     df_phShs = pd.read_csv(ToAs, sep='\s+', comment='#')
     tToA_MJD = df_phShs['ToA_mid'].to_numpy()
-    dph = df_phShs['phShift'].to_numpy() / (2*np.pi)
-    dph_err = np.hypot(df_phShs['phShift_LL'].to_numpy()/(2*np.pi),df_phShs['phShift_UL'].to_numpy()/(2*np.pi))/np.sqrt(2) # converting to cycles
+    dph = df_phShs['phShift'].to_numpy() / (2 * np.pi)
+    dph_err = np.hypot(df_phShs['phShift_LL'].to_numpy() / (2 * np.pi),
+                       df_phShs['phShift_UL'].to_numpy() / (2 * np.pi)) / np.sqrt(2)  # converting to cycles
 
     # Initializing some parameters
     nbrToAs = len(tToA_MJD)
-    ToAsTim = np.zeros(nbrToAs)
-    ToAsTim_err_mus = np.zeros(nbrToAs)
+
+    # Writing .tim file
+    freqInst = 700  # X-rays
+    f = open(timFile + '.tim', "w+")
+    f.write('FORMAT 1\n')
 
     for ii in range(nbrToAs):
         ephemerides = ephemeridesAtTmjd(tToA_MJD[ii], timMod)
-
         ephemerides_intRot = ephemeridesAtTmjd(ephemerides["Tmjd_intRotation"], timMod)
 
         # Time corresponding to phase shift 
-        deltaT = dph[ii]*(1/ephemerides_intRot["freqAtTmjd"])
-        deltaT_err = dph_err[ii]*(1/ephemerides_intRot["freqAtTmjd"])
+        deltaT = dph[ii] * (1 / ephemerides_intRot["freqAtTmjd"])
+        deltaT_err = dph_err[ii] * (1 / ephemerides_intRot["freqAtTmjd"])
 
-        ToAsTim[ii] = ephemerides["Tmjd_intRotation"] + deltaT/86400
-        ToAsTim_err_mus[ii] = deltaT_err*1.0e6
+        ToATim = ephemerides["Tmjd_intRotation"] + deltaT / 86400
+        ToATim_err_mus = deltaT_err * 1.0e6
 
-    # Writing .tim file
-    freqInst = 700 # X-rays
-    f= open(timFile+'.tim',"w+")
-    f.write('FORMAT 1\n')
-
-    for ll in range(0, nbrToAs):
-        f.write(' ' + tempModPP + ' ' + str(freqInst) + ' ' + str(round(ToAsTim[ll],12)) + ' ' + str(round(ToAsTim_err_mus[ll],5)) + ' @ ' + str('-flag') + ' ' + flag + '\n')
+        f.write(' {0} {1} {2} {3} @ {4} {5}\n'.format(tempModPP, str(freqInst), str(round(ToATim, 12)),
+                                                      str(round(ToATim_err_mus, 5)), str('-flag'), flag))
 
     f.close()
 
     # Pandas table of .tim file
-    ToAsTim = pd.read_csv(timFile+'.tim', sep='\s+', comment='#', skiprows=1, header=None)
-    
-    return ToAsTim
+    ToAs_Tim = pd.read_csv(timFile + '.tim', sep='\s+', comment='#', skiprows=1, header=None)
+
+    return ToAs_Tim
+
 
 #################
 # End of script #
 #################
-    
-if __name__ == '__main__':
 
+if __name__ == '__main__':
     ############################
     # Parsing input parameters #
     ############################
@@ -80,9 +76,12 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Fold phases to create a pulse profile")
     parser.add_argument("ToAs", help=".txt file of phase shifts created with measToAs.py, e.g., ToAs.txt", type=str)
     parser.add_argument("timMod", help="Timing model in text format. A tempo2 .par file should work.", type=str)
-    parser.add_argument("-tf","--timfile", help="output .tim file, default = residuals(.tim)", type=str, default="residuals")
-    parser.add_argument("-tp", "--tempModPP", help="Name of best-fit template model used to measure ToAs, default = ppTemplateMod", type=str, default='ppTemplateMod')
-    parser.add_argument("-fg","--flag", help="Flag in the .timFile, default = Xray", type=str, default='Xray')
+    parser.add_argument("-tf", "--timfile", help="output .tim file, default = residuals(.tim)", type=str,
+                        default="residuals")
+    parser.add_argument("-tp", "--tempModPP",
+                        help="Name of best-fit template model used to measure ToAs, default = ppTemplateMod", type=str,
+                        default='ppTemplateMod')
+    parser.add_argument("-fg", "--flag", help="Flag in the .timFile, default = Xray", type=str, default='Xray')
     args = parser.parse_args()
 
     phShiftToTimFile(args.ToAs, args.timMod, args.timfile, args.tempModPP, args.flag)
