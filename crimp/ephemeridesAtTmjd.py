@@ -25,8 +25,8 @@ from math import factorial
 import logging
 
 # Custom modules
-from readTimMod import readTimMod
-from calcPhase import calcPhase
+from crimp import readTimMod
+from crimp import calcPhase
 
 sys.dont_write_bytecode = True
 

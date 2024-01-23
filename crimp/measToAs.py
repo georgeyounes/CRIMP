@@ -50,14 +50,14 @@ from scipy.stats import chi2
 from lmfit import Parameters, minimize
 
 # Custom modules
-from evtFileOps import EvtFileOps
-from calcPhase import calcPhase
-from foldPhases import foldPhases
-from readPPTemp import readPPTemp
-from templateModels import fourSeries, logLikelihoodFSNormalized
-from ephemeridesAtTmjd import ephemeridesAtTmjd
-from periodSearch import PeriodSearch
-from phShiftToTimFile import phShiftToTimFile
+from crimp import EvtFileOps
+from crimp import calcPhase
+from crimp import foldPhases
+from crimp import readPPTemp
+from crimp.templateModels import fourSeries, logLikelihoodFSNormalized
+from crimp.ephemeridesAtTmjd import ephemeridesAtTmjd
+from crimp.periodSearch import PeriodSearch
+from crimp import phShiftToTimFile
 
 sys.dont_write_bytecode = True
 

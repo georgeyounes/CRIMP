@@ -1,0 +1,5 @@
+[console_scripts]
+buildToAs = crimp.measToAs:main
+createPulseProfile = crimp.pulseProfileOps:main
+createTimeIntervalsForToAs = crimp.crtTimeIntForToAs:main
+diagnoseToAs = crimp.diagnoseToAs:main

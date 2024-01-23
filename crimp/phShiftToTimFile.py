@@ -20,7 +20,7 @@ import numpy as np
 import pandas as pd
 
 # Custom scripts
-from ephemeridesAtTmjd import ephemeridesAtTmjd
+from crimp import ephemeridesAtTmjd
 
 
 ######################################################################################

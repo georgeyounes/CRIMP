@@ -15,7 +15,7 @@ from astropy.table import Table, Column
 from astropy.io import fits
 
 # Custom modules
-from calcPhase import calcPhase
+from crimp import calcPhase
 
 sys.dont_write_bytecode = True
 

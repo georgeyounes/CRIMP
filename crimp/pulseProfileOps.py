@@ -58,11 +58,11 @@ import copy
 from lmfit import Parameters, minimize
 
 # Custom modules
-from evtFileOps import EvtFileOps
-from calcPhase import calcPhase
-from readPPTemp import readPPTemp
-from templateModels import fourSeries, logLikelihoodFS, wrapCauchy, logLikelihoodCA, vonmises, logLikelihoodVM
-from foldPhases import foldPhases
+from crimp.evtFileOps import EvtFileOps
+from crimp.calcPhase import calcPhase
+from crimp.readPPTemp import readPPTemp
+from crimp.templateModels import fourSeries, logLikelihoodFS, wrapCauchy, logLikelihoodCA, vonmises, logLikelihoodVM
+from crimp.foldPhases import foldPhases
 
 sys.dont_write_bytecode = True
 

@@ -58,12 +58,12 @@ import warnings
 import numpy as np
 
 # Custom modules
-from evtFileOps import EvtFileOps
+from crimp import EvtFileOps
 
 
-###################################################################
-## Script that creates time intervals to use for ToA calculation ##
-###################################################################
+#################################################################
+# Script that creates time intervals to use for ToA calculation #
+#################################################################
 
 def timeIntForToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.5, eneHigh=10):
     """

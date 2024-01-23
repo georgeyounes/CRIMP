@@ -14,7 +14,7 @@ import numpy as np
 from math import factorial
 
 # Custom modules
-from readTimMod import readTimMod
+from crimp import readTimMod
 
 sys.dont_write_bytecode = True
 

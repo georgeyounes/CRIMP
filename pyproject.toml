@@ -1,6 +1,6 @@
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "crimp"
@@ -33,10 +33,7 @@ classifiers = [
 #Changelog = "https://github.com/me/spam/blob/master/CHANGELOG.md"
 
 [project.scripts]
-createTimeIntervalsForToAs = "src.crtTimeIntForToAs:main"
-createPulseProfile = "src.pulseProfileOps:main"
-buildToAs = "src.measToAs:main"
-diagnoseToAs = "src.diagnoseToAs:main"
-
-[project.entry-points."spam.magical"]
-tomatoes = "spam:main_tomatoes"
+createTimeIntervalsForToAs = "crimp.crtTimeIntForToAs:main"
+createPulseProfile = "crimp.pulseProfileOps:main"
+buildToAs = "crimp.measToAs:main"
+diagnoseToAs = "crimp.diagnoseToAs:main"
