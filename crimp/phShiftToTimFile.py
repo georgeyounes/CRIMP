@@ -20,7 +20,7 @@ import numpy as np
 import pandas as pd
 
 # Custom scripts
-from crimp import ephemeridesAtTmjd
+from crimp.ephemIntRotation import ephemIntRotation
 
 
 ######################################################################################
@@ -43,14 +43,15 @@ def phShiftToTimFile(ToAs, timMod, timFile='residuals', tempModPP='ppTemplateMod
     f.write('FORMAT 1\n')
 
     for ii in range(nbrToAs):
-        ephemerides = ephemeridesAtTmjd(tToA_MJD[ii], timMod)
-        ephemerides_intRot = ephemeridesAtTmjd(ephemerides["Tmjd_intRotation"], timMod)
+        ephemerides_intRot = ephemIntRotation(tToA_MJD[ii], timMod)
+
+        # {'Tmjd_intRotation': Tmjd_intRotation, 'freq_intRotation': freq_intRotation,
 
         # Time corresponding to phase shift 
-        deltaT = dph[ii] * (1 / ephemerides_intRot["freqAtTmjd"])
-        deltaT_err = dph_err[ii] * (1 / ephemerides_intRot["freqAtTmjd"])
+        deltaT = dph[ii] * (1 / ephemerides_intRot["freq_intRotation"])
+        deltaT_err = dph_err[ii] * (1 / ephemerides_intRot["freq_intRotation"])
 
-        ToATim = ephemerides["Tmjd_intRotation"] + deltaT / 86400
+        ToATim = ephemerides_intRot["Tmjd_intRotation"] + deltaT / 86400
         ToATim_err_mus = deltaT_err * 1.0e6
 
         f.write(' {0} {1} {2} {3} @ {4} {5}\n'.format(tempModPP, str(freqInst), str(round(ToATim, 12)),

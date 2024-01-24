@@ -46,7 +46,7 @@ class PeriodSearch:
         n = len(self.time)
         Z2nHarm = np.zeros(self.nbrHarm)
         for jj in range(len(self.freq)):
-            for kk in range(len(self.nbrHarm)):
+            for kk in range(0, self.nbrHarm):
                 Z2nHarm[kk] = ((np.sum(np.cos(2 * (kk + 1) * np.pi * self.freq[jj] * self.time))) ** 2 +
                                (np.sum(np.sin(2 * (kk + 1) * np.pi * self.freq[jj] * self.time))) ** 2) * (2.0 / n)
             Z2nHarm.cumsum()

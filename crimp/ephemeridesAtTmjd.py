@@ -25,15 +25,10 @@ from math import factorial
 import logging
 
 # Custom modules
-from crimp import readTimMod
-from crimp import calcPhase
+from crimp.readTimMod import readTimMod
 
 sys.dont_write_bytecode = True
 
-
-##########################################################################
-# Function that creates a light curve given a time column and a GTI list #
-##########################################################################
 
 def ephemeridesAtTmjd(Tmjd, timMod, loglevel='warning'):
     timModParam = readTimMod(timMod)
@@ -48,7 +43,7 @@ def ephemeridesAtTmjd(Tmjd, timMod, loglevel='warning'):
     ##################################
     # Taking into account the glitches
     nbrGlitches = len([gg for glKey, gg in timModParam.items() if glKey.startswith('GLEP_')])
-    freqAtTmjd_gl_all = 0  # initializing the jump in frequency due to all glitches combined
+    freqAtTmjd_gl = 0  # initializing the jump in frequency due to all glitches combined
 
     for jj in range(1, nbrGlitches + 1):
         glep = timModParam["GLEP_" + str(jj)]
@@ -64,50 +59,16 @@ def ephemeridesAtTmjd(Tmjd, timMod, loglevel='warning'):
             gltd = timModParam["GLTD_" + str(jj)]
             # Here we calculate frequency shift according to each glitch model for all time column,
             # then we multiply by 0 if times are < glep and 1 if times are > glep using the boolean list created above
-            freq_gl = (glf0 + (glf1 * ((Tmjd - glep) * 86400)) + (0.5 * glf2 * ((Tmjd - glep) * 86400) ** 2) +
-                       (glf0d * np.exp(-((Tmjd - glep) * 86400) / (gltd * 86400)))) * timesAfterGlitch
-
-            freqAtTmjd_gl_all += freq_gl
+            freqAtTmjd_gl += (glf0 + (glf1 * ((Tmjd - glep) * 86400)) + (0.5 * glf2 * ((Tmjd - glep) * 86400) ** 2) +
+                              (glf0d * np.exp(-((Tmjd - glep) * 86400) / (gltd * 86400)))) * timesAfterGlitch
 
     ######################################
     # Adding all frequency-shifts together
-    freqAtTmjd = freqAtTmjd_te + freqAtTmjd_gl_all
-
-    #############################################################
-    # Phases that correspond to Tmjd according to timing model
-    phAtTmjd, _ = calcPhase(Tmjd, timMod)
-
-    #################################################################################
-    # Deriving the closest MJD and spin frequency with an integer number of rotations
-    phAtTmjd_Frac = phAtTmjd % 1
-    FracTFromIntRotation = ((1 - phAtTmjd_Frac) / freqAtTmjd) / 86400
-
-    Tmjd_intRotation = Tmjd + FracTFromIntRotation
+    freqAtTmjd = freqAtTmjd_te + freqAtTmjd_gl
 
     logging.basicConfig(level=loglevel.upper())
-    logging.info(
-        ' Freq at Tmjd {} = {}\n Phase at Tmjd = {}\n Closest MJD with integer number of rotations is {}'.format(Tmjd,
-                                                                                                                 freqAtTmjd,
-                                                                                                                 phAtTmjd,
-                                                                                                                 Tmjd_intRotation))
+    logging.info(' Freq at Tmjd {} = {}'.format(Tmjd, freqAtTmjd, ))
 
-    ephemerides = {'Tmjd': Tmjd, 'freqAtTmjd': freqAtTmjd, 'phAtTmjd': phAtTmjd, 'Tmjd_intRotation': Tmjd_intRotation}
+    ephemerides = {'Tmjd': Tmjd, 'freqAtTmjd': freqAtTmjd}
 
     return ephemerides
-
-
-######################################
-######################################
-######################################
-if __name__ == '__main__':
-    ############################
-    # Parsing input parameters #
-    ############################
-
-    parser = argparse.ArgumentParser(description="Fold phases to create a pulse profile")
-    parser.add_argument("tMJD", help="Time in MJD at which to derive frequency and rotational phase", type=float)
-    parser.add_argument("timMod", help="Timing model in text format. A tempo2 .par file should work.", type=str)
-    parser.add_argument('-ll', '--loglevel', help='Provide logging level. default, default=warning', default='warning')
-    args = parser.parse_args()
-
-    ephemeridesAtTmjd(args.tMJD, args.timMod, args.loglevel)

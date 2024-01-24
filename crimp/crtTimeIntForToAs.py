@@ -58,7 +58,7 @@ import warnings
 import numpy as np
 
 # Custom modules
-from crimp import EvtFileOps
+from crimp.evtFileOps import EvtFileOps
 
 
 #################################################################

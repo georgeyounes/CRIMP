@@ -14,8 +14,9 @@ import numpy as np
 from math import factorial
 
 # Custom modules
-from crimp import readTimMod
+from crimp.readTimMod import readTimMod
 
+from crimp.ephemeridesAtTmjd import ephemeridesAtTmjd
 sys.dont_write_bytecode = True
 
 
@@ -58,7 +59,7 @@ class Phases:
         """
         self.timeMJD = timeMJD
         self.timMod = timMod
-        self.timModParam = readTimMod(self.timMod)
+        self.timModParam = readTimMod(timMod)
 
     def taylorExpansion(self):
         """
@@ -125,9 +126,14 @@ class Phases:
             waveFreq = self.timModParam["WAVE_OM"]
 
             for jj in range(1, len(nbrWaves) - 1):
-                phases_waves_all += ((self.timModParam["WAVE" + str(jj)]["A"] * np.sin(jj * waveFreq * (self.timeMJD - waveEpoch))) +
-                                     (self.timModParam["WAVE" + str(jj)]["B"] * np.cos(jj * waveFreq * (self.timeMJD - waveEpoch))))
-        return phases_waves_all
+                phases_waves_all += ((self.timModParam["WAVE" + str(jj)]["A"] * np.sin(
+                    jj * waveFreq * (self.timeMJD - waveEpoch))) +
+                                     (self.timModParam["WAVE" + str(jj)]["B"] * np.cos(
+                                         jj * waveFreq * (self.timeMJD - waveEpoch))))
+
+        # Normalizing by frequency to create residuals in seconds per tempo2
+        freqAtTmjd = ephemeridesAtTmjd(self.timeMJD, self.timMod)["freqAtTmjd"]
+        return np.multiply(phases_waves_all, freqAtTmjd)
 
 
 def calcPhase(timeMJD, timMod):

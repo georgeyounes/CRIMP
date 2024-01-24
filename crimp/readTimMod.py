@@ -8,7 +8,6 @@
 ####################################################################################
 
 import sys
-import argparse
 import numpy as np
 
 sys.dont_write_bytecode = True
@@ -279,20 +278,3 @@ def readTimMod(timMod):
     # Things that are not read in and not taken into account are IFUNC, binary modulation, proper motion, parallax,
     # Non-relativistic binary modulation, proper motion, parallax, and (especially) IFUNC might be added in later versions
     return timModParam
-
-
-##############
-# End Script #
-##############
-
-if __name__ == '__main__':
-    ###########################
-    # Parsing input arguments #
-    ###########################
-
-    parser = argparse.ArgumentParser(
-        description="Simple script to read in a .par timing model (compatible with TEMPO2)")
-    parser.add_argument("timMod", help="Timing model in text format. A tempo2 .par file should work.", type=str)
-    args = parser.parse_args()
-
-    readTimMod(args.timMod)

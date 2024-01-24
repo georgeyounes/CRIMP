@@ -50,14 +50,14 @@ from scipy.stats import chi2
 from lmfit import Parameters, minimize
 
 # Custom modules
-from crimp import EvtFileOps
-from crimp import calcPhase
-from crimp import foldPhases
-from crimp import readPPTemp
+from crimp.evtFileOps import EvtFileOps
+from crimp.calcPhase import calcPhase
+from crimp.foldPhases import foldPhases
+from crimp.readPPTemp import readPPTemp
 from crimp.templateModels import fourSeries, logLikelihoodFSNormalized
 from crimp.ephemeridesAtTmjd import ephemeridesAtTmjd
 from crimp.periodSearch import PeriodSearch
-from crimp import phShiftToTimFile
+from crimp.phShiftToTimFile import phShiftToTimFile
 
 sys.dont_write_bytecode = True
 
@@ -208,7 +208,7 @@ def measToA_fourier(BFtempModPP, cycleFoldedPhases, exposureInt, outFile='', phS
     for kk in range(1, nbrComp + 1):  # Adding the amplitudes and phases of the harmonics, they are fixed
         initTempModPPparam.add('amp_' + str(kk), BFtempModPP['amp_' + str(kk)], vary=False)
         initTempModPPparam.add('ph_' + str(kk), BFtempModPP['ph_' + str(kk)], vary=False)
-    initTempModPPparam.add('phShift', 0, vary=True)  # Phase shift - parameter of interest
+    initTempModPPparam.add('phShift', 0, vary=True, min=-np.pi, max=np.pi)  # Phase shift - parameter of interest
     initTempModPPparam.add('ampShift', 1, vary=False)
     # Running the extended maximum likelihood
     nll = lambda *args: -logLikelihoodFSNormalized(*args)  # Needs to be done on a normalized function
@@ -219,11 +219,11 @@ def measToA_fourier(BFtempModPP, cycleFoldedPhases, exposureInt, outFile='', phS
         # We still first fit with fourier amplitudes fixed to 1, this serves to derive a good first guess
         initTempModPPparam.add('ampShift', 1, min=0.0, max=np.inf, vary=True)
         initTempModPPparam.add('phShift', results_mle_FSNormalized.params.valuesdict()['phShift'],
-                               vary=True)  # Phase shift - set to best fit value from above
-        initTempModPPparam.add('norm', results_mle_FSNormalized.params.valuesdict()['norm'], min=0.0, max=1000.,
+                               vary=True, min=-1.5*np.pi, max=1.5*np.pi)  # Phase shift - set to best fit value from above
+        initTempModPPparam.add('norm', results_mle_FSNormalized.params.valuesdict()['norm'], min=0.0, max=1000.0,
                                vary=True)  # normalization - set to best fit value from above
         results_mle_FSNormalized = minimize(nll, initTempModPPparam, args=(cycleFoldedPhases, exposureInt),
-                                            method='nelder', max_nfev=1.0e4, nan_policy='propagate')
+                                            method='nelder', max_nfev=1.0e3, nan_policy='propagate')
 
     phShiBF = results_mle_FSNormalized.params.valuesdict()['phShift']  # Best fit phase shift
     LLmax = -results_mle_FSNormalized.residual  # the - sign is to flip the likelihood - no reason for it, just personal choice
