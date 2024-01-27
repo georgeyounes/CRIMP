@@ -2,7 +2,7 @@
 # This code calculates ToAs a la Ray et al. 2018. It takes a barycentered
 # corrected event file, a timing model (.par file), a template model (.txt file,
 # e.g., from pulseProfileOps.py), and a .txt file defining the ToAs (e.g., ToAs
-# start and end times - could be built with crtTimeIntForToAs.py). The user could
+# start and end times - could be built with buildTimeIntToAs.py). The user could
 # apply an energy filtering to the event file through eneLow and eneHigh.
 # A subset of ToAs could be measured if desired through 'toaStart' and/or 'toaEnd'
 # Most of the calculations are in fact done in the template-appropriate functions,
@@ -21,7 +21,7 @@
 # 1- evtFile : barycenter-corrected event file (could be merged along TIME *and* GTIs)
 # 2- timMod : *.par timing model (TEMPO2 format is okay)
 # 3- tempModPP : *.txt file of the tempolate pulse profile (could be biult with pulseProfileOps.py)
-# 4- toagtifile : *.txt file with ToA properties (could be built with crtTimeIntForToAs.py)
+# 4- toagtifile : *.txt file with ToA properties (could be built with buildTimeIntToAs.py)
 # 5 eneLow : low energy limit (in keV)
 # 6 eneHigh : high energy limit (in keV)
 # 7 toaStart : Number of ToA to start from (based on ToAs from toagtifile)
@@ -409,7 +409,7 @@ def main():
     parser.add_argument("tempModPP", help="Parameters of template pulse profile (e.g., built with pulseProfileOps.py)",
                         type=str)
     parser.add_argument("toagtifile",
-                        help="User supplied .txt file with ToA interval information (built with crtTimeIntForToAs.py)",
+                        help="User supplied .txt file with ToA interval information (built with buildTimeIntToAs.py)",
                         type=str)
     parser.add_argument("-el", "--eneLow", help="Low energy filter in event file, default=0.5", type=float, default=0.5)
     parser.add_argument("-eh", "--eneHigh", help="High energy filter in event file, default=10", type=float, default=10)

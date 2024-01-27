@@ -2,10 +2,8 @@
 # calcPhase.py is a module that calculates phases of an array of TIME (MJD) instances
 # using a .par file. It reads the .par file with the readTimMod scripts. As a reminder,
 # this script can manage glitches, wave functions and the frequency and its derivatives
-# up to F12; it does not accomodate IFUNC, binary systems, proper motion, or parallax.
+# up to F12; it does not accomodate IFUNC, proper motion, binary systems, or parallax.
 # These will be implemented in future versions, likely in that respective order
-#
-# Make this into a class
 ####################################################################################
 
 import sys
@@ -20,11 +18,7 @@ from crimp.ephemeridesAtTmjd import ephemeridesAtTmjd
 sys.dont_write_bytecode = True
 
 
-##############################################################################################
-# Script that calculates pulsar rotational phases using a time array and a .par timing model #
-##############################################################################################
-
-
+# Script that calculates pulsar rotational phases using a time array and a .par timing model
 class Phases:
     """
         A class to calcualte the phases of a time array
@@ -63,7 +57,8 @@ class Phases:
 
     def taylorExpansion(self):
         """
-        Method to calculate phases from the spin parameters, i.e., taylor expansion of the phase evolution
+        Calculates phases from the taylor expansion of the phase evolution
+
         :return: phases_te
         :rtype: float
         """
@@ -77,7 +72,8 @@ class Phases:
 
     def glitches(self):
         """
-        Method to calculate phases from glitches in spin evolution
+        Calculates phases from glitches in spin evolution
+
         :return: phases_gl_all
         :rtype: float
         """
@@ -114,7 +110,8 @@ class Phases:
 
     def waves(self):
         """
-        Method to calculate phases from "waves", which is used to whiten noise and align ToAs
+        Calculates phases from "waves", used to whiten noise and align ToAs
+
         :return: phases_waves_all
         :rtype: float
         """
@@ -131,7 +128,7 @@ class Phases:
                                      (self.timModParam["WAVE" + str(jj)]["B"] * np.cos(
                                          jj * waveFreq * (self.timeMJD - waveEpoch))))
 
-        # Normalizing by frequency to create residuals in seconds per tempo2
+        # Normalizing by frequency to create residuals in seconds (per tempo2)
         freqAtTmjd = ephemeridesAtTmjd(self.timeMJD, self.timMod)["freqAtTmjd"]
         return np.multiply(phases_waves_all, freqAtTmjd)
 
@@ -139,12 +136,13 @@ class Phases:
 def calcPhase(timeMJD, timMod):
     """
     Function that adds all above phase calculations
-    :param timeMJD: array of times
+
+    :param timeMJD: time array in modified julian day
     :type timeMJD: float
-    :param timMod: timing model, .par file
+    :param timMod: timing model, i.e., .par file
     :type timMod: str
     returns
-            - totalphases (float): phases (normalised by 2pi) \n
+            - totalphases (float): phases (normalised by 2pi)
             - cycleFoldedPhases (float): cycle folded phases [0,1)
     """
     phases = Phases(timeMJD, timMod)

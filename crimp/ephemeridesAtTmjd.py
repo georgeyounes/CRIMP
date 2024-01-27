@@ -1,28 +1,22 @@
 #################################################################
-# A simple script to derive the ephemerides (frequency and
-# rotational phase) at a given MJD based on a timing solution
-# For convenience it also provides the closest MJD that results
-# in an integer number of rotational phases according to the
-# timing solution. 
-# Reminder that currently this script deals with taylor
-# expansion of the rotation evolution, a random number of
-# glitches, and waves - binary motion is not included
+# A simple script to derive the ephemerides (only frequency at
+# the moment) at a given MJD based on a timing solution. Currently,
+# this script takes into account taylor expansion of the phase
+# evolution and a random number of glitches - binary motion is
+# not included
 # 
 # Input:
 # 1- Tmjd: time at which to derive frequency
-# 2- timeMod: timing model
-# 3- Logging
-# 
-# output:
-# 1- freqAtTmjd: Frequency at timeMJD
-# 2- phAtTmjd: Rotational phase at timeMJD (from reference epoch)
+# 2- timeMod: timing model (.par file)
+#
+# Return:
+# 1- ephemerides: dictionary of Tmjd and corresponding rotational
+# frequency
 #################################################################
 
-import argparse
 import sys
 import numpy as np
 from math import factorial
-import logging
 
 # Custom modules
 from crimp.readTimMod import readTimMod
@@ -30,7 +24,18 @@ from crimp.readTimMod import readTimMod
 sys.dont_write_bytecode = True
 
 
-def ephemeridesAtTmjd(Tmjd, timMod, loglevel='warning'):
+def ephemeridesAtTmjd(Tmjd, timMod):
+    """
+    Function that provides the spin frequency at the input MJD according
+    to a timing model (.par file)
+
+    :param Tmjd: time
+    :type Tmjd: float
+    :param timMod: .par file
+    :type timMod: str
+    :return: ephemerides
+    :rtype: dict
+    """
     timModParam = readTimMod(timMod)
     t0mjd = timModParam["PEPOCH"]
 
@@ -65,9 +70,6 @@ def ephemeridesAtTmjd(Tmjd, timMod, loglevel='warning'):
     ######################################
     # Adding all frequency-shifts together
     freqAtTmjd = freqAtTmjd_te + freqAtTmjd_gl
-
-    logging.basicConfig(level=loglevel.upper())
-    logging.info(' Freq at Tmjd {} = {}'.format(Tmjd, freqAtTmjd, ))
 
     ephemerides = {'Tmjd': Tmjd, 'freqAtTmjd': freqAtTmjd}
 

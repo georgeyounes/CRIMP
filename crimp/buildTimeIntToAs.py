@@ -1,6 +1,6 @@
 #############################################################
 # A code to create START and END times that will define each
-# TOA. It takes as input a barycenter-corrected event file,
+# TOA. It takes as input a (barycenter-corrected) event file,
 # the desired number of counts in each ToA (totCtsEachToA),
 # and a desired max waiting time between GTIs (waitTimeCutoff).
 # In essence, if the waiting time between two GTIs in an event
@@ -10,22 +10,24 @@
 # full monitoring program. The code also allows for an energy
 # filtering through the parameters enelow and enehigh.
 # 
-# The outputs are two text files: (1) timIntForBunchToAs.txt,
+# The outputs are two text files: (1) "outFile"_bunches.txt,
 # an intermediary file (that can be largely ignored), and (2)
-# a timIntToAs.txt file that summarizes the T_start and T_end 
+# a "outFile".txt file that summarizes the T_start and T_end
 # of each ToA_GTI, the length of the time_interval to
-# accumulate ~totCtsEachToA, the exact exposure of each ToA,
-# the total number of counts in each ToA, and the exact count
-# rate.
-#
+# accumulate totCtsEachToA, the exact exposure (livetime) of
+# each ToA, the total number of counts in each ToA, and the
+# exact count rate.
 # 
 # Input:
-# 1- evtFile: barycenter-corrected event file
-# 2- totCtsEachToA: desired number of counts in each ToA_GTI
+# 1- evtFile: event file (barycenter-corrected)
+# 2- totCtsEachToA: desired number of counts in each ToA_GTI (default = 1000)
 #                   (last bin within a valid time interval might not provide exactly totCtsEachToA)
-# 3- waitTimeCutoff: if gap in GTIs surpass this (in days), move to new ToA_GTI
-# 4- eneLow: low energy limit (in keV)
-# 5- eneHigh: high energy limit (in keV)
+# 3- waitTimeCutoff: GTI gap cutoff to start new ToA (in days, default = 1)
+# 4- eneLow: low energy limit (in keV, default = 0.5)
+# 5- eneHigh: high energy limit (in keV, default = 10)
+# 6- outputFile: name of output file (default = "timIntToAs")
+#
+# Return: None
 #
 # output:
 # 1- timIntForBunchToAs.txt: intermediate file for housekeeping
@@ -33,22 +35,22 @@
 #
 # Warning:
 # In the case of fragmented observations, say, hypothetically,
-# you have few tens of seconds of exposure every day for 2 weeks,
-# and if your "waitTimeCutoff" is >1 day, you may continuously
-# accumulate counts until you reach the desired "totCtsEachToA",
-# e.g., say 2 weeks (which also assumes low source count rate and/or
-# large number of desired counts to derive a ToA). This is because
-# "waitTimeCutoff" is based on GTI separation, and not "time-passed".
-# This might not be ideal for noisy pulsars, or when you are trying
-# to find glitches. This script does not deal with such monitoring
-# instances, simply since they are very rare (I have not encoutered
-# such a case). Yet, the "ToA_lenInt" column in the timIntToAs.txt
-# file will provide this information, and if the interval length for
-# the ToA is larger than your desired length, you could simply comment
-# it out with "#" or just delete it. If you can afford it, lowering
-# your "totCtsEachToA" might fix this problem. I have thought of a
-# few ways to deal with this, though none is ideal for various
-# reasons that I won't go into here.
+# you have few tens of seconds of exposure (livetime) on your
+# source every day for 2 weeks, if your "waitTimeCutoff" is >1 day,
+# you may continuously accumulate counts until you reach the desired
+# "totCtsEachToA", e.g., say 2 weeks (which also assumes low source
+# count rate and/or large number of desired counts to derive a ToA).
+# This is because "waitTimeCutoff" is based on GTI separation, and
+# not "time-passed". This might not be ideal for noisy pulsars,
+# or when you are trying to find glitches. This script does not deal
+# with such monitoring instances, simply since they are very rare
+# (I have not encoutered such a case). Yet, the "ToA_lenInt" column
+# in the timIntToAs.txt file will provide this information, and if
+# the interval length for the ToA is larger than your desired length,
+# you could simply comment it out with "#" or just delete it. If you
+# can afford it, lowering your "totCtsEachToA" might fix this problem.
+# I have thought of a few ways to deal with this, though none is ideal
+# for various reasons that I won't go into here.
 # Again, hopefully, you will never have to worry about this.
 #############################################################
 
@@ -61,23 +63,24 @@ import numpy as np
 from crimp.evtFileOps import EvtFileOps
 
 
-#################################################################
-# Script that creates time intervals to use for ToA calculation #
-#################################################################
+# Script that creates time intervals to use for ToA calculation
 
-def timeIntForToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.5, eneHigh=10):
+def timeIntToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.5, eneHigh=10, outputFile="timIntToAs"):
     """
+    Calculates START and END times that will define each TOA
 
     :param evtFile:
     :type evtFile: str
-    :param totCtsEachToA:
+    :param totCtsEachToA: default = 1000 (counts)
     :type totCtsEachToA: int
-    :param waitTimeCutoff:
+    :param waitTimeCutoff: default = 1 (day)
     :type waitTimeCutoff: float
-    :param eneLow:
+    :param eneLow: default = 0.5 (keV)
     :type eneLow: float
-    :param eneHigh:
+    :param eneHigh: default = 10 (keV)
     :type eneHigh: float
+    :param outputFile: default = "timIntToAs"
+    :type outputFile: str
     """
     # Reading data and filtering for energy
     #######################################
@@ -136,7 +139,7 @@ def timeIntForToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.5, 
         ToAs_timeInfo = np.vstack((ToAs_timeInfo, ToAs_timeInfo_tmp))
 
     # Writing above results to .txt file.
-    f = open("timIntForBunchToAs.txt", "w+")
+    f = open(outputFile + "_bunches.txt", "w+")
     nbrGTIs = np.shape(ToAs_timeInfo)[0]
 
     f.write('ToABunch_tstart \t ToABunch_tend \t ToABunch_exp \t ToABunch_lenInt\n')
@@ -148,7 +151,7 @@ def timeIntForToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.5, 
 
     # Utilizing the above to create final GTI .txt file that can be used to derive ToAs
     ###################################################################################
-    f = open("timIntToAs.txt", "w+")
+    f = open(outputFile + ".txt", "w+")
     f.write('ToA \t ToA_tstart \t ToA_tend \t ToA_lenInt \t ToA_exposure \t Events \t ct_rate\n')
 
     nbrToATOT = 0
@@ -253,10 +256,12 @@ def main():
                         type=float, default=0.5)
     parser.add_argument("-eh", "--eneHigh", help="High energy range for burst search (in keV units, default=10)",
                         type=float, default=10)
-
+    parser.add_argument("-of", "--outputFile",
+                        help="name of .txt output GTI file that defines ToAs (default = timIntToAs)", type=str,
+                        default='timIntToAs')
     args = parser.parse_args()
 
-    timeIntForToAs(args.evtFile, args.totCtsEachToA, args.waitTimeCutoff, args.eneLow, args.eneHigh)
+    timeIntToAs(args.evtFile, args.totCtsEachToA, args.waitTimeCutoff, args.eneLow, args.eneHigh, args.outputFile)
 
 
 if __name__ == '__main__':

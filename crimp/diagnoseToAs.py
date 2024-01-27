@@ -1,16 +1,20 @@
 ###############################################################################
-# A simple script to create plots of ToA properties, i.e., ToA interval length,
+# A simple script that creates plots of ToA properties, i.e., ToA interval length,
 # ToA exposure (livetime), number of counts, count rate, H-test power
 # (significance of pulse detection), recduced chi2 (how well the template fit
 # the data). These are plotted as a function of ToA number and ToA MJD.
-# Plots are created with plotly in simple interactive mode for ease of diagnostics.
+# Plots are created with plotly, as a html file, in simple interactive mode for
+# ease of visualization and diagnostics.
 #
 # Input:
-# 1- ToAs : a .txt table of ToA properties (as created with measToAs.py)
+# 1- ToAs : a .txt table of ToA properties (as built with measToAs.py)
 # 2- outputFile : name of output interactive html file (default = "ToADiagnosticsPlot".html)
 #
-# output:
-# ToAs : dictionary of ToAs properties
+# Return:
+# ToAsProp : dictionary of ToAs properties
+#
+# Output:
+# "ToADiagnosticsPlot".html : a plotly plot for easy visualization
 ################################################################################
 
 import sys
@@ -22,13 +26,18 @@ import pandas as pd
 sys.dont_write_bytecode = True
 
 
-################
-# Start Script #
-################
-
-##############################################################
 # Script to create a simple interactive plot of ToA properties
 def diagnoseToAs(ToAs, outputFile='ToADiagnosticsPlot'):
+    """
+    Crates an interactive html plot of ToA properties with plotly
+
+    :param ToAs: a .txt table of ToA properties (as built with measToAs.py)
+    :type ToAs: str
+    :param outputFile: name of output file (default = "ToADiagnosticsPlot")
+    :type outputFile: str
+    :return: ToAsProp - dictionary of ToAs properties
+    :rtype: pandas.DataFrame
+    """
     # ToA table as created with measToAs.py
     ToAsProp = pd.read_csv(ToAs, sep='\s+', comment='#')
 
@@ -89,10 +98,10 @@ def diagnoseToAs(ToAs, outputFile='ToADiagnosticsPlot'):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Script to measure ToAs from event file")
-    parser.add_argument("ToAs", help=".txt file of phase shifts created with measToAs.py, e.g., ToAs.txt", type=str)
+    parser = argparse.ArgumentParser(description="Script to create a diagnostic plot of ToAs")
+    parser.add_argument("ToAs", help="Text file of phase shifts as created with measToAs.py", type=str)
     parser.add_argument("-of", "--outputFile",
-                        help="name of output ToA diagnostics file (default = ToADiagnosticsPlot(.html))", type=str,
+                        help="Name of output ToA diagnostics file (default = ToADiagnosticsPlot(.html))", type=str,
                         default='ToADiagnosticsPlot')
     args = parser.parse_args()
 
