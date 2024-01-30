@@ -1,7 +1,7 @@
 ####################################################################################
 # pulseProfileOps.py is a module that essentially serves to create a template model
 # of a high S/N pulse profile. This template model is what is used as anchor to derive
-# phase-shifts, i.e., ToAs, from an events fits file (see measToAs.py).
+# phase-shifts, i.e., ToAs, from an events fits file (see measureToAs.py).
 # The module is composed of a class "PulseProfileFromEventFile" that runs on event files.
 # It has two methods, one to simply create a pulse profile of the event file given a
 # .par file, and the other to perform the fit. By default, the model is a Fourier series,
@@ -62,7 +62,7 @@ from crimp.evtFileOps import EvtFileOps
 from crimp.calcPhase import calcPhase
 from crimp.readPPTemp import readPPTemp
 from crimp.templateModels import fourSeries, logLikelihoodFS, wrapCauchy, logLikelihoodCA, vonmises, logLikelihoodVM
-from crimp.foldPhases import foldPhases
+from crimp.binPhases import binPhases
 
 sys.dont_write_bytecode = True
 
@@ -106,11 +106,11 @@ class PulseProfileFromEventFile:
 
         # Creating pulse profile from PHASE
         ###################################
-        foldedProfile = foldPhases(cycleFoldedPhases, self.nbrBins)
-        ppBins = foldedProfile["ppBins"]
-        ppBinsRange = foldedProfile["ppBinsRange"]
-        ctRate = foldedProfile["ctsBins"] / (LIVETIME / self.nbrBins)
-        ctRateErr = foldedProfile["ctsBinsErr"] / (LIVETIME / self.nbrBins)
+        binnedProfile = binPhases(cycleFoldedPhases, self.nbrBins)
+        ppBins = binnedProfile["ppBins"]
+        ppBinsRange = binnedProfile["ppBinsRange"]
+        ctRate = binnedProfile["ctsBins"] / (LIVETIME / self.nbrBins)
+        ctRateErr = binnedProfile["ctsBinsErr"] / (LIVETIME / self.nbrBins)
         pulseProfile = {'ppBins': ppBins, 'ppBinsRange': ppBinsRange, 'countRate': ctRate, 'countRateErr': ctRateErr}
 
         # Creating figure of pulse profile

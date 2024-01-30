@@ -1,17 +1,17 @@
 ####################################################################
 # A simple script to convert phase shifts to a .tim file compatible
 # with Tempo2 and PINT. The phase shifts are read-in from a "ToAs.txt"
-# file which could be created with measToAs.py. The .par file that
+# file which could be created with measureToAs.py. The .par file that
 # was used to build the "ToAs.txt" file must also be supplied.
 # 
 # Inputs:
-# 1- ToAs: text file containing phase-shifts (created with measToAs.py)
+# 1- ToAs: text file containing phase-shifts (created with measureToAs.py)
 # 2- timMod: timing model (e.g. .par file)
 # 3- timFile: output .tim file (default = residuals(.tim))
 # 4- tempModPP: name of tempolate pulse profile used to measure the phase shifts (default = ppTemplateMod)
 # 5- flag: a flag inserted into the .timFile to give it a sort of identity (default = Xray)
 # 
-# outputs:
+# Return:
 # 1- .tim file as pandas table
 ####################################################################
 import argparse
@@ -23,11 +23,22 @@ import pandas as pd
 from crimp.ephemIntRotation import ephemIntRotation
 
 
-######################################################################################
-# Script that converts phaseShift .txt file to .tim file compatible with Tempo2/PINT #
-######################################################################################
-
 def phShiftToTimFile(ToAs, timMod, timFile='residuals', tempModPP='ppTemplateMod', flag='Xray'):
+    """
+    Convert phase shifts to a .tim file compatible with Tempo2 and PINT
+    :param ToAs: text file containing phase-shifts (created with measureToAs.py)
+    :type ToAs: str
+    :param timMod: timing model (e.g. .par file)
+    :type timMod: str
+    :param timFile: name of output .tim file (default = residuals(.tim))
+    :type timFile: str
+    :param tempModPP: name of tempolate pulse profile used to measure the phase shifts (default = ppTemplateMod)
+    :type tempModPP: str
+    :param flag: flag inserted in .timFile to give it a sort of identity (default = Xray)
+    :type flag: str
+    :return: .tim file as pandas DataFrame
+    :rtype: pandas.DataFrame
+    """
     df_phShs = pd.read_csv(ToAs, sep='\s+', comment='#')
     tToA_MJD = df_phShs['ToA_mid'].to_numpy()
     dph = df_phShs['phShift'].to_numpy() / (2 * np.pi)
@@ -44,8 +55,6 @@ def phShiftToTimFile(ToAs, timMod, timFile='residuals', tempModPP='ppTemplateMod
 
     for ii in range(nbrToAs):
         ephemerides_intRot = ephemIntRotation(tToA_MJD[ii], timMod)
-
-        # {'Tmjd_intRotation': Tmjd_intRotation, 'freq_intRotation': freq_intRotation,
 
         # Time corresponding to phase shift 
         deltaT = dph[ii] * (1 / ephemerides_intRot["freq_intRotation"])
@@ -75,7 +84,7 @@ if __name__ == '__main__':
     ############################
 
     parser = argparse.ArgumentParser(description="Fold phases to create a pulse profile")
-    parser.add_argument("ToAs", help=".txt file of phase shifts created with measToAs.py, e.g., ToAs.txt", type=str)
+    parser.add_argument("ToAs", help=".txt file of phase shifts created with measureToAs.py, e.g., ToAs.txt", type=str)
     parser.add_argument("timMod", help="Timing model in text format. A tempo2 .par file should work.", type=str)
     parser.add_argument("-tf", "--timfile", help="output .tim file, default = residuals(.tim)", type=str,
                         default="residuals")

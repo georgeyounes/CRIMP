@@ -7,7 +7,7 @@
 # ease of visualization and diagnostics.
 #
 # Input:
-# 1- ToAs : a .txt table of ToA properties (as built with measToAs.py)
+# 1- ToAs : a .txt table of ToA properties (as built with measureToAs.py)
 # 2- outputFile : name of output interactive html file (default = "ToADiagnosticsPlot".html)
 #
 # Return:
@@ -31,14 +31,14 @@ def diagnoseToAs(ToAs, outputFile='ToADiagnosticsPlot'):
     """
     Crates an interactive html plot of ToA properties with plotly
 
-    :param ToAs: a .txt table of ToA properties (as built with measToAs.py)
+    :param ToAs: a .txt table of ToA properties (as built with measureToAs.py)
     :type ToAs: str
     :param outputFile: name of output file (default = "ToADiagnosticsPlot")
     :type outputFile: str
     :return: ToAsProp - dictionary of ToAs properties
     :rtype: pandas.DataFrame
     """
-    # ToA table as created with measToAs.py
+    # ToA table as created with measureToAs.py
     ToAsProp = pd.read_csv(ToAs, sep='\s+', comment='#')
 
     tToA_MJD = ToAsProp['ToA_mid'].to_numpy()
@@ -99,7 +99,7 @@ def diagnoseToAs(ToAs, outputFile='ToADiagnosticsPlot'):
 
 def main():
     parser = argparse.ArgumentParser(description="Script to create a diagnostic plot of ToAs")
-    parser.add_argument("ToAs", help="Text file of phase shifts as created with measToAs.py", type=str)
+    parser.add_argument("ToAs", help="Text file of phase shifts as created with measureToAs.py", type=str)
     parser.add_argument("-of", "--outputFile",
                         help="Name of output ToA diagnostics file (default = ToADiagnosticsPlot(.html))", type=str,
                         default='ToADiagnosticsPlot')

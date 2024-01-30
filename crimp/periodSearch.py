@@ -6,29 +6,56 @@
 # for more details on the Ztest and Jagar et al. (1989) for
 # more details on the Htest, and many more recent literature.
 #
-# In a future iteration, I may implement other tests, e.g.,
-# 2d-Ztest
+# In a future iteration, 2d-Z^2 and more periodicity search
+# methods may be implemented
 #############################################################
-import argparse
+
 import sys
 import numpy as np
 
 sys.dont_write_bytecode = True
 
 
-#######################################
-# Class to search for periodic signal #
-#######################################
-
 class PeriodSearch:
+    """
+            A class to operate on a fits event file
+
+            Attributes
+            ----------
+            time : numpy.ndarray
+                array of photon arrival times
+            freq : numpy.ndarray
+                array of frequencies
+            nbrHarm : int
+                number of harmonics for the Z^2-test or H-test
+
+            Methods
+            -------
+            ztest(): calculate Z^2 power at each frequency
+            htest(): calculate H power at each frequency
+            """
     def __init__(self, time, freq, nbrHarm: int = 2):
+        """
+        Constructs the necessary attribute for the Phases object.
+
+        :param time: array of photon arrival times
+        :type time: numpy.ndarray
+        :param freq: array of frequencies
+        :type freq: numpy.ndarray
+        :param nbrHarm: number of harmonics for the Z^2-test or H-test
+        :type nbrHarm: int
+        """
         self.time = time
         self.freq = freq
         self.nbrHarm = nbrHarm
 
     #################################################################
     def ztest(self):  # Ztest implmentation - could be made more efficient
-
+        """
+        Calculate Z^2-test power
+        :return: array of Z^2-power
+        :rtype: numpy.ndarray
+        """
         Z2pow = np.zeros(len(self.freq))
         n = len(self.time)
 
@@ -41,7 +68,11 @@ class PeriodSearch:
 
     #################################################################
     def htest(self):  # Htest implmentation - could be made more efficient
-
+        """
+        Calculate H-test power
+        :return: array of H-power
+        :rtype: numpy.ndarray
+        """
         Hpow = np.zeros(len(self.freq))
         n = len(self.time)
         Z2nHarm = np.zeros(self.nbrHarm)
@@ -53,10 +84,3 @@ class PeriodSearch:
             Hpow[jj] = np.amax([(Z2nHarm[ll] - 4 * ll + 4) for ll in range(0, self.nbrHarm)])
 
         return Hpow
-
-
-##########################
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(
-        description="Class to search for periodic signal - methods allowed are ztest and htest")
-    args = parser.parse_args()

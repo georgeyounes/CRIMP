@@ -53,9 +53,9 @@ def ephemIntRotation(Tmjd, timMod, printOutput=False):
 
     # Deriving the closest MJD and spin frequency with an integer number of rotations
     phAtTmjd_Frac = phAtTmjd % 1
-    FracTFromIntRotation = ((1 - phAtTmjd_Frac) / freqAtTmjd) / 86400
+    FracTFromIntRotation = (phAtTmjd_Frac / freqAtTmjd) / 86400
 
-    Tmjd_intRotation = Tmjd + FracTFromIntRotation
+    Tmjd_intRotation = Tmjd - FracTFromIntRotation
     freq_intRotation = ephemeridesAtTmjd(Tmjd_intRotation, timMod)["freqAtTmjd"]
     ph_intRotation, _ = calcPhase(Tmjd_intRotation, timMod)
 

@@ -5,7 +5,7 @@
 # start and end times - could be built with buildTimeIntToAs.py). The user could
 # apply an energy filtering to the event file through eneLow and eneHigh.
 # A subset of ToAs could be measured if desired through 'toaStart' and/or 'toaEnd'
-# Most of the calculations are in fact done in the template-appropriate functions,
+# Most of the calculations are done in the template-appropriate functions,
 # e.g., "measToA_fourier". The appropriate TIME array is folded using the .par file,
 # and fit with the provided template model. For this step, we use the extended MLE
 # method, all model parameters are fixed, except for the normalization and a
@@ -13,10 +13,12 @@
 # from the best fit phase-shift in steps of 2pi/phShiftRes (default=1000) and
 # calculating the corresponding maximum likelihood; +/-1 sigma uncertainty is when
 # the latter drops by +/-0.5 (given that our Likelihood follows a chi2 distribution
-# with 1 dof). For debugging purposes, the user may choose to plot the pulse profile
-# (and specify the nbrBins in the plot) and/or the log-likelihood around the best
-# fit phase-shift (which should be quite symmetric).
+# with 1 dof). For debugging/testing/analysis purposes, the user may choose to plot
+# the pulse profile (and specify the nbrBins in the plot) and/or the log-likelihood
+# around the best fit phase-shift (which should be quite symmetric).
 #
+# evtFile, timMod, tempModPP, toagtifile, eneLow=0.5, eneHigh=10., toaStart=0, toaEnd=None,
+# phShiftRes=1000, nbrBins=15, varyAmps=False, plotPPs=False, plotLLs=False, toaFile='ToAs', timFile=None):
 # Input:
 # 1- evtFile : barycenter-corrected event file (could be merged along TIME *and* GTIs)
 # 2- timMod : *.par timing model (TEMPO2 format is okay)
@@ -28,10 +30,11 @@
 # 8 toaEnd : Number of ToA to end (based on ToAs from toagtifile)
 # 9- phShiftRes : Phase-shift step resolution (2*pi/phShiftRes, default = 1000)
 # 10- nbrBins : for plotting purposes of pulse profile (default=15)
-# 11- plotPPs : plot all pulse profiles (only for debugging, default=False)
-# 12- plotLLs : plot all logLikelihoods (only for debugging, default=False)
-# 13- toaFile : name of output ToA file (default = ToAs(.txt))
-# 14- timFile : name of output .tim file compatible with tempo2/PINT - (default = None)
+# 11- varyAmps : vary component amplitude in template pulse profile (i.e., vary pulsed fraction, default=False)
+# 12- plotPPs : plot all pulse profiles (only for debugging, default=False)
+# 13- plotLLs : plot all logLikelihoods (only for debugging, default=False)
+# 14- toaFile : name of output ToA file (default = ToAs(.txt))
+# 15- timFile : name of output .tim file compatible with tempo2/PINT - (default = None)
 #
 # output:
 # ToAsTable : pandas table of ToAs properties
@@ -52,7 +55,7 @@ from lmfit import Parameters, minimize
 # Custom modules
 from crimp.evtFileOps import EvtFileOps
 from crimp.calcPhase import calcPhase
-from crimp.foldPhases import foldPhases
+from crimp.binPhases import binPhases
 from crimp.readPPTemp import readPPTemp
 from crimp.templateModels import fourSeries, logLikelihoodFSNormalized
 from crimp.ephemeridesAtTmjd import ephemeridesAtTmjd
@@ -62,15 +65,46 @@ from crimp.phShiftToTimFile import phShiftToTimFile
 sys.dont_write_bytecode = True
 
 
-################
-# Start Script #
-################
-
-
-########################################################################################################################################
-# Script to measure ToAs as phase shifts typically applied to a merged event file encompassing a large data-set of a monitoring campaign
-def measToAs(evtFile, timMod, tempModPP, toagtifile, eneLow=0.5, eneHigh=10., toaStart=0, toaEnd=None, phShiftRes=1000,
-             nbrBins=15, varyAmps=False, plotPPs=False, plotLLs=False, toaFile='ToAs', timFile=None):
+def measureToAs(evtFile, timMod, tempModPP, toagtifile, eneLow=0.5, eneHigh=10., toaStart=0, toaEnd=None,
+                phShiftRes=1000, nbrBins=15, varyAmps=False, plotPPs=False, plotLLs=False, toaFile='ToAs',
+                timFile=None):
+    """
+    Measure ToAs given an event file (could be merged along TIME **and** gti), a timing model (.par file),
+    a template pulse profile (built with **createTemplatePulseProfile**), and  file containing the details
+    of the ToAs (i.e. start and end times, built with **buildTimeIntervalsForToAs**)
+    :param evtFile: name of the fits event file
+    :type evtFile: str
+    :param timMod: name of timing model (.par file)
+    :type timMod: str
+    :param tempModPP: name of the template pulse profile
+    :type tempModPP: str
+    :param toagtifile: file containing the details of the ToAs (i.e. start and end times, built with **buildTimeIntervalsForToAs**)
+    :type toagtifile: str
+    :param eneLow: low energy cutoff (default = 0.5 keV)
+    :type eneLow: float
+    :param eneHigh: high energy cutoff (default = 10 keV)
+    :type eneHigh: float
+    :param toaStart: number of ToA to start from (default = first)
+    :type toaStart: int
+    :param toaEnd: stop ToA calculation here (default = last)
+    :type toaEnd: int
+    :param phShiftRes: step resolution at which to calculate uncertainties in ToAs (default = 1000)
+    :type phShiftRes: int
+    :param nbrBins: number of bins in pulse profile (for plotting purposes only, default = 15)
+    :type nbrBins: int
+    :param varyAmps: boolean flag to vary pulse amplitudes (default = False)
+    :type varyAmps: bool
+    :param plotPPs: boolean flag to plot pulse profile and best fit model (default = False)
+    :type plotPPs: bool
+    :param plotLLs: boolean flag to plot likelihood curve (default = False)
+    :type plotLLs: bool
+    :param toaFile: file name of ToAs (default = "ToAs".txt)
+    :type toaFile: str
+    :param timFile: file name of .tim file (default=None)
+    :type timFile: str
+    :return: ToAsTable
+    :rtype: pandas.DataFrame
+    """
     # Reading and operating on event file
     #####################################
     EF = EvtFileOps(evtFile)
@@ -142,9 +176,9 @@ def measToAs(evtFile, timMod, tempModPP, toagtifile, eneLow=0.5, eneHigh=10., to
         BFtempModPP = readPPTemp(tempModPP)  # BFtempModPP is a dictionary of parameters of best-fit template model
 
         if BFtempModPP["model"] == str.casefold('fourier'):
-            ToAProp = measToA_fourier(BFtempModPP, cycleFoldedPhases, ToA_exposure[ii], outFile=ToA_ID,
-                                      phShiftRes=phShiftRes, nbrBins=nbrBins, varyAmps=varyAmps, plotPPs=plotPPs,
-                                      plotLLs=plotLLs)
+            ToAProp = measureToA_fourier(BFtempModPP, cycleFoldedPhases, ToA_exposure[ii], outFile=ToA_ID,
+                                         phShiftRes=phShiftRes, nbrBins=nbrBins, varyAmps=varyAmps, plotPPs=plotPPs,
+                                         plotLLs=plotLLs)
         elif BFtempModPP["model"] == str.casefold('cauchy'):
             print("Not implemented yet - soon")
         elif BFtempModPP["model"] == str.casefold('vonmises'):
@@ -198,32 +232,58 @@ def measToAs(evtFile, timMod, tempModPP, toagtifile, eneLow=0.5, eneHigh=10., to
 
 ###############################################################################################
 # Main script to calculate the phase shift and associated uncertainties for a FOURIER template
-def measToA_fourier(BFtempModPP, cycleFoldedPhases, exposureInt, outFile='', phShiftRes=1000, nbrBins=15,
-                    varyAmps=False, plotPPs=False, plotLLs=False):
+def measureToA_fourier(tempModPP, cycleFoldedPhases, exposureInt, outFile='', phShiftRes=1000, nbrBins=15,
+                       varyAmps=False, plotPPs=False, plotLLs=False):
+    """
+    Measure ToA according to a Fourier series template
+    :param tempModPP: best fit Fourier template model
+    :type tempModPP: str
+    :param cycleFoldedPhases: array of cycle folded phases [0,1)
+    :type cycleFoldedPhases: numpy.ndarray
+    :param exposureInt: exposure of good time interval during which we accumulated len(cycleFoldedPhases) (seconds)
+    :type exposureInt: int
+    :param outFile: name of pulse profile and loglikelihood plots (pp_"outFile".pdf and LogL_"outFile".pdf)
+    :type outFile: str
+    :param phShiftRes: step resolution at which to calculate uncertainties in ToAs (default = 1000)
+    :type phShiftRes: int
+    :param nbrBins: number of bins in pulse profile (for plotting purposes only, default = 15)
+    :type nbrBins: int
+    :param varyAmps: boolean flag to vary pulse amplitudes (default = False)
+    :type varyAmps: bool
+    :param plotPPs: boolean flag to plot pulse profile and best fit model (default = False)
+    :type plotPPs: bool
+    :param plotLLs: boolean flag to plot likelihood curve (default = False)
+    :type plotLLs: bool
+    :return: ToAPropFourier, a dictionary of ToA properties
+    :rtype: dict
+    """
     initTempModPPparam = Parameters()  # Initializing an instance of Parameters based on the best-fit template model
-    initTempModPPparam.add('norm', BFtempModPP['norm'], min=0.0, max=np.inf,
+    initTempModPPparam.add('norm', tempModPP['norm'], min=0.0, max=np.inf,
                            vary=True)  # Adding the normalization - this is free to vary
     # Number of components in template model
-    nbrComp = len(np.array([ww for harmKey, ww in BFtempModPP.items() if harmKey.startswith('amp_')]))
+    nbrComp = len(np.array([ww for harmKey, ww in tempModPP.items() if harmKey.startswith('amp_')]))
     for kk in range(1, nbrComp + 1):  # Adding the amplitudes and phases of the harmonics, they are fixed
-        initTempModPPparam.add('amp_' + str(kk), BFtempModPP['amp_' + str(kk)], vary=False)
-        initTempModPPparam.add('ph_' + str(kk), BFtempModPP['ph_' + str(kk)], vary=False)
+        initTempModPPparam.add('amp_' + str(kk), tempModPP['amp_' + str(kk)], vary=False)
+        initTempModPPparam.add('ph_' + str(kk), tempModPP['ph_' + str(kk)], vary=False)
     initTempModPPparam.add('phShift', 0, vary=True, min=-np.pi, max=np.pi)  # Phase shift - parameter of interest
     initTempModPPparam.add('ampShift', 1, vary=False)
     # Running the extended maximum likelihood
     nll = lambda *args: -logLikelihoodFSNormalized(*args)  # Needs to be done on a normalized function
     results_mle_FSNormalized = minimize(nll, initTempModPPparam, args=(cycleFoldedPhases, exposureInt), method='nelder',
                                         max_nfev=1.0e3, nan_policy='propagate')
+    nbrFreeParams = 2
     # In case pulsed fraction should be varied
     if varyAmps is True:
         # We still first fit with fourier amplitudes fixed to 1, this serves to derive a good first guess
         initTempModPPparam.add('ampShift', 1, min=0.0, max=np.inf, vary=True)
         initTempModPPparam.add('phShift', results_mle_FSNormalized.params.valuesdict()['phShift'],
-                               vary=True, min=-1.5*np.pi, max=1.5*np.pi)  # Phase shift - set to best fit value from above
+                               vary=True, min=-1.5 * np.pi,
+                               max=1.5 * np.pi)  # Phase shift - set to best fit value from above
         initTempModPPparam.add('norm', results_mle_FSNormalized.params.valuesdict()['norm'], min=0.0, max=1000.0,
                                vary=True)  # normalization - set to best fit value from above
         results_mle_FSNormalized = minimize(nll, initTempModPPparam, args=(cycleFoldedPhases, exposureInt),
                                             method='nelder', max_nfev=1.0e3, nan_policy='propagate')
+        nbrFreeParams = 3 # In this case we varied a third parameters, the harmonics amplitudes
 
     phShiBF = results_mle_FSNormalized.params.valuesdict()['phShift']  # Best fit phase shift
     LLmax = -results_mle_FSNormalized.residual  # the - sign is to flip the likelihood - no reason for it, just personal choice
@@ -280,16 +340,15 @@ def measToA_fourier(BFtempModPP, cycleFoldedPhases, exposureInt, outFile='', phS
 
     # Measuring chi2 of each profile from model template
     ####################################################
-    pulseProfile = foldPhases(cycleFoldedPhases, nbrBins)
-    ppBins = pulseProfile["ppBins"]
-    ctRate = pulseProfile["ctsBins"] / (exposureInt / nbrBins)
-    ctRateErr = pulseProfile["ctsBinsErr"] / (exposureInt / nbrBins)
+    binnedProfile = binPhases(cycleFoldedPhases, nbrBins)
+    ppBins = binnedProfile["ppBins"]
+    ctRate = binnedProfile["ctsBins"] / (exposureInt / nbrBins)
+    ctRateErr = binnedProfile["ctsBinsErr"] / (exposureInt / nbrBins)
     # Best fit model
     bfModel = fourSeries(ppBins, results_mle_FSNormalized.params)
     # Chi2 and reduced chi2
     chi2_pp = np.sum(np.divide(((bfModel - ctRate) ** 2), ctRateErr ** 2))
-    redchi2_pp = np.divide(chi2_pp,
-                           np.size(ppBins) - 2)  # We varied 2 parameters, the normalization and the phase-shift
+    redchi2_pp = np.divide(chi2_pp, np.size(ppBins) - nbrFreeParams)
 
     # Plotting pulse profile of each ToA along with the best fit template model before and after correcting the phase shift
     #######################################################################################################################
@@ -305,6 +364,15 @@ def measToA_fourier(BFtempModPP, cycleFoldedPhases, exposureInt, outFile='', phS
 ##########################################
 # A simple function to measure the phase shift and 1 sigma uncertainty given the Log_Likelihood
 def plotLogLikelihood(phaseShifts, logLikeDist, outFile):
+    """
+    Plot the log-likelihood around the best fit phaseShift
+    :param phaseShifts: array of phase shifts
+    :type phaseShifts: numpy.ndarray
+    :param logLikeDist: log-likelihood of corresponding phase shifts
+    :type logLikeDist: numpy.ndarray
+    :param outFile: name of the log-likelihood plot
+    :type outFile: str
+    """
     fig, ax1 = plt.subplots(1, figsize=(7, 5), dpi=80, facecolor='w', edgecolor='k')
     ax1.tick_params(axis='both', labelsize=12)
     ax1.set_xlabel(r'$\,\mathrm{Phase\,(cycles)}$', fontsize=12)
@@ -331,6 +399,21 @@ def plotLogLikelihood(phaseShifts, logLikeDist, outFile):
 ##########################################
 # Plotting pulse profile with template fit + phase shift
 def plotPPofToAs(ppBins, ctRate, ctRateErr, bfModel, initModel, outFile):
+    """
+    Plot the pulse profile and best fit model of a ToA
+    :param ppBins: centroid of pulse profile bins
+    :type ppBins: numpy.ndarray
+    :param ctRate: countrate of pulse profile bins
+    :type ctRate: numpy.ndarray
+    :param ctRateErr: uncertainty on count rate of pulse profile bins
+    :type ctRateErr: numpy.ndarray
+    :param bfModel: model pridicted count rate
+    :type bfModel: numpy.ndarray
+    :param initModel: initial template model pridicted count rate
+    :type initModel: numpy.ndarray
+    :param outFile: name of the pulse-profile plot
+    :type outFile: str
+    """
     # Initiating plot
     fig, ax1 = plt.subplots(1, figsize=(7, 5), dpi=80, facecolor='w', edgecolor='k')
 
@@ -376,7 +459,20 @@ def plotPPofToAs(ppBins, ctRate, ctRateErr, bfModel, initModel, outFile):
 
 ##########################################
 # Plotting Phase residuals of all ToAs
-def plotPhaseResiduals(ToAsMJD, phaseShifts, phaseShiftsLL, phaseShiftsUL, outFile):
+def plotPhaseResiduals(ToAsMJD, phaseShifts, phaseShiftsLL, phaseShiftsUL, outFile=''):
+    """
+    Plot phase residuals
+    :param ToAsMJD: mid-times of the ToA interval (strictly speaking, this is not **pulse** ToA)
+    :type ToAsMJD: numpy.ndarray
+    :param phaseShifts: array of phase shifts at ToAsMJD
+    :type phaseShifts: numpy.ndarray
+    :param phaseShiftsLL: 1sigma lower bound on phase shifts
+    :type phaseShiftsLL: numpy.ndarray
+    :param phaseShiftsUL: 1sigma upper bound on phase shifts
+    :type phaseShiftsUL: numpy.ndarray
+    :param outFile: name of plot (default='outFile'_phaseResiduals.pdf)
+    :type outFile:
+    """
     fig, ax1 = plt.subplots(1, figsize=(7, 5), dpi=80, facecolor='w', edgecolor='k')
 
     ax1.tick_params(axis='both', labelsize=12)
@@ -397,7 +493,7 @@ def plotPhaseResiduals(ToAsMJD, phaseShifts, phaseShiftsLL, phaseShiftsUL, outFi
 
     fig.tight_layout()
 
-    plotName = str(outFile) + '.pdf'
+    plotName = str(outFile) + '_phaseResiduals.pdf'
     fig.savefig(plotName, format='pdf', dpi=1000)
     plt.close()
 
@@ -434,9 +530,9 @@ def main():
                         type=str, default=None)
     args = parser.parse_args()
 
-    measToAs(args.evtFile, args.timMod, args.tempModPP, args.toagtifile, args.eneLow, args.eneHigh, args.toaStart,
-             args.toaEnd, args.phShiftRes, args.nbrBins, args.varyAmps, args.plotPPs, args.plotLLs, args.toaFile,
-             args.timFile)
+    measureToAs(args.evtFile, args.timMod, args.tempModPP, args.toagtifile, args.eneLow, args.eneHigh, args.toaStart,
+                args.toaEnd, args.phShiftRes, args.nbrBins, args.varyAmps, args.plotPPs, args.plotLLs, args.toaFile,
+                args.timFile)
 
 
 if __name__ == '__main__':

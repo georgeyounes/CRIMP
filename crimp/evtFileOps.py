@@ -25,17 +25,38 @@ sys.dont_write_bytecode = True
 ########################################################################################################
 
 class EvtFileOps:
-    def __init__(self, evtFile: str):
+    """
+        A class to operate on a fits event file
+
+        Attributes
+        ----------
+        evtFile : str
+            name of the fits event file
+
+        Methods
+        -------
+        readEF(): reads essential keywords from an event file
+        readGTI(): reads GTI table from an event
+        filtEneEF(): filters the event list accoring to energy (in keV)
+        addPhaseColEF(): adds phase column to event file according to timing model (.par file)
         """
 
-        :param evtFile:
-        :type evtFile:
+    def __init__(self, evtFile: str):
+        """
+        Constructs the necessary attribute for the Phases object.
+
+        :param evtFile: name of the fits event file
+        :type evtFile: str
         """
         self.evtFile = evtFile
 
     #################################################################
     def readEF(self):  # Reading fits event file from X-ray satellites
-
+        """
+        Reads essential keywords from an event file
+        :return: evtFileKeyWords - dictionary of essential keywords
+        :rtype: dict
+        """
         # Opening the fits file
         hdulist = fits.open(self.evtFile)
 
@@ -91,7 +112,11 @@ class EvtFileOps:
 
     #################################################################
     def readGTI(self):  # Reading fits event file GTI lists
-
+        """
+        Reads GTI table from an event
+        :return: gtiList
+        :rtype: numpy.ndarray
+        """
         # Reading EF for some necessary keywords
         evtFileKeyWords = self.readEF()
         TELESCOPE = evtFileKeyWords["TELESCOPE"]
@@ -136,7 +161,15 @@ class EvtFileOps:
 
     ################################################################################
     def filtEneEF(self, eneLow: float, eneHigh: float):  # Filtering event file according to energy
-
+        """
+        Filters the event list accoring to energy (in keV)
+        :param eneLow: low energy cutoff
+        :type eneLow: float
+        :param eneHigh: high energy cutoff
+        :type eneHigh: float
+        :return: dataTP_eneFlt, dictionary of TIME and PI, filtered for energy
+        :rtype: dict
+        """
         # Reading columns TIME and PI (pulse-invariant - proxy for photon energy) from binary table
         hdulist = fits.open(self.evtFile)
         tbdata = hdulist['EVENTS'].data
@@ -188,7 +221,15 @@ class EvtFileOps:
 
     ################################################################################
     def addPhaseColEF(self, timMod: str, nonBaryEvtFile: str = ""):  # Filtering event file according to energy
-
+        """
+        Adds phase column to event file according to timing model (.par file)
+        the phase column will be added to the self.evtFile, but also could be added to a non-barycentered event file
+        (though see warning in source code)
+        :param timMod: name of timing model (.par file)
+        :type timMod: str
+        :param nonBaryEvtFile: name of non-barycentered event file (default = None)
+        :type nonBaryEvtFile: str
+        """
         # Reading some necessary keywords
         evtFileKeyWords = self.readEF()
 
@@ -221,10 +262,10 @@ class EvtFileOps:
 
         #####################################
         # adding phase column to NON-barycentered event file fits table. Why do this?
-        # In rare instances, you wish to perform phase-resolved spectroscpoy along with some native filtering,
-        # e.g., from NICER specific heasoft tools. The latter are typically performed on mkf files
+        # In some instances, you wish to perform phase-resolved spectroscpoy along with some native filtering,
+        # e.g., with NICER specific heasoft tools. The latter are typically performed on mkf files
         # which are not barycenter corrected. Mixing barycenter-corrected time filtering with non-barycenter
-        # corrected filtering can get messy. This way, time filtering for certain phases and native
+        # corrected filtering can get messy. This way, filtering for certain phases and native
         # filtering are done on non-barycentered times and the merged GTIs should be valid.
         # Use with EXTREME care
         if nonBaryEvtFile:
@@ -241,6 +282,11 @@ class EvtFileOps:
 
 
 def main():
+    """
+    Main function for evtFileOps.py
+    This runs the method addPhaseColEF from class EvtFileOps
+    Included as a script called "addPhaseColumn"
+    """
     parser = argparse.ArgumentParser(description="Create and append event file with Phase column")
     parser.add_argument("evtFile", help="Name of (X-ray) fits event file", type=str)
     parser.add_argument("timMod", help="Timing model for phase folding, e.g., a .par file", type=str)
