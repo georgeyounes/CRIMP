@@ -60,12 +60,12 @@ import warnings
 import numpy as np
 
 # Custom modules
-from crimp.evtFileOps import EvtFileOps
+from crimp.eventfile import EvtFileOps
 
 
 # Script that creates time intervals to use for ToA calculation
 
-def timeIntToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.5, eneHigh=10, outputFile="timIntToAs"):
+def timeintervalsToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.5, eneHigh=10, outputFile="timIntToAs"):
     """
     Calculates START and END times that will define each TOA
 
@@ -98,7 +98,7 @@ def timeIntToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.5, ene
     gtiList = EF.readGTI()
 
     # Reading TIME column after energy filtering
-    dataTP_eneFlt = EF.filtEneEF(eneLow=eneLow, eneHigh=eneHigh)
+    dataTP_eneFlt = EF.filtenergyEF(eneLow=eneLow, eneHigh=eneHigh)
     TIME = dataTP_eneFlt['TIME'].to_numpy()
 
     # Calculating the wait time until next GTI and exposure of each GTI
@@ -261,7 +261,7 @@ def main():
                         default='timIntToAs')
     args = parser.parse_args()
 
-    timeIntToAs(args.evtFile, args.totCtsEachToA, args.waitTimeCutoff, args.eneLow, args.eneHigh, args.outputFile)
+    timeintervalsToAs(args.evtFile, args.totCtsEachToA, args.waitTimeCutoff, args.eneLow, args.eneHigh, args.outputFile)
 
 
 if __name__ == '__main__':

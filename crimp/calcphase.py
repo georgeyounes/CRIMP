@@ -1,5 +1,5 @@
 ####################################################################################
-# calcPhase.py is a module that calculates phases of an array of TIME (MJD) instances
+# calcphase.py is a module that calculates phases of an array of TIME (MJD) instances
 # using a .par file. It reads the .par file with the readTimMod scripts. As a reminder,
 # this script can manage glitches, wave functions and the frequency and its derivatives
 # up to F12; it does not accomodate IFUNC, proper motion, binary systems, or parallax.
@@ -12,7 +12,7 @@ import numpy as np
 from math import factorial
 
 # Custom modules
-from crimp.readTimMod import readTimMod
+from crimp.readtimingmodel import readtimingmodel
 
 from crimp.ephemeridesAtTmjd import ephemeridesAtTmjd
 sys.dont_write_bytecode = True
@@ -53,9 +53,9 @@ class Phases:
         """
         self.timeMJD = timeMJD
         self.timMod = timMod
-        self.timModParam = readTimMod(timMod)
+        self.timModParam = readtimingmodel(timMod)
 
-    def taylorExpansion(self):
+    def taylorexpansion(self):
         """
         Calculates phases from the taylor expansion of the phase evolution
 
@@ -133,7 +133,7 @@ class Phases:
         return np.multiply(phases_waves_all, freqAtTmjd)
 
 
-def calcPhase(timeMJD, timMod):
+def calcphase(timeMJD, timMod):
     """
     Function that adds all above phase calculations
 
@@ -146,7 +146,7 @@ def calcPhase(timeMJD, timMod):
             - cycleFoldedPhases (float): cycle folded phases [0,1)
     """
     phases = Phases(timeMJD, timMod)
-    phases_te = phases.taylorExpansion()
+    phases_te = phases.taylorexpansion()
     phases_gl_all = phases.glitches()
     phases_waves_all = phases.waves()
 

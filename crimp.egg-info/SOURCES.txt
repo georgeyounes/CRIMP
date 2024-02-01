@@ -6,13 +6,14 @@ pyproject.toml
 .idea/inspectionProfiles/Project_Default.xml
 .idea/inspectionProfiles/profiles_settings.xml
 crimp/__init__.py
+crimp/binPhases.py
+crimp/buildTimeIntToAs.py
 crimp/calcPhase.py
-crimp/crtTimeIntForToAs.py
 crimp/diagnoseToAs.py
+crimp/ephemIntRotation.py
 crimp/ephemeridesAtTmjd.py
 crimp/evtFileOps.py
-crimp/foldPhases.py
-crimp/measToAs.py
+crimp/measureToAs.py
 crimp/periodSearch.py
 crimp/phShiftToTimFile.py
 crimp/pulseProfileOps.py
@@ -34,7 +35,8 @@ crimp/.idea/vcs.xml
 crimp/.idea/inspectionProfiles/profiles_settings.xml
 crimp/__pycache__/__init__.cpython-39.pyc
 crimp/__pycache__/calcPhase.cpython-39.pyc
-crimp/__pycache__/crtTimeIntForToAs.cpython-39.pyc
+crimp/__pycache__/ephemIntRotation.cpython-39.pyc
+crimp/__pycache__/ephemeridesAtTmjd.cpython-39.pyc
 crimp/__pycache__/evtFileOps.cpython-39.pyc
 crimp/__pycache__/pulseProfileOps.cpython-39.pyc
 crimp/__pycache__/readTimMod.cpython-39.pyc

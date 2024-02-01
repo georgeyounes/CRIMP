@@ -20,10 +20,10 @@ import numpy as np
 import pandas as pd
 
 # Custom scripts
-from crimp.ephemIntRotation import ephemIntRotation
+from crimp.ephemeridesIntRotation import ephemeridesIntRotation
 
 
-def phShiftToTimFile(ToAs, timMod, timFile='residuals', tempModPP='ppTemplateMod', flag='Xray'):
+def phshiftTotimfile(ToAs, timMod, timFile='residuals', tempModPP='ppTemplateMod', flag='Xray'):
     """
     Convert phase shifts to a .tim file compatible with Tempo2 and PINT
     :param ToAs: text file containing phase-shifts (created with measureToAs.py)
@@ -54,7 +54,7 @@ def phShiftToTimFile(ToAs, timMod, timFile='residuals', tempModPP='ppTemplateMod
     f.write('FORMAT 1\n')
 
     for ii in range(nbrToAs):
-        ephemerides_intRot = ephemIntRotation(tToA_MJD[ii], timMod)
+        ephemerides_intRot = ephemeridesIntRotation(tToA_MJD[ii], timMod)
 
         # Time corresponding to phase shift 
         deltaT = dph[ii] * (1 / ephemerides_intRot["freq_intRotation"])
@@ -74,24 +74,24 @@ def phShiftToTimFile(ToAs, timMod, timFile='residuals', tempModPP='ppTemplateMod
     return ToAs_Tim
 
 
-#################
-# End of script #
-#################
-
-if __name__ == '__main__':
-    ############################
-    # Parsing input parameters #
-    ############################
-
-    parser = argparse.ArgumentParser(description="Fold phases to create a pulse profile")
+def main():
+    parser = argparse.ArgumentParser(description="Convert a phase shift into a .tim file")
     parser.add_argument("ToAs", help=".txt file of phase shifts created with measureToAs.py, e.g., ToAs.txt", type=str)
-    parser.add_argument("timMod", help="Timing model in text format. A tempo2 .par file should work.", type=str)
+    parser.add_argument("timMod", help=".par timing model", type=str)
     parser.add_argument("-tf", "--timfile", help="output .tim file, default = residuals(.tim)", type=str,
                         default="residuals")
     parser.add_argument("-tp", "--tempModPP",
                         help="Name of best-fit template model used to measure ToAs, default = ppTemplateMod", type=str,
                         default='ppTemplateMod')
-    parser.add_argument("-fg", "--flag", help="Flag in the .timFile, default = Xray", type=str, default='Xray')
+    parser.add_argument("-fg", "--flag", help="Flag keyword in the .tim file, default = Xray", type=str, default='Xray')
     args = parser.parse_args()
 
-    phShiftToTimFile(args.ToAs, args.timMod, args.timfile, args.tempModPP, args.flag)
+    phshiftTotimfile(args.ToAs, args.timMod, args.timfile, args.tempModPP, args.flag)
+
+
+#################
+# End of script #
+#################
+
+if __name__ == '__main__':
+    main()

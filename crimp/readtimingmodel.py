@@ -1,10 +1,14 @@
 ####################################################################################
-# readTimMod.py is a script that reads in a .par file. It is made to be as compatible
-# with tempo2 as possible. It reads in all glitches, frequency derivatives, and any 
-# wave functions, which are typically used to align pulses in noisy systems, i.e.,  
-# magnetars and isolated neutron stars. Returns a dictionary 'timModParam' of
-# parameters. As a reminder this tool does not yet accomodate binary systems, or deal
-# with proper motion, parallax, or IFUNC
+# readtimingmodel.py is a script that reads in a .par file. It is made to be as
+# compatible with tempo2 as possible. It reads in all glitches, frequency derivatives,
+# and any wave functions, which are typically used to align pulses in noisy systems,
+# i.e., magnetars and isolated neutron stars. Returns a dictionary 'timModParam' of
+# parameters. As a reminder this tool does not yet accomodate IFUNC, proper motion,
+# binary systems, or parallax. These may get included in later versions, likely in
+# that order.
+#
+# to do: could be beautified and written as a class to separate the different
+#        components such as taylor expansion, glitches, waves, etc.
 ####################################################################################
 
 import sys
@@ -13,12 +17,14 @@ import numpy as np
 sys.dont_write_bytecode = True
 
 
-##################################
-# Script that reads a .par file ##
-##################################
-
-# Reading timing model
-def readTimMod(timMod):
+def readtimingmodel(timMod):
+    """
+    Reading timing model parameters from .par file
+    :param timMod: timing model, .par file
+    :type timMod: str
+    :return: timModParam, dictionary of timing model parameters
+    :rtype: dict
+    """
     ###############################
     # Parsing the .par timing model
     data_file = open(timMod, 'r+')

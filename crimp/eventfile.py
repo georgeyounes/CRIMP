@@ -1,5 +1,5 @@
 ####################################################################################
-# evtFileOps.py is a module to perform simple operations on X-ray event files,
+# eventfile.py is a module to perform simple operations on X-ray event files,
 # reading useful header words, filter for energy, add a phase column, etc. X-ray
 # instruments that are accepted are Swift/XRT, NICER, XMM/EPIC, IXPE, Fermi/GBM,
 # NuSTAR
@@ -15,7 +15,7 @@ from astropy.table import Table, Column
 from astropy.io import fits
 
 # Custom modules
-from crimp.calcPhase import calcPhase
+from crimp.calcphase import calcphase
 
 sys.dont_write_bytecode = True
 
@@ -160,7 +160,7 @@ class EvtFileOps:
         return gtiList
 
     ################################################################################
-    def filtEneEF(self, eneLow: float, eneHigh: float):  # Filtering event file according to energy
+    def filtenergyEF(self, eneLow: float, eneHigh: float):  # Filtering event file according to energy
         """
         Filters the event list accoring to energy (in keV)
         :param eneLow: low energy cutoff
@@ -220,7 +220,7 @@ class EvtFileOps:
         return dataTP_eneFlt
 
     ################################################################################
-    def addPhaseColEF(self, timMod: str, nonBaryEvtFile: str = ""):  # Filtering event file according to energy
+    def addphasecolEF(self, timMod: str, nonBaryEvtFile: str = ""):  # Filtering event file according to energy
         """
         Adds phase column to event file according to timing model (.par file)
         the phase column will be added to the self.evtFile, but also could be added to a non-barycentered event file
@@ -248,7 +248,7 @@ class EvtFileOps:
         # Creating phases
         timeMET = tbdataPH.field('TIME')
         timeMJD = timeMET / 86400 + MJDREF
-        _, cycleFoldedPhases = calcPhase(timeMJD, timMod)
+        _, cycleFoldedPhases = calcphase(timeMJD, timMod)
 
         #####################################
         # adding phase column to barycentered event file fits table, called table
@@ -283,7 +283,7 @@ class EvtFileOps:
 
 def main():
     """
-    Main function for evtFileOps.py
+    Main function for eventfile.py
     This runs the method addPhaseColEF from class EvtFileOps
     Included as a script called "addPhaseColumn"
     """
@@ -294,7 +294,7 @@ def main():
     args = parser.parse_args()
 
     addPhaseCol = EvtFileOps(args.evtFile)
-    addPhaseCol.addPhaseColEF(args.timMod, args.nonBaryEvtFile)
+    addPhaseCol.addphasecolEF(args.timMod, args.nonBaryEvtFile)
 
 
 if __name__ == '__main__':

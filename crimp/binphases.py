@@ -1,12 +1,12 @@
 ####################################################################################
 # Function to bin a "phases" array to create a pulse profile. Phases are assumed
-# to be between [0, 1), i.e., cycle folded, e.g., from calcPhase.py
+# to be between [0, 1), i.e., cycle folded, e.g., from calcphase.py
 ####################################################################################
 
 import numpy as np
 
 
-def binPhases(phases, nbrBins=15):
+def binphases(phases, nbrBins=15):
     """
     Function to bin an array of phases to create a counts pulse profile, given a number of bins
     :param phases: array of cycle-folded phases, i.e., in the [0,1) range

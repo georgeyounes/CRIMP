@@ -1,6 +1,6 @@
 #################################################################
 # A simple script that, given an MJD and a .par file, will provide
-# the closest MJD that results in an integer number of rotational
+# the earliest MJD that results in an integer number of rotational
 # phases from PEPOCH (epoch of timing solution) and corresponding
 # ephemerides (currently only spin frequency)
 #
@@ -25,15 +25,15 @@ import sys
 
 # Custom modules
 from crimp.ephemeridesAtTmjd import ephemeridesAtTmjd
-from crimp.calcPhase import calcPhase
+from crimp.calcphase import calcphase
 
 sys.dont_write_bytecode = True
 
 
-def ephemIntRotation(Tmjd, timMod, printOutput=False):
+def ephemeridesIntRotation(Tmjd, timMod, printOutput=False):
     """
-    Function that provides the closest MJD and corresponding spin frequency
-    to input MJD  which, according the input .par file, would result in an
+    Function that provides the earliest MJD and corresponding spin frequency
+    to input MJD which, according the input .par file, would result in an
     integer number of rotational phases from PEPOCH
 
     :param Tmjd: time for measurement of ephemerides that result
@@ -49,7 +49,7 @@ def ephemIntRotation(Tmjd, timMod, printOutput=False):
     freqAtTmjd = ephemeridesAtTmjd(Tmjd, timMod)["freqAtTmjd"]
 
     # Phases that correspond to Tmjd according to timing model
-    phAtTmjd, _ = calcPhase(Tmjd, timMod)
+    phAtTmjd, _ = calcphase(Tmjd, timMod)
 
     # Deriving the closest MJD and spin frequency with an integer number of rotations
     phAtTmjd_Frac = phAtTmjd % 1
@@ -57,12 +57,12 @@ def ephemIntRotation(Tmjd, timMod, printOutput=False):
 
     Tmjd_intRotation = Tmjd - FracTFromIntRotation
     freq_intRotation = ephemeridesAtTmjd(Tmjd_intRotation, timMod)["freqAtTmjd"]
-    ph_intRotation, _ = calcPhase(Tmjd_intRotation, timMod)
+    ph_intRotation, _ = calcphase(Tmjd_intRotation, timMod)
 
     if printOutput is True:
-        print('Input Tmjd = {} days. Corresponding spin frequency = {} Hz, \n'
-              'CLosest Tmjd with integer number of rotation = {}. Corresponding '
-              'frequency = {}. Corresponding phase = {}'.format(Tmjd, freqAtTmjd, Tmjd_intRotation, freq_intRotation, ph_intRotation))
+        print('Input Tmjd = {} days. Corresponding spin frequency = {} Hz. Corresponding phase = {} \n'
+              'Earliest Tmjd with integer number of rotation = {}. Corresponding '
+              'frequency = {}. Corresponding phase = {}'.format(Tmjd, freqAtTmjd, phAtTmjd, Tmjd_intRotation, freq_intRotation, ph_intRotation))
 
     ephemerides_intRotation = {'Tmjd_intRotation': Tmjd_intRotation, 'freq_intRotation': freq_intRotation,
                                'ph_intRotation': ph_intRotation}
@@ -71,15 +71,15 @@ def ephemIntRotation(Tmjd, timMod, printOutput=False):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Calculate closes MJD (and corresponding spin frequency and "
-                                                 "rotational phase) that results in an integer number of rotation")
+    parser = argparse.ArgumentParser(description="Calculate earliest MJD (and corresponding spin frequency and "
+                                                 "rotational phase) that results in an integer number of rotations")
     parser.add_argument("tMJD", help="Time in MJD at which to derive frequency and rotational phase", type=float)
     parser.add_argument("timMod", help="Timing model in text format. A tempo2 .par file should work.", type=str)
     parser.add_argument('-po', '--printOutput', help='Print output.', type=bool,
                         default=False, action=argparse.BooleanOptionalAction)
     args = parser.parse_args()
 
-    ephemIntRotation(args.tMJD, args.timMod, args.printOutput)
+    ephemeridesIntRotation(args.tMJD, args.timMod, args.printOutput)
 
 
 if __name__ == '__main__':

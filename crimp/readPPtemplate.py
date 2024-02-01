@@ -1,26 +1,26 @@
 ####################################################################################
-# readPPTemp.py is a module that reads in a template model of a pulse profile. The
-# readPPTempAny is sort of a "wrapper" that directs to the appropriate function
+# readPPtemplate.py is a module that reads in a template model of a pulse profile. The
+# readPPtemplate is sort of a "wrapper" that directs to the appropriate function
 # according to whichever template is being read-in. For now, the allowed templates
 # are fourier, vonmises, wrapped cauchy. It returns a dictionary of model parameters
-# The template model could be built using the module pulseProfileOps.py
+# The template model could be built using the module pulseprofile.py
 ####################################################################################
 
 import sys
-import argparse
 
 import numpy as np
 
 sys.dont_write_bytecode = True
 
 
-#######################################################################
-# Module to read-in template pulse profile for use in ToA calculation #
-#######################################################################
-
-#########################################
-# Reading a template by its header keyword 'model'
-def readPPTemp(tempModPP):
+def readPPtemplate(tempModPP):
+    """
+    Reading template model parameters from .txt best fit template model to pulse profile
+    :param tempModPP:
+    :type tempModPP: str
+    :return: tempModPPparam, dictionary of template model parameters
+    :rtype: dict
+    """
     data_file = open(tempModPP, 'r+')
 
     blockModel = ""
@@ -34,9 +34,9 @@ def readPPTemp(tempModPP):
 
     # Direct to appropriate function based on model keyword
     if model.casefold() == str.casefold('fourier'):
-        tempModPPparam = readPPTempFour(tempModPP)
+        tempModPPparam = readPPtempFour(tempModPP)
     elif model.casefold() in [str.casefold('vonmises'), str.casefold('cauchy')]:
-        tempModPPparam = readPPTempVonMisesCauchy(tempModPP)
+        tempModPPparam = readPPtempVonMisesCauchy(tempModPP)
     else:
         raise Exception('Model {} is not supported yet; fourier, vonmises, cauchy are supported'.format(model))
 
@@ -85,9 +85,14 @@ def readstandard(tempModPP):
     return data_file, tempModPPparam, nbrOfComp
 
 
-#########################################
-# Specifically reading a fourier template
-def readPPTempFour(tempModPP):
+def readPPtempFour(tempModPP):
+    """
+    Reading template model parameters from .txt best fit Fourier template model to pulse profile
+    :param tempModPP:
+    :type tempModPP: str
+    :return: tempModPPparam, dictionary of template model parameters
+    :rtype: dict
+    """
     data_file, tempModPPparam, nbrOfComp = readstandard(tempModPP)
 
     # We now loop over all harmonics and add them to the dictionary
@@ -112,9 +117,14 @@ def readPPTempFour(tempModPP):
     return tempModPPparam
 
 
-#####################################################
-# Specifically reading a von Mises or cauchy template
-def readPPTempVonMisesCauchy(tempModPP):
+def readPPtempVonMisesCauchy(tempModPP):
+    """
+    Reading template model parameters from .txt best fit von Mises or Cauchy template model to pulse profile
+    :param tempModPP:
+    :type tempModPP: str
+    :return: tempModPPparam, dictionary of template model parameters
+    :rtype: dict
+    """
     data_file, tempModPPparam, nbrOfComp = readstandard(tempModPP)
 
     # We now loop over all harmonics and add them to the dictionary
@@ -140,21 +150,3 @@ def readPPTempVonMisesCauchy(tempModPP):
         raise Exception('Parameter of first component, "amp_1", "cen_1", wid_1, must exist in template file')
 
     return tempModPPparam
-
-
-##############
-# End Script #
-##############
-
-if __name__ == '__main__':
-    ###########################
-    # Parsing input arguments #
-    ###########################
-
-    parser = argparse.ArgumentParser(description="Simple script to read in a .txt template pulse profile model")
-    parser.add_argument("tempModPP",
-                        help="Template model in text format. Could be created with fitPulseProfile from pulseProfileOps.PulseProfileFromEventFile",
-                        type=str)
-    args = parser.parse_args()
-
-    readPPTemp(args.tempModPP)

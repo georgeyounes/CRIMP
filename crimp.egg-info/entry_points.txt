@@ -1,5 +1,7 @@
 [console_scripts]
-buildToAs = crimp.measToAs:main
-createPulseProfile = crimp.pulseProfileOps:main
-createTimeIntervalsForToAs = crimp.crtTimeIntForToAs:main
+addPhaseColumn = crimp.evtFileOps:main
+buildTimeIntervalsForToAs = crimp.buildTimeIntToAs:main
+createTemplatePulseProfile = crimp.pulseProfileOps:main
 diagnoseToAs = crimp.diagnoseToAs:main
+ephemeIntegerRotation = crimp.ephemIntRotation:main
+measureToAs = crimp.measureToAs:main

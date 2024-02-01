@@ -1,8 +1,8 @@
 ###############################################################################
 # This code calculates ToAs a la Ray et al. 2018. It takes a barycentered
 # corrected event file, a timing model (.par file), a template model (.txt file,
-# e.g., from pulseProfileOps.py), and a .txt file defining the ToAs (e.g., ToAs
-# start and end times - could be built with buildTimeIntToAs.py). The user could
+# e.g., from pulseprofile.py), and a .txt file defining the ToAs (e.g., ToAs
+# start and end times - could be built with buildtimeintervalsToAs.py). The user could
 # apply an energy filtering to the event file through eneLow and eneHigh.
 # A subset of ToAs could be measured if desired through 'toaStart' and/or 'toaEnd'
 # Most of the calculations are done in the template-appropriate functions,
@@ -22,8 +22,8 @@
 # Input:
 # 1- evtFile : barycenter-corrected event file (could be merged along TIME *and* GTIs)
 # 2- timMod : *.par timing model (TEMPO2 format is okay)
-# 3- tempModPP : *.txt file of the tempolate pulse profile (could be biult with pulseProfileOps.py)
-# 4- toagtifile : *.txt file with ToA properties (could be built with buildTimeIntToAs.py)
+# 3- tempModPP : *.txt file of the tempolate pulse profile (could be biult with pulseprofile.py)
+# 4- toagtifile : *.txt file with ToA properties (could be built with buildtimeintervalsToAs.py)
 # 5 eneLow : low energy limit (in keV)
 # 6 eneHigh : high energy limit (in keV)
 # 7 toaStart : Number of ToA to start from (based on ToAs from toagtifile)
@@ -53,14 +53,14 @@ from scipy.stats import chi2
 from lmfit import Parameters, minimize
 
 # Custom modules
-from crimp.evtFileOps import EvtFileOps
-from crimp.calcPhase import calcPhase
-from crimp.binPhases import binPhases
-from crimp.readPPTemp import readPPTemp
-from crimp.templateModels import fourSeries, logLikelihoodFSNormalized
+from crimp.eventfile import EvtFileOps
+from crimp.calcphase import calcphase
+from crimp.binphases import binphases
+from crimp.readPPtemplate import readPPtemplate
+from crimp.templatemodels import fourSeries, logLikelihoodFSNormalized
 from crimp.ephemeridesAtTmjd import ephemeridesAtTmjd
-from crimp.periodSearch import PeriodSearch
-from crimp.phShiftToTimFile import phShiftToTimFile
+from crimp.periodsearch import PeriodSearch
+from crimp.phshiftTotimfile import phshiftTotimfile
 
 sys.dont_write_bytecode = True
 
@@ -117,7 +117,7 @@ def measureToAs(evtFile, timMod, tempModPP, toagtifile, eneLow=0.5, eneHigh=10.,
     MJDREF = evtFileKeyWords["MJDREF"]
 
     # Reading TIME column after energy filtering
-    dataTP_eneFlt = EF.filtEneEF(eneLow=eneLow, eneHigh=eneHigh)
+    dataTP_eneFlt = EF.filtenergyEF(eneLow=eneLow, eneHigh=eneHigh)
     TIME = dataTP_eneFlt['TIME'].to_numpy()
     TIMEMJD = TIME / 86400 + MJDREF
 
@@ -169,11 +169,11 @@ def measureToAs(evtFile, timMod, tempModPP, toagtifile, eneLow=0.5, eneHigh=10.,
 
         # Fold data using timing model
         ##############################
-        phases, cycleFoldedPhases = calcPhase(TIME_toa, timMod)
+        phases, cycleFoldedPhases = calcphase(TIME_toa, timMod)
 
         # Measuring the best fit phase shift through an unbinned extended maximum likelihood fit
         ########################################################################################
-        BFtempModPP = readPPTemp(tempModPP)  # BFtempModPP is a dictionary of parameters of best-fit template model
+        BFtempModPP = readPPtemplate(tempModPP)  # BFtempModPP is a dictionary of parameters of best-fit template model
 
         if BFtempModPP["model"] == str.casefold('fourier'):
             ToAProp = measureToA_fourier(BFtempModPP, cycleFoldedPhases, ToA_exposure[ii], outFile=ToA_ID,
@@ -217,7 +217,7 @@ def measureToAs(evtFile, timMod, tempModPP, toagtifile, eneLow=0.5, eneHigh=10.,
     # Creating .tim file if specified
     #################################
     if timFile is not None:  # if given convert ToAs.txt to a .tim file
-        phShiftToTimFile(toaFile + '.txt', timMod, timFile=timFile, tempModPP=tempModPP, flag='Xray')
+        phshiftTotimfile(toaFile + '.txt', timMod, timFile=timFile, tempModPP=tempModPP, flag='Xray')
 
     # Plotting Phase residuals of all ToAs
     ######################################
@@ -283,7 +283,7 @@ def measureToA_fourier(tempModPP, cycleFoldedPhases, exposureInt, outFile='', ph
                                vary=True)  # normalization - set to best fit value from above
         results_mle_FSNormalized = minimize(nll, initTempModPPparam, args=(cycleFoldedPhases, exposureInt),
                                             method='nelder', max_nfev=1.0e3, nan_policy='propagate')
-        nbrFreeParams = 3 # In this case we varied a third parameters, the harmonics amplitudes
+        nbrFreeParams = 3  # In this case we varied a third parameters, the harmonics amplitudes
 
     phShiBF = results_mle_FSNormalized.params.valuesdict()['phShift']  # Best fit phase shift
     LLmax = -results_mle_FSNormalized.residual  # the - sign is to flip the likelihood - no reason for it, just personal choice
@@ -340,7 +340,7 @@ def measureToA_fourier(tempModPP, cycleFoldedPhases, exposureInt, outFile='', ph
 
     # Measuring chi2 of each profile from model template
     ####################################################
-    binnedProfile = binPhases(cycleFoldedPhases, nbrBins)
+    binnedProfile = binphases(cycleFoldedPhases, nbrBins)
     ppBins = binnedProfile["ppBins"]
     ctRate = binnedProfile["ctsBins"] / (exposureInt / nbrBins)
     ctRateErr = binnedProfile["ctsBinsErr"] / (exposureInt / nbrBins)
@@ -502,10 +502,10 @@ def main():
     parser = argparse.ArgumentParser(description="Script to measure ToAs from event file")
     parser.add_argument("evtFile", help="Name of a barycentered event file", type=str)
     parser.add_argument("timMod", help="Timing model, Tempo2 .par file should work", type=str)
-    parser.add_argument("tempModPP", help="Parameters of template pulse profile (e.g., built with pulseProfileOps.py)",
+    parser.add_argument("tempModPP", help="Parameters of template pulse profile (e.g., built with pulseprofile.py)",
                         type=str)
     parser.add_argument("toagtifile",
-                        help="User supplied .txt file with ToA interval information (built with buildTimeIntToAs.py)",
+                        help="User supplied .txt file with ToA interval information (built with buildtimeintervalsToAs.py)",
                         type=str)
     parser.add_argument("-el", "--eneLow", help="Low energy filter in event file, default=0.5", type=float, default=0.5)
     parser.add_argument("-eh", "--eneHigh", help="High energy filter in event file, default=10", type=float, default=10)
