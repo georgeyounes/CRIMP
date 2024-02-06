@@ -1,24 +1,18 @@
 ####################################################################################
-# A script that encapsulates all the allowed functions to derive a best-fit template
-# model to the pulse profiles. These are Fourier, von Mises, and Cauchy. The likelihoods
-# for each is also written out.
-# Normzalied (to unity) version of each of the functions is also spelled out, which
-# is necessary when performing an extended maximum likelihood fit to measure a ToA.
-# Note that for the latter, a phaseShift is incorporated into the model which
-# translates into a ToA. An amplitude shift is also incorporated to take into account
-# possible variation in pulsed fraction of magnetars, e.g., during outbursts.
+# A script that encapsulates all the allowed models to derive a best-fit template
+# to the pulse profiles. These are Fourier, von Mises, and Cauchy. Each model has
+# its own class. Each class has three methods, (1) to calculate model curve given
+# model parameters and an array of phases, (2) a binned likelihood function  with a
+# gaussian pdf, and (3) an unbinned extended likelihood function with a poisson pdf
 #
-# Input for each function:
-# 1- xx: independent variable
-# 2- theta: dictionary of input parameters
-# 
+# Note that each model also incorporates a phaseShift which translates into a ToA,
+# and an amplitude shift that takes into account possible variation in pulsed
+# fraction of magnetars, e.g., during outbursts. When not calculating ToAs, these
+# two could be set to 0 and 1, respectively.
 #
-# Extra input for their likelihoods:
-# 3- yy: dependent variable
-# 4- yy_err: uncertainties on dependent variable
-#
-# To do: add normalized likelihoods for Cauchy and von Mises
-#        beautify by making each model its own class
+# Input for each class:
+# 1- theta: dictionary of input parameters
+# 2- xx: independent variable (phases)
 ####################################################################################
 
 import sys

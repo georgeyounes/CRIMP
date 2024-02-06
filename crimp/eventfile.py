@@ -293,8 +293,7 @@ def main():
     parser.add_argument("-ne", "--nonBaryEvtFile", help="Name of non-barycentered event file", type=str, default="")
     args = parser.parse_args()
 
-    addPhaseCol = EvtFileOps(args.evtFile)
-    addPhaseCol.addphasecolEF(args.timMod, args.nonBaryEvtFile)
+    EvtFileOps(args.evtFile).addphasecolEF(args.timMod, args.nonBaryEvtFile)
 
 
 if __name__ == '__main__':

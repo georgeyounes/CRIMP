@@ -43,8 +43,6 @@ class ReadTimingModel:
                 timing model, i.e., .par file
         """
         self.timMod = timMod
-        # Parsing the .par timing model
-        self.data_file = open(self.timMod, 'r+')
 
     def readtaylorexpansion(self):
         """
@@ -52,8 +50,8 @@ class ReadTimingModel:
         :return: timModParamTE, dictionary of taylor expansion parameters
         :rtype: dict
         """
+        data_file = open(self.timMod, 'r+')
 
-        #######################################
         # Reading frequency and its derivatives
         blockF1 = ""
         blockF2 = ""
@@ -69,7 +67,7 @@ class ReadTimingModel:
         blockF12 = ""
 
         # Reading lines in the .par file
-        for line in self.data_file:
+        for line in data_file:
             # Stripping lines vertically to create a list of characters
             li = line.lstrip()
 
@@ -190,8 +188,10 @@ class ReadTimingModel:
         :return: timModParamGlitches, dictionary of glitch parameters
         :rtype: dict
         """
+        data_file = open(self.timMod, 'r+')
+
         nmbrOfGlitches = np.array([])
-        for line in self.data_file:
+        for line in data_file:
             # Stripping lines vertically to create a list of characters
             li = line.lstrip()
             # Glitch parameters
@@ -200,14 +200,13 @@ class ReadTimingModel:
                 nmbrOfGlitches = np.append(nmbrOfGlitches, blockglep.split('_')[1].split(' ')[0])
 
         # Check if there are glitches
-        if nmbrOfGlitches.size:
-            timModParamGlitches = {}  # initialize timModParamGlitches
-        else:
-            return
+        timModParamGlitches = {}  # initialize timModParamGlitches
+        if not nmbrOfGlitches.size:
+            return timModParamGlitches
 
         # We now loop over all glitches and add them to the dictionary
         for jj in nmbrOfGlitches:
-            self.data_file.seek(0)
+            data_file.seek(0)
             # Glitch parameters
             # no need to define glep (blockglep), glph (blockglph), and glf0 (blockglf0)
             # These are mandatory for any glitch
@@ -216,7 +215,7 @@ class ReadTimingModel:
             blockglf0d = ""
             blockgltd = ""
 
-            for line in self.data_file:
+            for line in data_file:
                 li = line.lstrip()
                 # Glitch parameters
                 if li.startswith(("GLEP_" + jj + " ", "GLEP_" + jj + "\t")):
@@ -276,8 +275,10 @@ class ReadTimingModel:
         :return: timModParamWaves, dictionary of glitch parameters
         :rtype: dict
         """
+        data_file = open(self.timMod, 'r+')
+
         waveHarms = np.array([])
-        for line in self.data_file:
+        for line in data_file:
             # Stripping lines vertically to create a list of characters
             li = line.lstrip()
             # Wave parameters
@@ -285,13 +286,13 @@ class ReadTimingModel:
                 waveHarms = np.append(waveHarms, line.split('WAVE')[1].split(' ')[0])
 
         # Check if there are waves
+        timModParamWaves = {}  # initialize timModParamWaves
         if waveHarms.size:
-            timModParamWaves = {}  # initialize timModParamWaves
-            self.data_file.seek(0)
+            data_file.seek(0)
         else:
-            return
+            return timModParamWaves
 
-        for line in self.data_file:
+        for line in data_file:
             li = line.lstrip()
             # Wave parameters
             if li.startswith("WAVEEPOCH "):
@@ -305,9 +306,9 @@ class ReadTimingModel:
 
         # Now we loop through the rest of the wave parameters, i.e., the harmonics
         for jj in range(1, len(waveHarms) - 1):
-            self.data_file.seek(0)
+            data_file.seek(0)
 
-            for line in self.data_file:
+            for line in data_file:
                 li = line.lstrip()
                 # Wave parameters
                 if li.startswith(("WAVE" + str(jj) + " ", "WAVE" + str(jj) + "\t")):
@@ -318,18 +319,14 @@ class ReadTimingModel:
 
         return timModParamWaves
 
-
-def readtimingmodel(timMod):
-    """
-    Read full .par timing model into a dictionary
-    :param timMod: timiding model, i.e., .par file
-    :type timMod: str
-    :return: timModParams, dictionary of timing parameters
-    :rtype: dict
-    """
-    timingModel = ReadTimingModel(timMod)
-    timModParamTE = timingModel.readtaylorexpansion()
-    timModParamGlitches = timingModel.readglitches()
-    timModParamwaves = timingModel.readwaves()
-    timModParams = {**timModParamTE, **timModParamGlitches, **timModParamwaves}
-    return timModParams
+    def readfulltimingmodel(self):
+        """
+        Read full .par timing model into a dictionary
+        :return: timModParams, dictionary of timing parameters
+        :rtype: dict
+        """
+        timModParamTE = ReadTimingModel.readtaylorexpansion(self.timMod)
+        timModParamGlitches = ReadTimingModel.readglitches(self.timMod)
+        timModParamwaves = ReadTimingModel.readwaves(self.timMod)
+        timModParams = {**timModParamTE, **timModParamGlitches, **timModParamwaves}
+        return timModParams

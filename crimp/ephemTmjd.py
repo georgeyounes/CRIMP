@@ -19,7 +19,7 @@ import numpy as np
 from math import factorial
 
 # Custom modules
-from crimp.readtimingmodel import readtimingmodel
+from crimp.readtimingmodel import ReadTimingModel
 
 sys.dont_write_bytecode = True
 
@@ -36,7 +36,7 @@ def ephemTmjd(Tmjd, timMod):
     :return: ephemerides
     :rtype: dict
     """
-    timModParam = readtimingmodel(timMod)
+    timModParam = ReadTimingModel(timMod).readfulltimingmodel()
     t0mjd = timModParam["PEPOCH"]
 
     #############################

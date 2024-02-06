@@ -12,7 +12,7 @@ import numpy as np
 from math import factorial
 
 # Custom modules
-from crimp.readtimingmodel import readtimingmodel
+from crimp.readtimingmodel import ReadTimingModel
 
 from crimp.ephemTmjd import ephemTmjd
 sys.dont_write_bytecode = True
@@ -53,7 +53,7 @@ class Phases:
         """
         self.timeMJD = timeMJD
         self.timMod = timMod
-        self.timModParam = readtimingmodel(timMod)
+        self.timModParam = ReadTimingModel(timMod).readfulltimingmodel()
 
     def taylorexpansion(self):
         """

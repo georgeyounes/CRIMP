@@ -18,7 +18,7 @@
 # phases. This is important to maitain absolute timing when deriving ToAs from several
 # different instruments (think XTI, XRT, PN, etc.), which require their own template.
 #
-# Then there is a class called PulseProfile which models a pulse profile that was provided
+# Then there is a class called ModelPulseProfile which models a pulse profile that was provided
 # as a dictionary with (at least) three keys, 'ppBins', 'countRate', and 'countRateErr';
 # numpy arrays with same length.
 #
@@ -67,7 +67,11 @@ from lmfit import Parameters, minimize
 from crimp.eventfile import EvtFileOps
 from crimp.calcphase import calcphase
 from crimp.readPPtemplate import readPPtemplate
-from crimp.templatemodels import fourSeries, logLikelihoodFS, wrapCauchy, logLikelihoodCA, vonmises, logLikelihoodVM
+
+from crimp.templatemodels import Fourier
+from crimp.templatemodels import WrappedCauchy
+from crimp.templatemodels import VonMises
+
 from crimp.binphases import binphases
 
 sys.dont_write_bytecode = True
@@ -196,11 +200,11 @@ class PulseProfileFromEventFile:
 
         if initTemplateMod is None:  # in case an initial template not given, use 'template' keyword to redirect to the appropriate function
             if ppmodel.casefold() == str.casefold('fourier'):
-                fitResultsDict, bestFitModel = PulseProfile.fitpulseprofilefourier(pulseProfile)
+                fitResultsDict, bestFitModel = ModelPulseProfile(pulseProfile, nbrComp).fouriermodel()
             elif ppmodel.casefold() == str.casefold('cauchy'):
-                fitResultsDict, bestFitModel = PulseProfile.fitpulseprofilecauchy(pulseProfile)
+                fitResultsDict, bestFitModel = ModelPulseProfile(pulseProfile, nbrComp).cauchymodel()
             elif ppmodel.casefold() == str.casefold('vonmises'):
-                fitResultsDict, bestFitModel = PulseProfile.fitpulseprofilevonmises(pulseProfile)
+                fitResultsDict, bestFitModel = ModelPulseProfile(pulseProfile, nbrComp).vonmisesmodel()
             else:
                 raise Exception(
                     'Model {} is not supported yet; fourier, vonmises, cauchy are supported'.format(ppmodel))
@@ -208,11 +212,11 @@ class PulseProfileFromEventFile:
         else:  # if template is given, continue based on 'model' keyword
             tempModPPparam = readPPtemplate(initTemplateMod)
             if tempModPPparam["model"] == str.casefold('fourier'):
-                fitResultsDict, bestFitModel = PulseProfile.fitpulseprofilefourier(pulseProfile)
+                fitResultsDict, bestFitModel = ModelPulseProfile(pulseProfile, nbrComp, initTemplateMod, fixPhases).fouriermodel()
             elif tempModPPparam["model"] == str.casefold('cauchy'):
-                fitResultsDict, bestFitModel = PulseProfile.fitpulseprofilecauchy(pulseProfile)
+                fitResultsDict, bestFitModel = ModelPulseProfile(pulseProfile, nbrComp, initTemplateMod, fixPhases).cauchymodel()
             elif tempModPPparam["model"] == str.casefold('vonmises'):
-                fitResultsDict, bestFitModel = PulseProfile.fitpulseprofilevonmises(pulseProfile)
+                fitResultsDict, bestFitModel = ModelPulseProfile(pulseProfile, nbrComp, initTemplateMod, fixPhases).vonmisesmodel()
             else:
                 raise Exception('Model {} is not supported yet; fourier, vonmises, cauchy are supported'.format(
                     tempModPPparam["model"]))
@@ -251,7 +255,7 @@ class PulseProfileFromEventFile:
         return fitResultsDict, bestFitModel, pulsedProperties
 
 
-class PulseProfile:
+class ModelPulseProfile:
     """
     A class to model a pulse profile, which is provided as a dictionary
 
@@ -277,7 +281,7 @@ class PulseProfile:
     """
     def __init__(self, pulseProfile: dict, nbrComp: int = 2, initTemplateMod: str = None, fixPhases: bool = False):
         """
-        Constructs all the necessary attributes for the PulseProfile object
+        Constructs all the necessary attributes for the ModelPulseProfile object
 
         Parameters
         ----------
@@ -295,7 +299,7 @@ class PulseProfile:
         self.initTemplateMod = initTemplateMod
         self.fixPhases = fixPhases
 
-    def fitpulseprofilefourier(self):
+    def fouriermodel(self):
         """
         Function to fit pulse profile to a Fourier series
 
@@ -338,12 +342,12 @@ class PulseProfile:
                                vary=False)  # For consistency with our model definition, we define a dummy phase shift
 
         # Running the maximum likelihood
-        nll = lambda *args: -logLikelihoodFS(*args)
+        nll = lambda *args: -Fourier.loglikelihoodFS(*args)
         results_mle_FS = minimize(nll, initParams_mle, args=(ppBins, ctRate, ctRateErr), method='nedler',
                                   max_nfev=1.0e6)
 
         # Calculating the bf Model for the data
-        bfModel = fourSeries(ppBins, results_mle_FS.params)
+        bfModel = Fourier.fourseries(ppBins, results_mle_FS.params)
 
         # Measuring chi2 and reduced chi2 of template best fit
         ######################################################
@@ -361,7 +365,7 @@ class PulseProfile:
 
         return fitResultsDict, bfModel
 
-    def fitpulseprofilecauchy(self):
+    def cauchymodel(self):
         """
         Function to fit pulse profile to a Cauchy curve
 
@@ -410,12 +414,12 @@ class PulseProfile:
                                vary=False)  # For consistency with our model definition, we define a dummy amplitude shift
 
         # Running the maximum likelihood
-        nll = lambda *args: -logLikelihoodCA(*args)
+        nll = lambda *args: -WrappedCauchy.loglikelihoodCA(*args)
         results_mle_CA = minimize(nll, initParams_mle, args=(ppBins, ctRate, ctRateErr), method='nedler',
                                   max_nfev=1.0e6)
 
         # Calculating the bf Model for the data
-        bfModel = wrapCauchy(ppBins, results_mle_CA.params)
+        bfModel = WrappedCauchy.wrapcauchy(ppBins, results_mle_CA.params)
 
         # Measuring chi2 and reduced chi2 of template best fit
         ######################################################
@@ -433,7 +437,7 @@ class PulseProfile:
 
         return fitResultsDict, bfModel
 
-    def fitpulseprofilevonmises(self):
+    def vonmisesmodel(self):
         """
         Function to fit pulse profile to a von Mises curve
 
@@ -482,12 +486,12 @@ class PulseProfile:
                                vary=False)  # For consistency with our model definition, we define a dummy amplitude shift
 
         # Running the maximum likelihood
-        nll = lambda *args: -logLikelihoodVM(*args)
+        nll = lambda *args: -VonMises.loglikelihoodVM(*args)
         results_mle_VM = minimize(nll, initParams_mle, args=(ppBins, ctRate, ctRateErr), method='nedler',
                                   max_nfev=1.0e6)
 
         # Calculating the bf Model for the data
-        bfModel = vonmises(ppBins, results_mle_VM.params)
+        bfModel = VonMises.vonmises(ppBins, results_mle_VM.params)
 
         # Measuring chi2 and reduced chi2 of template best fit
         ######################################################
