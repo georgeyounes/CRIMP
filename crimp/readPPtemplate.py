@@ -33,9 +33,9 @@ def readPPtemplate(tempModPP):
         raise Exception('The "model" parameter must exist in template file')
 
     # Direct to appropriate function based on model keyword
-    if model.casefold() == str.casefold('fourier'):
+    if model.casefold() == 'fourier':
         tempModPPparam = readPPtempFour(tempModPP)
-    elif model.casefold() in [str.casefold('vonmises'), str.casefold('cauchy')]:
+    elif model.casefold() in ('vonmises', 'cauchy'):
         tempModPPparam = readPPtempVonMisesCauchy(tempModPP)
     else:
         raise Exception('Model {} is not supported yet; fourier, vonmises, cauchy are supported'.format(model))
@@ -80,9 +80,9 @@ def readstandard(tempModPP):
         # Stripping lines vertically to create a list of characters
         li = line.lstrip()
         if li.startswith("amp"):
-            nbrOfComp = np.append(nbrOfComp, (" ".join(line.split('=')[0].split())).split('_')[1])
-
-    return data_file, tempModPPparam, nbrOfComp
+            nbrOfComp = np.append(nbrOfComp, (" ".join(line.split('=')[0].split())).split('_')[1]).astype(int)
+    tempModPPparam.update({'nbrComp': np.max(nbrOfComp)})
+    return data_file, tempModPPparam
 
 
 def readPPtempFour(tempModPP):
@@ -93,23 +93,23 @@ def readPPtempFour(tempModPP):
     :return: tempModPPparam, dictionary of template model parameters
     :rtype: dict
     """
-    data_file, tempModPPparam, nbrOfComp = readstandard(tempModPP)
+    data_file, tempModPPparam = readstandard(tempModPP)
 
     # We now loop over all harmonics and add them to the dictionary
-    for jj in nbrOfComp:
+    for jj in range(1, tempModPPparam["nbrComp"] + 1):
         # Resetting the read from top of text file - not the most efficient but all I can think of
         data_file.seek(0)
         for line in data_file:
             # Stripping lines vertically to create a list of characters
             li = line.lstrip()
             # Harmonic parameters
-            if li.startswith("amp_" + jj):
+            if li.startswith("amp_" + str(jj)):
                 ampTmp = np.float64(" ".join(line.split('=')[1].split()))
-                tempModPPparam["amp_" + jj] = ampTmp
+                tempModPPparam["amp_" + str(jj)] = ampTmp
 
-            elif li.startswith("ph_" + jj):
+            elif li.startswith("ph_" + str(jj)):
                 phTmp = np.float64(" ".join(line.split('=')[1].split()))
-                tempModPPparam["ph_" + jj] = phTmp
+                tempModPPparam["ph_" + str(jj)] = phTmp
 
     if (tempModPPparam.get("amp_1") is None) or (tempModPPparam.get("ph_1") is None):
         raise Exception('Parameter of first harmonic, "amp_1" and "ph_1", must exist in template file')
@@ -125,25 +125,25 @@ def readPPtempVonMisesCauchy(tempModPP):
     :return: tempModPPparam, dictionary of template model parameters
     :rtype: dict
     """
-    data_file, tempModPPparam, nbrOfComp = readstandard(tempModPP)
+    data_file, tempModPPparam = readstandard(tempModPP)
 
     # We now loop over all harmonics and add them to the dictionary
-    for jj in nbrOfComp:
+    for jj in range(1, tempModPPparam["nbrComp"] + 1):
         # Resetting the read from top of text file - not the most efficient but all I can think of
         data_file.seek(0)
         for line in data_file:
             # Stripping lines vertically to create a list of characters
             li = line.lstrip()
             # Component parameters
-            if li.startswith("amp_" + jj):
+            if li.startswith("amp_" + str(jj)):
                 ampTmp = np.float64(" ".join(line.split('=')[1].split()))
-                tempModPPparam["amp_" + jj] = ampTmp
-            elif li.startswith("cen_" + jj):
+                tempModPPparam["amp_" + str(jj)] = ampTmp
+            elif li.startswith("cen_" + str(jj)):
                 phTmp = np.float64(" ".join(line.split('=')[1].split()))
-                tempModPPparam["cen_" + jj] = phTmp
-            elif li.startswith("wid_" + jj):
+                tempModPPparam["cen_" + str(jj)] = phTmp
+            elif li.startswith("wid_" + str(jj)):
                 phTmp = np.float64(" ".join(line.split('=')[1].split()))
-                tempModPPparam["wid_" + jj] = phTmp
+                tempModPPparam["wid_" + str(jj)] = phTmp
 
     if ((tempModPPparam.get("amp_1") is None) or (tempModPPparam.get("cen_1") is None) or
             (tempModPPparam.get("wid_1") is None)):

@@ -56,6 +56,8 @@
 
 import argparse
 import sys
+import warnings
+
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.stats import norm
@@ -93,8 +95,6 @@ class PulseProfileFromEventFile:
             upper bound of energy band in keV, default = 10
         nbrBins: int
             number of bins in pulse profile, default = 30
-        figure: str
-            Name of pulse profile plot, default = None
 
         Methods
         -------
@@ -105,8 +105,7 @@ class PulseProfileFromEventFile:
             fit pulse profile to model (Fourier, von Mises, Cauchy)
         """
 
-    def __init__(self, evtFile: str, timMod: str, eneLow: float = 0.5, eneHigh: float = 10., nbrBins: int = 30,
-                 figure: str = None):
+    def __init__(self, evtFile: str, timMod: str, eneLow: float = 0.5, eneHigh: float = 10., nbrBins: int = 30):
         """
         Constructs all the necessary attributes for the **PulseProfileFromEventFile** object.
 
@@ -122,15 +121,12 @@ class PulseProfileFromEventFile:
             upper bound of energy band in keV, default = 10
         nbrBins: int
             number of bins in pulse profile, default = 30
-        figure: str
-            Name of pulse profile plot, default = None
         """
         self.evtFile = evtFile
         self.timMod = timMod
         self.eneLow = eneLow
         self.eneHigh = eneHigh
         self.nbrBins = nbrBins
-        self.figure = figure
 
     #################################################################################
     def createpulseprofile(self):
@@ -170,16 +166,12 @@ class PulseProfileFromEventFile:
         ctRateErr = binnedProfile["ctsBinsErr"] / (LIVETIME / self.nbrBins)
         pulseProfile = {'ppBins': ppBins, 'ppBinsRange': ppBinsRange, 'countRate': ctRate, 'countRateErr': ctRateErr}
 
-        # Creating figure of pulse profile
-        ##################################
-        if self.figure is not None:
-            plotpulseprofile(pulseProfile, outFile=self.figure)
-
         return pulseProfile
 
     #################################################################################
     def fitpulseprofile(self, ppmodel: str = 'fourier', nbrComp: int = 2, initTemplateMod: str = None,
-                        fixPhases: bool = False, templateFile: str = None, calcPulsedFraction: bool = False):
+                        fixPhases: bool = False, figure: str = None, templateFile: str = None,
+                        calcPulsedFraction: bool = False):
         """
         Fit pulse profile to a model (Fourier, vonMises, or Cauchy)
         :param ppmodel: name of model to fit data (default = fourier, vonmises, or cauchy)
@@ -190,6 +182,8 @@ class PulseProfileFromEventFile:
         :type initTemplateMod: str
         :param fixPhases: if **initTemplateMod** is provided, fix phases (default = False)
         :type fixPhases: bool
+        :param figure: Name of pulse profile plot, default = None
+        :type figure: str
         :param templateFile: name of output file with best-fit model parameters (default = None)
         :type templateFile: str
         :param calcPulsedFraction: calculate pulsed fraction (default = False)
@@ -199,11 +193,13 @@ class PulseProfileFromEventFile:
         pulseProfile = self.createpulseprofile()
 
         if initTemplateMod is None:  # in case an initial template not given, use 'template' keyword to redirect to the appropriate function
-            if ppmodel.casefold() == str.casefold('fourier'):
+            if ppmodel.casefold() == 'fourier':
                 fitResultsDict, bestFitModel = ModelPulseProfile(pulseProfile, nbrComp).fouriermodel()
-            elif ppmodel.casefold() == str.casefold('cauchy'):
+            elif ppmodel.casefold() == 'cauchy':
+                pulseProfile["ppBins"] *= 2 * np.pi  # need to be normalized to 2pi
                 fitResultsDict, bestFitModel = ModelPulseProfile(pulseProfile, nbrComp).cauchymodel()
-            elif ppmodel.casefold() == str.casefold('vonmises'):
+            elif ppmodel.casefold() == 'vonmises':
+                pulseProfile["ppBins"] *= 2 * np.pi  # need to be normalized to 2pi
                 fitResultsDict, bestFitModel = ModelPulseProfile(pulseProfile, nbrComp).vonmisesmodel()
             else:
                 raise Exception(
@@ -211,12 +207,19 @@ class PulseProfileFromEventFile:
 
         else:  # if template is given, continue based on 'model' keyword
             tempModPPparam = readPPtemplate(initTemplateMod)
-            if tempModPPparam["model"] == str.casefold('fourier'):
-                fitResultsDict, bestFitModel = ModelPulseProfile(pulseProfile, nbrComp, initTemplateMod, fixPhases).fouriermodel()
-            elif tempModPPparam["model"] == str.casefold('cauchy'):
-                fitResultsDict, bestFitModel = ModelPulseProfile(pulseProfile, nbrComp, initTemplateMod, fixPhases).cauchymodel()
-            elif tempModPPparam["model"] == str.casefold('vonmises'):
-                fitResultsDict, bestFitModel = ModelPulseProfile(pulseProfile, nbrComp, initTemplateMod, fixPhases).vonmisesmodel()
+            ppmodel = tempModPPparam["model"]
+            nbrComp = tempModPPparam["nbrComp"]
+            if ppmodel.casefold() == 'fourier':
+                fitResultsDict, bestFitModel = ModelPulseProfile(pulseProfile, nbrComp, initTemplateMod,
+                                                                 fixPhases).fouriermodel()
+            elif ppmodel.casefold() == 'cauchy':
+                pulseProfile["ppBins"] *= 2 * np.pi  # need to be normalized to 2pi
+                fitResultsDict, bestFitModel = ModelPulseProfile(pulseProfile, nbrComp, initTemplateMod,
+                                                                 fixPhases).cauchymodel()
+            elif ppmodel.casefold() == 'vonmises':
+                pulseProfile["ppBins"] *= 2 * np.pi  # need to be normalized to 2pi
+                fitResultsDict, bestFitModel = ModelPulseProfile(pulseProfile, nbrComp, initTemplateMod,
+                                                                 fixPhases).vonmisesmodel()
             else:
                 raise Exception('Model {} is not supported yet; fourier, vonmises, cauchy are supported'.format(
                     tempModPPparam["model"]))
@@ -233,7 +236,11 @@ class PulseProfileFromEventFile:
 
             for nn in range(1, nbrComp + 1):
                 f.write('amp_' + str(nn) + ' = ' + str(fitResultsDict["amp_" + str(nn)]) + '\n')
-                f.write('ph_' + str(nn) + ' = ' + str(fitResultsDict["ph_" + str(nn)]) + '\n')
+                if ppmodel.casefold() == 'fourier':
+                    f.write('ph_' + str(nn) + ' = ' + str(fitResultsDict["ph_" + str(nn)]) + '\n')
+                if ppmodel.casefold() == 'vonmises' or ppmodel.casefold() == 'cauchy':
+                    f.write('cen_' + str(nn) + ' = ' + str(fitResultsDict["cen_" + str(nn)]) + '\n')
+                    f.write('wid_' + str(nn) + ' = ' + str(fitResultsDict["wid_" + str(nn)]) + '\n')
 
             f.write('chi2 = ' + str(fitResultsDict["chi2"]) + '\n')
             f.write('dof = ' + str(fitResultsDict["dof"]) + '\n')
@@ -242,15 +249,21 @@ class PulseProfileFromEventFile:
 
         # Calculating the rms pulsed flux and fraction, along with the harmonics fractions
         ##################################################################################
-        if calcPulsedFraction is True:
+        if calcPulsedFraction is True and ppmodel.casefold() == 'fourier':
             pulsedProperties = calcpulseproperties(pulseProfile, nbrComp)
+            pulsePropertiesErr = calcuncertaintypulseproperties(pulseProfile, nbrComp)
+            pulsedProperties.update(pulsePropertiesErr)
+        elif calcPulsedFraction is True and ppmodel.casefold() in ('cauchy', 'vonmises'):
+            warnings.warn('Cannot calculate rms pulsed fraction for ' + ppmodel.casefold() +
+                          '\n Setting pulsedProperties to None')
+            pulsedProperties = None
         else:
             pulsedProperties = None
 
         # Creating figure of pulse profile and best fit model
         #####################################################
-        if self.figure is not None:
-            plotpulseprofile(pulseProfile, outFile=self.figure, fittedModel=bestFitModel)
+        if figure is not None:
+            plotpulseprofile(pulseProfile, outFile=figure, fittedModel=bestFitModel)
 
         return fitResultsDict, bestFitModel, pulsedProperties
 
@@ -279,6 +292,7 @@ class ModelPulseProfile:
     fitPulseProfileVonMises():
         Fit pulse profile to a von Mises curve (wrappged Gaussian)
     """
+
     def __init__(self, pulseProfile: dict, nbrComp: int = 2, initTemplateMod: str = None, fixPhases: bool = False):
         """
         Constructs all the necessary attributes for the ModelPulseProfile object
@@ -329,9 +343,9 @@ class ModelPulseProfile:
                                vary=False)  # For consistency, we define an amplitude shift for the fourier model, though not required here
         else:  # Setting initial guesses to template parameters
             initParams_mle_temp = readPPtemplate(self.initTemplateMod)
-            nbrComp = len(np.array([ww for harmKey, ww in initParams_mle_temp.items() if harmKey.startswith('amp_')]))
+            self.nbrComp = initParams_mle_temp["nbrComp"]
             initParams_mle.add('norm', initParams_mle_temp['norm'], min=0.0, max=np.inf)
-            for kk in range(1, nbrComp + 1):
+            for kk in range(1, self.nbrComp + 1):
                 initParams_mle.add('amp_' + str(kk), initParams_mle_temp['amp_' + str(kk)])
                 initParams_mle.add('ph_' + str(kk), initParams_mle_temp['ph_' + str(kk)])
                 if self.fixPhases is True:  # In case component phases should be fixed
@@ -342,16 +356,18 @@ class ModelPulseProfile:
                                vary=False)  # For consistency with our model definition, we define a dummy phase shift
 
         # Running the maximum likelihood
-        nll = lambda *args: -Fourier.loglikelihoodFS(*args)
-        results_mle_FS = minimize(nll, initParams_mle, args=(ppBins, ctRate, ctRateErr), method='nedler',
+        def binnednllfourier(param, xx, yy, yyErr):
+            return -Fourier(param, xx).loglikelihoodFS(yy, yyErr)
+
+        results_mle_FS = minimize(binnednllfourier, initParams_mle, args=(ppBins, ctRate, ctRateErr), method='nedler',
                                   max_nfev=1.0e6)
 
         # Calculating the bf Model for the data
-        bfModel = Fourier.fourseries(ppBins, results_mle_FS.params)
+        bfModel = Fourier(results_mle_FS.params, ppBins).fourseries()
 
         # Measuring chi2 and reduced chi2 of template best fit
         ######################################################
-        nbrFreeParam = nbrComp * 2 + 1
+        nbrFreeParam = self.nbrComp * 2 + 1
         chi2Results = measurechi2(self.pulseProfile, bfModel, nbrFreeParam)
         print('Template {} best fit statistics\n chi2 = {} for dof = {}\n Reduced chi2 = {}'.format(template,
                                                                                                     chi2Results["chi2"],
@@ -361,7 +377,8 @@ class ModelPulseProfile:
 
         # Creating dictionary of results
         fitResultsDict = results_mle_FS.params.valuesdict()  # converting best-fit results to dictionary
-        fitResultsDict.update(chi2Results, {'model': template})
+        fitResultsDict.update(chi2Results)
+        fitResultsDict.update({'model': template})
 
         return fitResultsDict, bfModel
 
@@ -380,10 +397,6 @@ class ModelPulseProfile:
         # used a few times down below
         template = 'cauchy'
 
-        # Typically the pulse profile is normalized to unity, if that is the case, multiply by 2*pi
-        if np.max(ppBins) <= 1:
-            ppBins *= 2 * np.pi
-
         # Fitting pulse profile utilizing mle
         #####################################
         initParams_mle = Parameters()  # Initializing an instance of Parameters
@@ -400,9 +413,9 @@ class ModelPulseProfile:
                                vary=False)  # For consistency with our model definition, we define a dummy amplitude shift
         else:  # Setting initial guesses to template parameters
             initParams_mle_temp = readPPtemplate(self.initTemplateMod)
-            nbrComp = len(np.array([ww for harmKey, ww in initParams_mle_temp.items() if harmKey.startswith('amp_')]))
+            self.nbrComp = initParams_mle_temp["nbrComp"]
             initParams_mle.add('norm', initParams_mle_temp['norm'], min=0.0, max=np.inf)
-            for kk in range(1, nbrComp + 1):
+            for kk in range(1, self.nbrComp + 1):
                 initParams_mle.add('amp_' + str(kk), initParams_mle_temp['amp_' + str(kk)], min=0.0, max=np.inf)
                 initParams_mle.add('cen_' + str(kk), initParams_mle_temp['cen_' + str(kk)], min=0.0, max=2 * np.pi)
                 initParams_mle.add('wid_' + str(kk), initParams_mle_temp['wid_' + str(kk)], min=0.0, max=np.inf)
@@ -414,16 +427,18 @@ class ModelPulseProfile:
                                vary=False)  # For consistency with our model definition, we define a dummy amplitude shift
 
         # Running the maximum likelihood
-        nll = lambda *args: -WrappedCauchy.loglikelihoodCA(*args)
-        results_mle_CA = minimize(nll, initParams_mle, args=(ppBins, ctRate, ctRateErr), method='nedler',
-                                  max_nfev=1.0e6)
+        def binnednllcauchy(param, xx, yy, yyErr):
+            return -WrappedCauchy(param, xx).loglikelihoodCA(yy, yyErr)
+
+        results_mle_CA = minimize(binnednllcauchy, initParams_mle, args=(ppBins, ctRate, ctRateErr),
+                                  method='nedler', max_nfev=1.0e6)
 
         # Calculating the bf Model for the data
-        bfModel = WrappedCauchy.wrapcauchy(ppBins, results_mle_CA.params)
+        bfModel = WrappedCauchy(results_mle_CA.params, ppBins).wrapcauchy()
 
         # Measuring chi2 and reduced chi2 of template best fit
         ######################################################
-        nbrFreeParam = nbrComp * 2 + 1
+        nbrFreeParam = self.nbrComp * 2 + 1
         chi2Results = measurechi2(self.pulseProfile, bfModel, nbrFreeParam)
         print('Template {} best fit statistics\n chi2 = {} for dof = {}\n Reduced chi2 = {}'.format(template,
                                                                                                     chi2Results["chi2"],
@@ -433,7 +448,8 @@ class ModelPulseProfile:
 
         # Creating dictionary of results
         fitResultsDict = results_mle_CA.params.valuesdict()  # converting best-fit results to dictionary
-        fitResultsDict.update(chi2Results, {'model': template})
+        fitResultsDict.update(chi2Results)
+        fitResultsDict.update({'model': template})
 
         return fitResultsDict, bfModel
 
@@ -452,10 +468,6 @@ class ModelPulseProfile:
         # used a few times down below
         template = 'vonmises'
 
-        # Typically the pulse profile is normalized to unity, if that is the case, multiply by 2*pi
-        if np.max(ppBins) <= 1:
-            ppBins *= 2 * np.pi
-
         # Fitting pulse profile utilizing mle
         #####################################
         initParams_mle = Parameters()  # Initializing an instance of Parameters
@@ -472,9 +484,9 @@ class ModelPulseProfile:
                                vary=False)  # For consistency with our model definition, we define a dummy amplitude shift
         else:  # Setting initial guesses to template parameters
             initParams_mle_temp = readPPtemplate(self.initTemplateMod)
-            nbrComp = len(np.array([ww for harmKey, ww in initParams_mle_temp.items() if harmKey.startswith('amp_')]))
+            self.nbrComp = initParams_mle_temp["nbrComp"]
             initParams_mle.add('norm', initParams_mle_temp['norm'], min=0.0, max=np.inf)
-            for kk in range(1, nbrComp + 1):
+            for kk in range(1, self.nbrComp + 1):
                 initParams_mle.add('amp_' + str(kk), initParams_mle_temp['amp_' + str(kk)], min=0.0, max=np.inf)
                 initParams_mle.add('cen_' + str(kk), initParams_mle_temp['cen_' + str(kk)], min=0.0, max=2 * np.pi)
                 initParams_mle.add('wid_' + str(kk), initParams_mle_temp['wid_' + str(kk)], min=0.0, max=np.inf)
@@ -485,17 +497,19 @@ class ModelPulseProfile:
             initParams_mle.add('ampShift', 1,
                                vary=False)  # For consistency with our model definition, we define a dummy amplitude shift
 
+        def binnednllvonmises(param, xx, yy, yyErr):
+            return -VonMises(param, xx).loglikelihoodVM(yy, yyErr)
+
         # Running the maximum likelihood
-        nll = lambda *args: -VonMises.loglikelihoodVM(*args)
-        results_mle_VM = minimize(nll, initParams_mle, args=(ppBins, ctRate, ctRateErr), method='nedler',
-                                  max_nfev=1.0e6)
+        results_mle_VM = minimize(binnednllvonmises, initParams_mle, args=(ppBins, ctRate, ctRateErr),
+                                  method='nedler', max_nfev=1.0e6)
 
         # Calculating the bf Model for the data
-        bfModel = VonMises.vonmises(ppBins, results_mle_VM.params)
+        bfModel = VonMises(results_mle_VM.params, ppBins).vonmises()
 
         # Measuring chi2 and reduced chi2 of template best fit
         ######################################################
-        nbrFreeParam = nbrComp * 2 + 1
+        nbrFreeParam = self.nbrComp * 2 + 1
         chi2Results = measurechi2(self.pulseProfile, bfModel, nbrFreeParam)
         print('Template {} best fit statistics\n chi2 = {} for dof = {}\n Reduced chi2 = {}'.format(template,
                                                                                                     chi2Results["chi2"],
@@ -505,7 +519,8 @@ class ModelPulseProfile:
 
         # Creating dictionary of results
         fitResultsDict = results_mle_VM.params.valuesdict()  # converting best-fit results to dictionary
-        fitResultsDict.update(chi2Results, {'model': template})
+        fitResultsDict.update(chi2Results)
+        fitResultsDict.update({'model': template})
 
         return fitResultsDict, bfModel
 
@@ -568,8 +583,6 @@ def calcpulseproperties(pulseProfile, nbrComp):
     PFrms = Frms / np.mean(ctRate)
 
     pulseProperties = {'pulsedFlux': Frms, 'pulsedFraction': PFrms, 'harmonicPulsedFractions': FrmsHarms}
-    pulsePropertiesErr = calcuncertaintypulseproperties(pulseProfile, nbrComp)
-    pulseProperties.update(pulsePropertiesErr)
 
     return pulseProperties
 
@@ -628,10 +641,15 @@ def plotpulseprofile(pulseProfile, outFile='pulseprof', fittedModel=None):
     ctRate = pulseProfile["countRate"]
     ctRateErr = pulseProfile["countRateErr"]
 
+    if np.max(pulseProfile["ppBins"]) > 1:  # Plotting a second cycle for cauchy or vonmises (cycle = 2*pi)
+        secondCycle = 2 * np.pi
+    else:  # Plotting a second cycle for fourier (cycle = 1)
+        secondCycle = 1
+
     # creating a two-cycles for clarity
     ctRate_plt = np.append(ctRate, ctRate)
     ctRateErr_plt = np.append(ctRateErr, ctRateErr)
-    ppBins_plt = np.append(ppBins, ppBins + 1.0)
+    ppBins_plt = np.append(ppBins, ppBins + secondCycle)
 
     fig, ax1 = plt.subplots(1, figsize=(6, 4.0), dpi=80, facecolor='w', edgecolor='k')
     ax1.tick_params(axis='both', labelsize=12)
@@ -673,9 +691,6 @@ def main():
     parser.add_argument("-eh", "--eneHigh", help="high energy cut, default=10 keV", type=float, default=10)
     parser.add_argument("-nb", "--nbrBins", help="Number of bins for visualization purposes only, default = 15",
                         type=int, default=15)
-    parser.add_argument("-fg", "--figure",
-                        help="If supplied, a plot of the pulse profile will be produced, 'figure'.pdf", type=str,
-                        default=None)
     parser.add_argument("-pm", "--ppmodel",
                         help="Model for fitting (default = 'fourier'; 'vonmises' and 'cauchy' are also supported)",
                         type=str, default='fourier')
@@ -688,6 +703,9 @@ def main():
     parser.add_argument("-fp", "--fixPhases",
                         help="Flag to fix phases in input initial template model (initTemplateMod), default = False",
                         type=bool, default=False, action=argparse.BooleanOptionalAction)
+    parser.add_argument("-fg", "--figure",
+                        help="If supplied, a plot of the pulse profile will be produced, 'figure'.pdf", type=str,
+                        default=None)
     parser.add_argument("-tf", "--templateFile", help="'Output' .txt file for best-fit model)", type=str,
                         default='None')
     parser.add_argument("-cp", "--calcPulsedFraction",
@@ -695,10 +713,9 @@ def main():
                         default=False, action=argparse.BooleanOptionalAction)
     args = parser.parse_args()
 
-    ppfromevt = PulseProfileFromEventFile(args.evtFile, args.timMod, args.eneLow, args.eneHigh, args.nbrBins,
-                                          args.figure)
-    ppfromevt.fitpulseprofile(args.ppmodel, args.nbrComp, args.initTemplateMod, args.fixPhases, args.templateFile,
-                              args.calcPulsedFraction)
+    ppfromevt = PulseProfileFromEventFile(args.evtFile, args.timMod, args.eneLow, args.eneHigh, args.nbrBins)
+    ppfromevt.fitpulseprofile(args.ppmodel, args.nbrComp, args.initTemplateMod, args.fixPhases, args.figure,
+                              args.templateFile, args.calcPulsedFraction)
 
 
 ##############

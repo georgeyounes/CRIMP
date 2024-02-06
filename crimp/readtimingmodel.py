@@ -325,8 +325,8 @@ class ReadTimingModel:
         :return: timModParams, dictionary of timing parameters
         :rtype: dict
         """
-        timModParamTE = ReadTimingModel.readtaylorexpansion(self.timMod)
-        timModParamGlitches = ReadTimingModel.readglitches(self.timMod)
-        timModParamwaves = ReadTimingModel.readwaves(self.timMod)
+        timModParamTE = ReadTimingModel.readtaylorexpansion(self)
+        timModParamGlitches = ReadTimingModel.readglitches(self)
+        timModParamwaves = ReadTimingModel.readwaves(self)
         timModParams = {**timModParamTE, **timModParamGlitches, **timModParamwaves}
         return timModParams

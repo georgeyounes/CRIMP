@@ -1,7 +1,8 @@
 [console_scripts]
-addPhaseColumn = crimp.evtFileOps:main
-buildTimeIntervalsForToAs = crimp.buildTimeIntToAs:main
-createTemplatePulseProfile = crimp.pulseProfileOps:main
+addPhaseColumn = crimp.eventfile:main
+buildTimeIntervalsForToAs = crimp.buildtimeintervalsToAs:main
+createTemplatePulseProfile = crimp.pulseprofile:main
 diagnoseToAs = crimp.diagnoseToAs:main
-ephemeIntegerRotation = crimp.ephemIntRotation:main
+ephemIntegerRotation = crimp.ephemIntegerRotation:main
 measureToAs = crimp.measureToAs:main
+phShiftToTimFile = crimp.phshiftTotimfile:main

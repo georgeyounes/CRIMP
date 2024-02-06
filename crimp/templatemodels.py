@@ -96,7 +96,7 @@ class Fourier:
         :return: log likelihood of yy given theta
         :rtype: numpy.ndarray
         """
-        modelFourSeriesCurve = Fourier.fourseries(self.theta, self.xx)
+        modelFourSeriesCurve = Fourier(self.theta, self.xx).fourseries()
         return np.sum(stats.norm.logpdf(yy, loc=modelFourSeriesCurve, scale=yy_err))
 
     def loglikelihoodFSnormalized(self, exposure):  # Normalized log likelihood
@@ -110,7 +110,7 @@ class Fourier:
         :return: extended log likelihood of xx given theta
         :rtype: numpy.ndarray
         """
-        modelFourSeriesCurve = Fourier.fourseries(self.theta, self.xx)
+        modelFourSeriesCurve = Fourier(self.theta, self.xx).fourseries()
         # extended maximum likelihood - Dividing Fourier model by norm to normalize it
         modelFourSeriesCurveNormalized = modelFourSeriesCurve / self.theta["norm"]
         if np.min(modelFourSeriesCurveNormalized) <= 0:
@@ -301,7 +301,7 @@ class VonMises:
         :return: log likelihood of yy given theta
         :rtype: numpy.ndarray
         """
-        modelVonmisesCurve = VonMises.vonmises(self.theta, self.xx)
+        modelVonmisesCurve = VonMises(self.theta, self.xx).vonmises()
         return np.sum(stats.norm.logpdf(yy, loc=modelVonmisesCurve, scale=yy_err))
 
     def loglikelihoodVMnormalized(self, exposure):
@@ -315,7 +315,7 @@ class VonMises:
         :return: extended log likelihood of xx given theta
         :rtype: numpy.ndarray
         """
-        modelVonMisesCurve = VonMises.vonmises(self.theta, self.xx)
+        modelVonMisesCurve = VonMises(self.theta, self.xx).vonmises()
         # extended maximum likelihood - normalizing von-Mises model
         nbrComp = len(np.array([ww for compKey, ww in self.theta.items() if compKey.startswith('amp_')]))
         normalizingFactor = self.theta["norm"]
