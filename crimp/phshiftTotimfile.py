@@ -20,7 +20,7 @@ import numpy as np
 import pandas as pd
 
 # Custom scripts
-from crimp.ephemeridesIntRotation import ephemeridesIntRotation
+from crimp.ephemIntegerRotation import ephemIntegerRotation
 
 
 def phshiftTotimfile(ToAs, timMod, timFile='residuals', tempModPP='ppTemplateMod', flag='Xray'):
@@ -54,7 +54,7 @@ def phshiftTotimfile(ToAs, timMod, timFile='residuals', tempModPP='ppTemplateMod
     f.write('FORMAT 1\n')
 
     for ii in range(nbrToAs):
-        ephemerides_intRot = ephemeridesIntRotation(tToA_MJD[ii], timMod)
+        ephemerides_intRot = ephemIntegerRotation(tToA_MJD[ii], timMod)
 
         # Time corresponding to phase shift 
         deltaT = dph[ii] * (1 / ephemerides_intRot["freq_intRotation"])

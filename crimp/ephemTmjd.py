@@ -24,7 +24,7 @@ from crimp.readtimingmodel import readtimingmodel
 sys.dont_write_bytecode = True
 
 
-def ephemeridesAtTmjd(Tmjd, timMod):
+def ephemTmjd(Tmjd, timMod):
     """
     Function that provides the spin frequency at the input MJD according
     to a timing model (.par file)

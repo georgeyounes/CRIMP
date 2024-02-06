@@ -38,6 +38,9 @@
 #
 # output:
 # ToAsTable : pandas table of ToAs properties
+#
+# To do:
+# Add ToA measurement for cauchy and von mises
 ################################################################################
 
 import sys
@@ -57,8 +60,8 @@ from crimp.eventfile import EvtFileOps
 from crimp.calcphase import calcphase
 from crimp.binphases import binphases
 from crimp.readPPtemplate import readPPtemplate
-from crimp.templatemodels import fourSeries, logLikelihoodFSNormalized
-from crimp.ephemeridesAtTmjd import ephemeridesAtTmjd
+from crimp.templatemodels import Fourier
+from crimp.ephemTmjd import ephemTmjd
 from crimp.periodsearch import PeriodSearch
 from crimp.phshiftTotimfile import phshiftTotimfile
 
@@ -153,7 +156,7 @@ def measureToAs(evtFile, timMod, tempModPP, toagtifile, eneLow=0.5, eneHigh=10.,
 
     for ii in range(toaStart, toaEnd):
 
-        # Here ii ignores some commented out ToA intervals in "toagtifile" - it is an easy fix though I am not sure it is necessary/helpful
+        # Here ii ignores some commented out ToA intervals in "toagtifile" - it is an easy fix though not sure if it is necessary/helpful
         # At the end of the day, we want to count the ToAs that mattered, so skipping on the numbers of ToAs might be confusing
 
         TIME_toa_bool = (TIMEMJD >= ToAStartMJD[ii]) & (TIMEMJD <= ToAEndMJD[ii])
@@ -189,7 +192,7 @@ def measureToAs(evtFile, timMod, tempModPP, toagtifile, eneLow=0.5, eneHigh=10.,
 
         # Calculating Htest power at the epoch frequency
         ################################################
-        ephemeridesAtTmid = ephemeridesAtTmjd(ToA_mid, timMod)
+        ephemeridesAtTmid = ephemTmjd(ToA_mid, timMod)
         htestAtTmid = PeriodSearch(TIME_toa * 86400, np.atleast_1d(ephemeridesAtTmid["freqAtTmjd"]), nbrHarm=5)
         htestPowAtTmid = htestAtTmid.htest()[0]
 
@@ -268,7 +271,7 @@ def measureToA_fourier(tempModPP, cycleFoldedPhases, exposureInt, outFile='', ph
     initTempModPPparam.add('phShift', 0, vary=True, min=-np.pi, max=np.pi)  # Phase shift - parameter of interest
     initTempModPPparam.add('ampShift', 1, vary=False)
     # Running the extended maximum likelihood
-    nll = lambda *args: -logLikelihoodFSNormalized(*args)  # Needs to be done on a normalized function
+    nll = lambda *args: -Fourier.loglikelihoodFSnormalized(*args)  # Needs to be done on a normalized function
     results_mle_FSNormalized = minimize(nll, initTempModPPparam, args=(cycleFoldedPhases, exposureInt), method='nelder',
                                         max_nfev=1.0e3, nan_policy='propagate')
     nbrFreeParams = 2
@@ -345,7 +348,7 @@ def measureToA_fourier(tempModPP, cycleFoldedPhases, exposureInt, outFile='', ph
     ctRate = binnedProfile["ctsBins"] / (exposureInt / nbrBins)
     ctRateErr = binnedProfile["ctsBinsErr"] / (exposureInt / nbrBins)
     # Best fit model
-    bfModel = fourSeries(ppBins, results_mle_FSNormalized.params)
+    bfModel = Fourier.fourseries(ppBins, results_mle_FSNormalized.params)
     # Chi2 and reduced chi2
     chi2_pp = np.sum(np.divide(((bfModel - ctRate) ** 2), ctRateErr ** 2))
     redchi2_pp = np.divide(chi2_pp, np.size(ppBins) - nbrFreeParams)
@@ -353,7 +356,7 @@ def measureToA_fourier(tempModPP, cycleFoldedPhases, exposureInt, outFile='', ph
     # Plotting pulse profile of each ToA along with the best fit template model before and after correcting the phase shift
     #######################################################################################################################
     if plotPPs is True:
-        initModel = fourSeries(ppBins, initTempModPPparam)
+        initModel = Fourier.fourseries(ppBins, initTempModPPparam)
         plotPPofToAs(ppBins, ctRate, ctRateErr, bfModel, initModel, outFile=outFile)
 
     ToAPropFourier = {'phShi': phShiBF, 'phShi_LL': phShiBF_LL, 'phShi_UL': phShiBF_UL, 'reducedChi2': redchi2_pp}

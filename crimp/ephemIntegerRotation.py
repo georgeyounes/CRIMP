@@ -24,13 +24,13 @@ import argparse
 import sys
 
 # Custom modules
-from crimp.ephemeridesAtTmjd import ephemeridesAtTmjd
+from crimp.ephemTmjd import ephemTmjd
 from crimp.calcphase import calcphase
 
 sys.dont_write_bytecode = True
 
 
-def ephemeridesIntRotation(Tmjd, timMod, printOutput=False):
+def ephemIntegerRotation(Tmjd, timMod, printOutput=False):
     """
     Function that provides the earliest MJD and corresponding spin frequency
     to input MJD which, according the input .par file, would result in an
@@ -46,7 +46,7 @@ def ephemeridesIntRotation(Tmjd, timMod, printOutput=False):
     :return: ephemerides_intRotation
     :rtype: dict
     """
-    freqAtTmjd = ephemeridesAtTmjd(Tmjd, timMod)["freqAtTmjd"]
+    freqAtTmjd = ephemTmjd(Tmjd, timMod)["freqAtTmjd"]
 
     # Phases that correspond to Tmjd according to timing model
     phAtTmjd, _ = calcphase(Tmjd, timMod)
@@ -56,7 +56,7 @@ def ephemeridesIntRotation(Tmjd, timMod, printOutput=False):
     FracTFromIntRotation = (phAtTmjd_Frac / freqAtTmjd) / 86400
 
     Tmjd_intRotation = Tmjd - FracTFromIntRotation
-    freq_intRotation = ephemeridesAtTmjd(Tmjd_intRotation, timMod)["freqAtTmjd"]
+    freq_intRotation = ephemTmjd(Tmjd_intRotation, timMod)["freqAtTmjd"]
     ph_intRotation, _ = calcphase(Tmjd_intRotation, timMod)
 
     if printOutput is True:
@@ -79,7 +79,7 @@ def main():
                         default=False, action=argparse.BooleanOptionalAction)
     args = parser.parse_args()
 
-    ephemeridesIntRotation(args.tMJD, args.timMod, args.printOutput)
+    ephemIntegerRotation(args.tMJD, args.timMod, args.printOutput)
 
 
 if __name__ == '__main__':

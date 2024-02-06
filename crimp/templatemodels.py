@@ -22,6 +22,8 @@
 ####################################################################################
 
 import sys
+
+import numpy
 import numpy as np
 from scipy.special import j0
 from scipy import stats
@@ -29,94 +31,308 @@ from scipy import stats
 sys.dont_write_bytecode = True
 
 
-def fourSeries(theta, xx):
+class Fourier:
     """
-    A rudimentary implementation of a Fourier series and its loglikelihood
-    Note that this is normalized to a frequency of 1 (cycle folded pulse profile)
+        class for Fourier series
 
-    :param theta: model parameters
-    :type theta: dict
-    :param xx: ppBins
-    :type xx: numpy.ndarray
-    :return: fourSeriesCurve, Fourier model given theta
-    :rtype: numpy.ndarray
+        Attributes
+        ----------
+        theta : dict
+            model parameters, keys are **norm**, a pair of **ampShift** and **phShift** (=1, =0, respectively
+            unless a ToA is being calculated), and pairs of **amp_n** and **ph_n** for nth harmonic
+        xx : numpy.ndarray
+                rotational phases of photons
+
+        Methods
+        -------
+        fourseries():
+            calculates the total fourier series curve at each *xx* according to *theta*
+        loglikelihoodFS():
+            Binned log likelihood of the Fourier curve given *yy* and corresponding uncertainty *yy_err* at each *xx*
+            Assumes a gaussian probability density function
+        loglikelihoodFSnormalized():
+            non-binned extended log likelihood of the normalized Fourier series curve. It requires **exposure** to
+            calculate number of counts (occurrences) from rate (i.e., theta["norm"]*exposure)
+            Assumes a poisson probability density function
+        """
+
+    def __init__(self, theta: dict, xx: numpy.ndarray):
+        """
+        Constructs all the necessary attributes for the Fourier object
+
+        Parameters
+        ----------
+            theta : dict
+                fourier model parameters, keys are **norm**, a pair of **ampShift** and **phShift** (=1, =0, respectively
+                unless a ToA is being calculated), and pairs of **amp_n** and **ph_n** for nth harmonic
+            xx : numpy.ndarray
+                rotational phases of photons
+        """
+        self.theta = theta
+        self.xx = xx
+
+    def fourseries(self):
+        """
+        calculates the total fourier series curve at each *xx* according to *theta*
+        :return: fourSeriesCurve
+        :rtype: numpy.ndarray
+        """
+        # number of fourier harmonics
+        nbrComp = len(np.array([ww for harmKey, ww in self.theta.items() if harmKey.startswith('amp_')]))
+
+        # Setting total fourier series curve to normalization
+        fourSeriesCurve = self.theta["norm"]
+
+        # Adding the harmonic to the fourier series curve above
+        for jj in range(1, nbrComp + 1):
+            fourSeriesCurve += (self.theta["amp_" + str(jj)] * self.theta["ampShift"] *
+                                np.cos(jj * 2 * np.pi * self.xx + self.theta["ph_" + str(jj)] - jj * self.theta[
+                                    "phShift"]))
+
+        return fourSeriesCurve
+
+    def loglikelihoodFS(self, yy, yy_err):
+        """
+        Binned log likelihood of the Fourier curve given *yy* and corresponding uncertainty *yy_err* at each *xx*
+        Assumes a gaussian probability density function
+        :param yy: count rate with same length as xx
+        :type yy: numpy.ndarray
+        :param yy_err: uncertainty on count rate with same length as xx
+        :type yy_err: numpy.ndarray
+        :return: log likelihood of yy given theta
+        :rtype: numpy.ndarray
+        """
+        modelFourSeriesCurve = Fourier.fourseries(self.theta, self.xx)
+        return np.sum(stats.norm.logpdf(yy, loc=modelFourSeriesCurve, scale=yy_err))
+
+    def loglikelihoodFSnormalized(self, exposure):  # Normalized log likelihood
+        """
+        non-binned log likelihood of the normalized Fourier series curve. It requires **exposure** to calculate
+        number of counts (occurrences) from rate (i.e., theta["norm"]*exposure)
+        This is considered the extended likelihood function since it cares about shape and normalization
+        Assumes a poisson probability density function
+        :param exposure: exposure time required to collect len(xx)
+        :type exposure: int
+        :return: extended log likelihood of xx given theta
+        :rtype: numpy.ndarray
+        """
+        modelFourSeriesCurve = Fourier.fourseries(self.theta, self.xx)
+        # extended maximum likelihood - Dividing Fourier model by norm to normalize it
+        modelFourSeriesCurveNormalized = modelFourSeriesCurve / self.theta["norm"]
+        if np.min(modelFourSeriesCurveNormalized) <= 0:
+            # in case of a 0/negative in the Fourier series estimate - results in undefined
+            return -np.inf
+        else:
+            return (-self.theta["norm"] * exposure + len(self.xx) * np.log(self.theta["norm"] * exposure) +
+                    (len(self.xx) * np.log(len(self.xx)) - len(self.xx)) +
+                    np.sum(np.log(modelFourSeriesCurveNormalized)))
+
+
+class WrappedCauchy:
     """
-    # number of fourier harmonics
-    nbrComp = len(np.array([ww for harmKey, ww in theta.items() if harmKey.startswith('amp_')]))
+        class for a wrapped Cauchy series
 
-    # Setting total fourier series curve to normalization
-    fourSeriesCurve = theta["norm"]
+        Attributes
+        ----------
+        theta : dict
+            wrapped Cauchy model parameters, keys are **norm**, a pair of **ampShift** and **cenShift** (=1, =0,
+            respectively unless a ToA is being calculated), and triplets of **amp_n**, **wid_n** and **cen_n** for nth
+            component
+        xx : numpy.ndarray
+                rotational phases of photons
 
-    # Adding the harmonic to the fourier series curve above
-    for jj in range(1, nbrComp + 1):
-        fourSeriesCurve += theta["amp_" + str(jj)] * theta["ampShift"] * np.cos(
-            jj * 2 * np.pi * xx + theta["ph_" + str(jj)] - jj * theta["phShift"])
+        Methods
+        -------
+        wrapcauchy():
+            calculates the total wrapped-Cauchy curve at each *xx* according to *theta*
+        loglikelihoodCA():
+            Binned log likelihood of the wrapped Cauchy curve given *yy* and corresponding uncertainty *yy_err* at each *xx*
+            Assumes a gaussian probability density function
+        loglikelihoodCAnormalized():
+            non-binned extended log likelihood of the normalized wrapped Cauchy curve. It requires **exposure** to
+            calculate number of counts (occurrences) from rate (i.e., theta["norm"]*exposure)
+            Assumes a poisson probability density function
+        """
 
-    return fourSeriesCurve
+    def __init__(self, theta: dict, xx: numpy.ndarray):
+        """
+        Constructs all the necessary attributes for the WrappedCauchy object
+
+        Parameters
+        ----------
+            theta : dict
+                wrapped Cauchy model parameters, keys are **norm**, a pair of **ampShift** and **cenShift** (=1, =0,
+                respectively unless a ToA is being calculated), and triplets of **amp_n**, **wid_n** and **cen_n** for
+                nth component
+            xx : numpy.ndarray
+                rotational phases of photons
+        """
+        self.theta = theta
+        self.xx = xx
+
+    def wrapcauchy(self):
+        """
+        calculates the total wrapped-Cauchy curve at each *xx* according to *theta*
+        :return: wrapCauchyCurve
+        :rtype: numpy.ndarray
+        """
+        # number of Cauchy components
+        nbrComp = len(np.array([ww for compKey, ww in self.theta.items() if compKey.startswith('amp_')]))
+
+        # Setting total cauchy curve to normalization
+        wrapCauchyCurve = self.theta["norm"]
+
+        # Adding the components to the cauchy curve above
+        for jj in range(1, nbrComp + 1):  # wrapped Lorentzian
+            wrapCauchyCurve += (((self.theta["amp_" + str(jj)] * self.theta["ampShift"]) / (2 * np.pi)) *
+                                (np.sinh(self.theta["wid_" + str(jj)]) /
+                                 (np.cosh(self.theta["wid_" + str(jj)]) -
+                                  np.cos(self.xx - self.theta["cen_" + str(jj)] - self.theta["cenShift"]))))
+
+        return wrapCauchyCurve
+
+    def loglikelihoodCA(self, yy, yy_err):
+        """
+        Binned log likelihood of the wrapped Cauchy curve given *yy* and corresponding uncertainty *yy_err* at each *xx*
+        Assumes a gaussian probability density function
+        :param yy: count rate with same length as xx
+        :type yy: numpy.ndarray
+        :param yy_err: uncertainty on count rate with same length as xx
+        :type yy_err: numpy.ndarray
+        :return: log likelihood of yy given theta
+        :rtype: numpy.ndarray
+        """
+        modelWrapCauchyCurve = WrappedCauchy.wrapcauchy(self)
+        return np.sum(stats.norm.logpdf(yy, loc=modelWrapCauchyCurve, scale=yy_err))
+
+    def loglikelihoodCAnormalized(self, exposure):
+        """
+        non-binned log likelihood of the normalized wrapped-cauchy curve. It requires **exposure** to calculate
+        number of counts (occurrences) from rate (i.e., theta["norm"]*exposure)
+        This is considered the extended likelihood function since it cares about shape and normalization
+        Assumes a poisson probability density function
+        :param exposure: exposure time required to collect len(xx)
+        :type exposure: int
+        :return: extended log likelihood of xx given theta
+        :rtype: numpy.ndarray
+        """
+        modelWrapCauchyCurve = WrappedCauchy.wrapcauchy(self.theta, self.xx)
+        # extended maximum likelihood - normalizing Cauchy model
+        nbrComp = len(np.array([ww for compKey, ww in self.theta.items() if compKey.startswith('amp_')]))
+        normalizingFactor = self.theta["norm"]
+        for jj in range(1, nbrComp + 1):
+            normalizingFactor += self.theta["amp_" + str(jj)]
+        modelWrapCauchyCurveNormalized = modelWrapCauchyCurve / normalizingFactor
+        if np.min(modelWrapCauchyCurveNormalized) <= 0:
+            # in case of a 0/negative in the Cauchy series estimate - results in undefined
+            # In practice, this should not occur
+            return -np.inf
+        else:
+            return (-self.theta["norm"] * exposure + len(self.xx) * np.log(self.theta["norm"] * exposure) +
+                    (len(self.xx) * np.log(len(self.xx)) - len(self.xx)) +
+                    np.sum(np.log(modelWrapCauchyCurveNormalized)))
 
 
-def logLikelihoodFS(theta, xx, yy, yy_err):
-    modelFourSeriesCurve = fourSeries(theta, xx)
-    return np.sum(stats.norm.logpdf(yy, loc=modelFourSeriesCurve, scale=yy_err))
+class VonMises:
+    """
+        class for a von Mises series
 
+        Attributes
+        ----------
+        theta : dict
+            von-Mises model parameters, keys are **norm**, a pair of **ampShift** and **cenShift** (=1, =0,
+            respectively unless a ToA is being calculated), and triplets of **amp_n**, **wid_n** and **cen_n** for nth
+            component
+        xx : numpy.ndarray
+                rotational phases of photons
 
-def logLikelihoodFSNormalized(theta, xx, exposureInt):  # Normalized log likelihood
-    modelFourSeriesCurve = fourSeries(theta, xx)
-    # extended maximum likelihood - Dividing Fourier model by norm to normalize it
-    modelFourSeriesCurveNormalized = modelFourSeriesCurve / theta["norm"]
-    if np.min(modelFourSeriesCurveNormalized) <= 0:  # in case of a 0/negative in the Fourier series estimate - results in undefined
-        return -np.inf
-    else:
-        return (-theta["norm"] * exposureInt + len(xx) * np.log(theta["norm"] * exposureInt) + (
-                len(xx) * np.log(len(xx)) - len(xx)) + np.sum(np.log(modelFourSeriesCurveNormalized)))
+        Methods
+        -------
+        vonmises():
+            calculates the total von-Mises curve at each *xx* according to *theta*
+        loglikelihoodVM():
+            Binned log likelihood of the von-Mises curve given *yy* and corresponding uncertainty *yy_err* at each *xx*
+            Assumes a gaussian probability density function
+        loglikelihoodVMnormalized():
+            non-binned extended log likelihood of the normalized von-Mises curve. It requires **exposure** to
+            calculate number of counts (occurrences) from rate (i.e., theta["norm"]*exposure)
+            Assumes a poisson probability density function
+        """
 
+    def __init__(self, theta: dict, xx: numpy.ndarray):
+        """
+        Constructs all the necessary attributes for the VonMises object
 
-######################################
-######################################
-# A rudimentary implementation of a cauchy function and its loglikelihood
-# Note that this is fit in the 0-2pi interval
-def wrapCauchy(theta, xx):
-    # number of Cauchy components
-    nbrComp = len(np.array([ww for compKey, ww in theta.items() if compKey.startswith('amp_')]))
+        Parameters
+        ----------
+            theta : dict
+                von-Mises model parameters, keys are **norm**, a pair of **ampShift** and **cenShift** (=1, =0,
+                respectively unless a ToA is being calculated), and triplets of **amp_n**, **wid_n** and **cen_n** for nth
+                component
+            xx : numpy.ndarray
+                rotational phases of photons
+        """
+        self.theta = theta
+        self.xx = xx
 
-    # Setting total cauchy curve to normalization
-    wrapCauchyCurve = theta["norm"]
+    def vonmises(self):
+        """
+        calculates the total von-Mises curve at each *xx* according to *theta*
+        :return: vonmisesCurve
+        :rtype: numpy.ndarray
+        """
+        # number of vonmises components
+        nbrComp = len(np.array([ww for compKey, ww in self.theta.items() if compKey.startswith('amp_')]))
 
-    # Adding the components to the cauchy curve above
-    for jj in range(1, nbrComp + 1):  # wrapped Lorentzian
-        wrapCauchyCurve += (((theta["amp_" + str(jj)] * theta["ampShift"]) / (2 * np.pi)) *
-                            (np.sinh(theta["wid_" + str(jj)]) / (np.cosh(theta["wid_" + str(jj)]) -
-                                                                 np.cos(xx - theta["cen_" + str(jj)] - theta["cenShift"]))))
+        # Setting total vonmises curve to normalization
+        vonmisesCurve = self.theta["norm"]
 
-    return wrapCauchyCurve
+        # Adding the components to the vonmises curve above
+        for jj in range(1, nbrComp + 1):  # wrapped Gaussian, i.e., von Mises function
+            vonmisesCurve += (((self.theta["amp_" + str(jj)] * self.theta["ampShift"]) /
+                               (2 * np.pi * j0(1 / self.theta["wid_" + str(jj)] ** 2))) *
+                              (np.exp((1 / self.theta["wid_" + str(jj)] ** 2) *
+                                      (np.cos(self.xx - self.theta["cen_" + str(jj)] - self.theta["cenShift"])))))
 
+        return vonmisesCurve
 
-def logLikelihoodCA(theta, xx, yy, yy_err):
-    modelWrapCauchyCurve = wrapCauchy(theta, xx)
-    return np.sum(stats.norm.logpdf(yy, loc=modelWrapCauchyCurve, scale=yy_err))
+    def loglikelihoodVM(self, yy, yy_err):
+        """
+        Binned log likelihood of the von-Mises curve given *yy* and corresponding uncertainty *yy_err* at each *xx*
+        Assumes a gaussian probability density function
+        :param yy: count rate with same length as xx
+        :type yy: numpy.ndarray
+        :param yy_err: uncertainty on count rate with same length as xx
+        :type yy_err: numpy.ndarray
+        :return: log likelihood of yy given theta
+        :rtype: numpy.ndarray
+        """
+        modelVonmisesCurve = VonMises.vonmises(self.theta, self.xx)
+        return np.sum(stats.norm.logpdf(yy, loc=modelVonmisesCurve, scale=yy_err))
 
-
-######################################
-######################################
-# A rudimentary implementation of a vonmises function and its loglikelihood
-# Note that this is fit in the 0-2pi interval
-def vonmises(theta, xx):
-    # number of vonmises components
-    nbrComp = len(np.array([ww for compKey, ww in theta.items() if compKey.startswith('amp_')]))
-
-    # Setting total vonmises curve to normalization
-    vonmisesCurve = theta["norm"]
-
-    # Adding the components to the vonmises curve above
-    for jj in range(1, nbrComp + 1):  # wrapped Gaussian, i.e., von Mises function
-        vonmisesCurve += (((theta["amp_" + str(jj)] * theta["ampShift"]) / (
-                2 * np.pi * j0(1 / theta["wid_" + str(jj)] ** 2))) *
-                          (np.exp((1 / theta["wid_" + str(jj)] ** 2) * (
-                              np.cos(xx - theta["cen_" + str(jj)] - theta["cenShift"])))))
-
-    return vonmisesCurve
-
-
-def logLikelihoodVM(theta, xx, yy, yy_err):
-    modelVonmisesCurve = vonmises(theta, xx)
-    return np.sum(stats.norm.logpdf(yy, loc=modelVonmisesCurve, scale=yy_err))
+    def loglikelihoodVMnormalized(self, exposure):
+        """
+        non-binned log likelihood of the normalized von-Mises curve. It requires **exposure** to calculate
+        number of counts (occurrences) from rate (i.e., theta["norm"]*exposure)
+        This is considered the extended likelihood function since it cares about shape and normalization
+        Assumes a poisson probability density function
+        :param exposure: exposure time required to collect len(xx)
+        :type exposure: int
+        :return: extended log likelihood of xx given theta
+        :rtype: numpy.ndarray
+        """
+        modelVonMisesCurve = VonMises.vonmises(self.theta, self.xx)
+        # extended maximum likelihood - normalizing von-Mises model
+        nbrComp = len(np.array([ww for compKey, ww in self.theta.items() if compKey.startswith('amp_')]))
+        normalizingFactor = self.theta["norm"]
+        for jj in range(1, nbrComp + 1):
+            normalizingFactor += self.theta["amp_" + str(jj)]
+        modelVonmisesCurveNormalized = modelVonMisesCurve / normalizingFactor
+        if np.min(modelVonmisesCurveNormalized) <= 0:
+            # in case of a 0/negative in the von-Mises curve estimate - results in undefined
+            # In practice, this should not occur
+            return -np.inf
+        else:
+            return (-self.theta["norm"] * exposure + len(self.xx) * np.log(self.theta["norm"] * exposure) +
+                    (len(self.xx) * np.log(len(self.xx)) - len(self.xx)) +
+                    np.sum(np.log(modelVonmisesCurveNormalized)))
