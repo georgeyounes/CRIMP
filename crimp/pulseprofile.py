@@ -32,16 +32,16 @@
 # 3- eneLow: low energy cutoff in keV (default = 0.5 keV)
 # 4- eneHigh: high energy cutoff in keV (default = 10 keV)
 # 5- nbrBins: number of bins in pulse profile (default = 30)
-# 6- figure: if provided a 'figure'.pdf plot of pulse profile will be created (default=None)
-# 7- ppmodel: which model to use (default = fourier, vonmises, cauchy are also allowed)
-# 8- nbrComp: number of components in template model (default = 2)
-# 9- initTemplateMod: initial template with best-guess for model parameters (default = None)
+# 6- ppmodel: which model to use (default = fourier, vonmises, cauchy are also allowed)
+# 7- nbrComp: number of components in template model (default = 2)
+# 8- initTemplateMod: initial template with best-guess for model parameters (default = None)
 #                     if this is provided, the "ppmodel" and "nbrComp" inputs will be ignored
 #                     and instead read-in from this initial template. The user could simply
 #                     run this script with default values to create a template, then modify
 #                     it as necessary.
-# 10- fixPhases: if True then phases will be fixed to initial value - only applicable if
+# 9- fixPhases: if True then phases will be fixed to initial value - only applicable if
 #                initTemplateMod is provided (default = False)
+# 10- figure: if provided a 'figure'.pdf plot of pulse profile will be created (default=None)
 # 11- templateFile: if provided a 'templateFile'.txt will be created of best fit model parameters (default = None)
 # 12- calcPulsedFraction: if True, the pulsed fraction will be calculated.
 # 
@@ -407,7 +407,7 @@ class ModelPulseProfile:
                 initParams_mle.add('amp_' + str(kk), 1.3 * np.min(ctRate), min=0.0, max=np.inf)
                 initParams_mle.add('cen_' + str(kk), np.pi, min=0.0, max=2 * np.pi)
                 initParams_mle.add('wid_' + str(kk), 1, min=0.0, max=np.inf)
-            initParams_mle.add('cenShift', 0,
+            initParams_mle.add('phShift', 0,
                                vary=False)  # For consistency with our model definition, we define a dummy phase/centroid shift
             initParams_mle.add('ampShift', 1,
                                vary=False)  # For consistency with our model definition, we define a dummy amplitude shift
@@ -421,7 +421,7 @@ class ModelPulseProfile:
                 initParams_mle.add('wid_' + str(kk), initParams_mle_temp['wid_' + str(kk)], min=0.0, max=np.inf)
                 if self.fixPhases is True:  # In case component phases should be fixed
                     initParams_mle['cen_' + str(kk)].vary = False
-            initParams_mle.add('cenShift', 0,
+            initParams_mle.add('phShift', 0,
                                vary=False)  # For consistency with our model definition, we define a dummy phase/centroid shift
             initParams_mle.add('ampShift', 1,
                                vary=False)  # For consistency with our model definition, we define a dummy amplitude shift
@@ -478,7 +478,7 @@ class ModelPulseProfile:
                 initParams_mle.add('amp_' + str(kk), 1.3 * np.min(ctRate), min=0.0, max=np.inf)
                 initParams_mle.add('cen_' + str(kk), np.pi, min=0.0, max=2 * np.pi)
                 initParams_mle.add('wid_' + str(kk), 1, min=0.0, max=np.inf)
-            initParams_mle.add('cenShift', 0,
+            initParams_mle.add('phShift', 0,
                                vary=False)  # For consistency with our model definition, we define a dummy phase/centroid shift
             initParams_mle.add('ampShift', 1,
                                vary=False)  # For consistency with our model definition, we define a dummy amplitude shift
@@ -492,7 +492,7 @@ class ModelPulseProfile:
                 initParams_mle.add('wid_' + str(kk), initParams_mle_temp['wid_' + str(kk)], min=0.0, max=np.inf)
                 if self.fixPhases is True:  # In case component phases should be fixed
                     initParams_mle['cen_' + str(kk)].vary = False
-            initParams_mle.add('cenShift', 0,
+            initParams_mle.add('phShift', 0,
                                vary=False)  # For consistency with our model definition, we define a dummy phase/centroid shift
             initParams_mle.add('ampShift', 1,
                                vary=False)  # For consistency with our model definition, we define a dummy amplitude shift

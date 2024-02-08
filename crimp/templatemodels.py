@@ -19,7 +19,7 @@ import sys
 
 import numpy
 import numpy as np
-from scipy.special import j0
+from scipy.special import i0
 from scipy import stats
 
 sys.dont_write_bytecode = True
@@ -63,7 +63,7 @@ class Fourier:
                 rotational phases of photons
         """
         self.theta = theta
-        self.xx = xx
+        self.xx = np.sort(xx)
 
     def fourseries(self):
         """
@@ -117,8 +117,10 @@ class Fourier:
             # in case of a 0/negative in the Fourier series estimate - results in undefined
             return -np.inf
         else:
+            # return (-self.theta["norm"] * exposure + len(self.xx) * np.log(self.theta["norm"] * exposure) +
+            #        (len(self.xx) * np.log(len(self.xx)) - len(self.xx)) +
+            #        np.sum(np.log(modelFourSeriesCurveNormalized)))
             return (-self.theta["norm"] * exposure + len(self.xx) * np.log(self.theta["norm"] * exposure) +
-                    (len(self.xx) * np.log(len(self.xx)) - len(self.xx)) +
                     np.sum(np.log(modelFourSeriesCurveNormalized)))
 
 
@@ -162,7 +164,7 @@ class WrappedCauchy:
                 rotational phases of photons
         """
         self.theta = theta
-        self.xx = xx
+        self.xx = np.sort(xx)
 
     def wrapcauchy(self):
         """
@@ -181,7 +183,7 @@ class WrappedCauchy:
             wrapCauchyCurve += (((self.theta["amp_" + str(jj)] * self.theta["ampShift"]) / (2 * np.pi)) *
                                 (np.sinh(self.theta["wid_" + str(jj)]) /
                                  (np.cosh(self.theta["wid_" + str(jj)]) -
-                                  np.cos(self.xx - self.theta["cen_" + str(jj)] - self.theta["cenShift"]))))
+                                  np.cos(self.xx - self.theta["cen_" + str(jj)] - self.theta["phShift"]))))
 
         return wrapCauchyCurve
 
@@ -196,7 +198,7 @@ class WrappedCauchy:
         :return: log likelihood of yy given theta
         :rtype: numpy.ndarray
         """
-        modelWrapCauchyCurve = WrappedCauchy.wrapcauchy(self)
+        modelWrapCauchyCurve = WrappedCauchy(self.theta, self.xx).wrapcauchy()
         return np.sum(stats.norm.logpdf(yy, loc=modelWrapCauchyCurve, scale=yy_err))
 
     def loglikelihoodCAnormalized(self, exposure):
@@ -210,21 +212,20 @@ class WrappedCauchy:
         :return: extended log likelihood of xx given theta
         :rtype: numpy.ndarray
         """
-        modelWrapCauchyCurve = WrappedCauchy.wrapcauchy(self.theta, self.xx)
+        modelWrapCauchyCurve = WrappedCauchy(self.theta, self.xx).wrapcauchy()
         # extended maximum likelihood - normalizing Cauchy model
         nbrComp = len(np.array([ww for compKey, ww in self.theta.items() if compKey.startswith('amp_')]))
-        normalizingFactor = self.theta["norm"]
+        normalizingFactor = 2 * np.pi * self.theta["norm"]
         for jj in range(1, nbrComp + 1):
             normalizingFactor += self.theta["amp_" + str(jj)]
         modelWrapCauchyCurveNormalized = modelWrapCauchyCurve / normalizingFactor
+
         if np.min(modelWrapCauchyCurveNormalized) <= 0:
             # in case of a 0/negative in the Cauchy series estimate - results in undefined
-            # In practice, this should not occur
             return -np.inf
         else:
-            return (-self.theta["norm"] * exposure + len(self.xx) * np.log(self.theta["norm"] * exposure) +
-                    (len(self.xx) * np.log(len(self.xx)) - len(self.xx)) +
-                    np.sum(np.log(modelWrapCauchyCurveNormalized)))
+            return (-np.mean(modelWrapCauchyCurve) * exposure + len(self.xx) *
+                    np.log(np.mean(modelWrapCauchyCurve) * exposure) + np.sum(np.log(modelWrapCauchyCurveNormalized)))
 
 
 class VonMises:
@@ -267,7 +268,7 @@ class VonMises:
                 rotational phases of photons
         """
         self.theta = theta
-        self.xx = xx
+        self.xx = np.sort(xx)
 
     def vonmises(self):
         """
@@ -284,9 +285,9 @@ class VonMises:
         # Adding the components to the vonmises curve above
         for jj in range(1, nbrComp + 1):  # wrapped Gaussian, i.e., von Mises function
             vonmisesCurve += (((self.theta["amp_" + str(jj)] * self.theta["ampShift"]) /
-                               (2 * np.pi * j0(1 / self.theta["wid_" + str(jj)] ** 2))) *
+                               (2 * np.pi * i0(1 / self.theta["wid_" + str(jj)] ** 2))) *
                               (np.exp((1 / self.theta["wid_" + str(jj)] ** 2) *
-                                      (np.cos(self.xx - self.theta["cen_" + str(jj)] - self.theta["cenShift"])))))
+                                      (np.cos(self.xx - self.theta["cen_" + str(jj)] - self.theta["phShift"])))))
 
         return vonmisesCurve
 
@@ -318,15 +319,13 @@ class VonMises:
         modelVonMisesCurve = VonMises(self.theta, self.xx).vonmises()
         # extended maximum likelihood - normalizing von-Mises model
         nbrComp = len(np.array([ww for compKey, ww in self.theta.items() if compKey.startswith('amp_')]))
-        normalizingFactor = self.theta["norm"]
+        normalizingFactor = 2 * np.pi * self.theta["norm"]
         for jj in range(1, nbrComp + 1):
             normalizingFactor += self.theta["amp_" + str(jj)]
-        modelVonmisesCurveNormalized = modelVonMisesCurve / normalizingFactor
-        if np.min(modelVonmisesCurveNormalized) <= 0:
-            # in case of a 0/negative in the von-Mises curve estimate - results in undefined
-            # In practice, this should not occur
+        modelVonMisesCurveNormalized = modelVonMisesCurve / normalizingFactor
+        if np.min(modelVonMisesCurveNormalized) <= 0:
+            # in case of a 0/negative in the Fourier series estimate - results in undefined
             return -np.inf
         else:
-            return (-self.theta["norm"] * exposure + len(self.xx) * np.log(self.theta["norm"] * exposure) +
-                    (len(self.xx) * np.log(len(self.xx)) - len(self.xx)) +
-                    np.sum(np.log(modelVonmisesCurveNormalized)))
+            return (-np.mean(modelVonMisesCurve) * exposure + len(self.xx) *
+                    np.log(np.mean(modelVonMisesCurve) * exposure) + np.sum(np.log(modelVonMisesCurveNormalized)))

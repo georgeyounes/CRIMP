@@ -60,7 +60,7 @@ from crimp.eventfile import EvtFileOps
 from crimp.calcphase import calcphase
 from crimp.binphases import binphases
 from crimp.readPPtemplate import readPPtemplate
-from crimp.templatemodels import Fourier
+from crimp.templatemodels import Fourier, WrappedCauchy, VonMises
 from crimp.ephemTmjd import ephemTmjd
 from crimp.periodsearch import PeriodSearch
 from crimp.phshiftTotimfile import phshiftTotimfile
@@ -178,14 +178,20 @@ def measureToAs(evtFile, timMod, tempModPP, toagtifile, eneLow=0.5, eneHigh=10.,
         ########################################################################################
         BFtempModPP = readPPtemplate(tempModPP)  # BFtempModPP is a dictionary of parameters of best-fit template model
 
-        if BFtempModPP["model"] == str.casefold('fourier'):
+        if BFtempModPP["model"] == 'fourier':
             ToAProp = measureToA_fourier(BFtempModPP, cycleFoldedPhases, ToA_exposure[ii], outFile=ToA_ID,
                                          phShiftRes=phShiftRes, nbrBins=nbrBins, varyAmps=varyAmps, plotPPs=plotPPs,
                                          plotLLs=plotLLs)
-        elif BFtempModPP["model"] == str.casefold('cauchy'):
-            print("Not implemented yet - soon")
-        elif BFtempModPP["model"] == str.casefold('vonmises'):
-            print("Not implemented yet - soon")
+        elif BFtempModPP["model"] == 'cauchy':
+            cycleFoldedPhases *= (2 * np.pi)
+            ToAProp = measureToA_cauchy(BFtempModPP, cycleFoldedPhases, ToA_exposure[ii], outFile=ToA_ID,
+                                        phShiftRes=phShiftRes, nbrBins=nbrBins, varyAmps=varyAmps, plotPPs=plotPPs,
+                                        plotLLs=plotLLs)
+        elif BFtempModPP["model"] == 'vonmises':
+            cycleFoldedPhases *= (2 * np.pi)
+            ToAProp = measureToA_vonmises(BFtempModPP, cycleFoldedPhases, ToA_exposure[ii], outFile=ToA_ID,
+                                          phShiftRes=phShiftRes, nbrBins=nbrBins, varyAmps=varyAmps, plotPPs=plotPPs,
+                                          plotLLs=plotLLs)
         else:
             raise Exception(
                 'Model {} is not supported yet; fourier, vonmises, cauchy are supported'.format(BFtempModPP["model"]))
@@ -233,8 +239,6 @@ def measureToAs(evtFile, timMod, tempModPP, toagtifile, eneLow=0.5, eneHigh=10.,
     return ToAsTable
 
 
-###############################################################################################
-# Main script to calculate the phase shift and associated uncertainties for a FOURIER template
 def measureToA_fourier(tempModPP, cycleFoldedPhases, exposureInt, outFile='', phShiftRes=1000, nbrBins=15,
                        varyAmps=False, plotPPs=False, plotLLs=False):
     """
@@ -270,10 +274,13 @@ def measureToA_fourier(tempModPP, cycleFoldedPhases, exposureInt, outFile='', ph
         initTempModPPparam.add('ph_' + str(kk), tempModPP['ph_' + str(kk)], vary=False)
     initTempModPPparam.add('phShift', 0, vary=True, min=-np.pi, max=np.pi)  # Phase shift - parameter of interest
     initTempModPPparam.add('ampShift', 1, vary=False)
+
     # Running the extended maximum likelihood
-    nll = lambda *args: -Fourier.loglikelihoodFSnormalized(*args)  # Needs to be done on a normalized function
-    results_mle_FSNormalized = minimize(nll, initTempModPPparam, args=(cycleFoldedPhases, exposureInt), method='nelder',
-                                        max_nfev=1.0e3, nan_policy='propagate')
+    def unbinnednllfourier(param, xx, exposure):
+        return -Fourier(param, xx).loglikelihoodFSnormalized(exposure)
+
+    results_mle_FSNormalized = minimize(unbinnednllfourier, initTempModPPparam, args=(cycleFoldedPhases, exposureInt),
+                                        method='nelder', max_nfev=1.0e3, nan_policy='propagate')
     nbrFreeParams = 2
     # In case pulsed fraction should be varied
     if varyAmps is True:
@@ -284,7 +291,8 @@ def measureToA_fourier(tempModPP, cycleFoldedPhases, exposureInt, outFile='', ph
                                max=1.5 * np.pi)  # Phase shift - set to best fit value from above
         initTempModPPparam.add('norm', results_mle_FSNormalized.params.valuesdict()['norm'], min=0.0, max=1000.0,
                                vary=True)  # normalization - set to best fit value from above
-        results_mle_FSNormalized = minimize(nll, initTempModPPparam, args=(cycleFoldedPhases, exposureInt),
+        results_mle_FSNormalized = minimize(unbinnednllfourier, initTempModPPparam,
+                                            args=(cycleFoldedPhases, exposureInt),
                                             method='nelder', max_nfev=1.0e3, nan_policy='propagate')
         nbrFreeParams = 3  # In this case we varied a third parameters, the harmonics amplitudes
 
@@ -309,7 +317,8 @@ def measureToA_fourier(tempModPP, cycleFoldedPhases, exposureInt, outFile='', ph
         initParam_forErrCalc['phShift'].value = phShiBF - kk * phShiftStep
         initParam_forErrCalc['phShift'].vary = False
         # Performing the fitting
-        results_mle_forErrCalc = minimize(nll, initParam_forErrCalc, args=(cycleFoldedPhases, exposureInt),
+        results_mle_forErrCalc = minimize(unbinnednllfourier, initParam_forErrCalc,
+                                          args=(cycleFoldedPhases, exposureInt),
                                           method='nedler', max_nfev=1.0e4, nan_policy='propagate')
         logLikeDist = np.hstack((logLikeDist, -results_mle_forErrCalc.residual))
         phShiftDist = np.hstack((phShiftDist, phShiBF - kk * phShiftStep))
@@ -326,7 +335,8 @@ def measureToA_fourier(tempModPP, cycleFoldedPhases, exposureInt, outFile='', ph
         initParam_forErrCalc['phShift'].value = phShiBF + kk * phShiftStep
         initParam_forErrCalc['phShift'].vary = False
         # Performing the fitting
-        results_mle_forErrCalc = minimize(nll, initParam_forErrCalc, args=(cycleFoldedPhases, exposureInt),
+        results_mle_forErrCalc = minimize(unbinnednllfourier, initParam_forErrCalc,
+                                          args=(cycleFoldedPhases, exposureInt),
                                           method='nedler', max_nfev=1.0e4, nan_policy='propagate')
         logLikeDist = np.hstack((logLikeDist, -results_mle_forErrCalc.residual))
         phShiftDist = np.hstack((phShiftDist, phShiBF + kk * phShiftStep))
@@ -348,7 +358,7 @@ def measureToA_fourier(tempModPP, cycleFoldedPhases, exposureInt, outFile='', ph
     ctRate = binnedProfile["ctsBins"] / (exposureInt / nbrBins)
     ctRateErr = binnedProfile["ctsBinsErr"] / (exposureInt / nbrBins)
     # Best fit model
-    bfModel = Fourier.fourseries(ppBins, results_mle_FSNormalized.params)
+    bfModel = Fourier(results_mle_FSNormalized.params, ppBins).fourseries()
     # Chi2 and reduced chi2
     chi2_pp = np.sum(np.divide(((bfModel - ctRate) ** 2), ctRateErr ** 2))
     redchi2_pp = np.divide(chi2_pp, np.size(ppBins) - nbrFreeParams)
@@ -356,12 +366,286 @@ def measureToA_fourier(tempModPP, cycleFoldedPhases, exposureInt, outFile='', ph
     # Plotting pulse profile of each ToA along with the best fit template model before and after correcting the phase shift
     #######################################################################################################################
     if plotPPs is True:
-        initModel = Fourier.fourseries(ppBins, initTempModPPparam)
+        initModel = Fourier(initTempModPPparam, ppBins).fourseries()
         plotPPofToAs(ppBins, ctRate, ctRateErr, bfModel, initModel, outFile=outFile)
 
     ToAPropFourier = {'phShi': phShiBF, 'phShi_LL': phShiBF_LL, 'phShi_UL': phShiBF_UL, 'reducedChi2': redchi2_pp}
 
     return ToAPropFourier
+
+
+def measureToA_cauchy(tempModPP, cycleFoldedPhases, exposureInt, outFile='', phShiftRes=1000, nbrBins=15,
+                      varyAmps=False, plotPPs=False, plotLLs=False):
+    """
+    Measure ToA according to a wrapped-cauchy template
+    :param tempModPP: best fit Fourier template model
+    :type tempModPP: str
+    :param cycleFoldedPhases: array of cycle folded phases [0,2*np.pi)
+    :type cycleFoldedPhases: numpy.ndarray
+    :param exposureInt: exposure of good time interval during which we accumulated len(cycleFoldedPhases) (seconds)
+    :type exposureInt: int
+    :param outFile: name of pulse profile and loglikelihood plots (pp_"outFile".pdf and LogL_"outFile".pdf)
+    :type outFile: str
+    :param phShiftRes: step resolution at which to calculate uncertainties in ToAs (default = 1000)
+    :type phShiftRes: int
+    :param nbrBins: number of bins in pulse profile (for plotting purposes only, default = 15)
+    :type nbrBins: int
+    :param varyAmps: boolean flag to vary pulse amplitudes (default = False)
+    :type varyAmps: bool
+    :param plotPPs: boolean flag to plot pulse profile and best fit model (default = False)
+    :type plotPPs: bool
+    :param plotLLs: boolean flag to plot likelihood curve (default = False)
+    :type plotLLs: bool
+    :return: ToAPropFourier, a dictionary of ToA properties
+    :rtype: dict
+    """
+    initTempModPPparam = Parameters()  # Initializing an instance of Parameters based on the best-fit template model
+    initTempModPPparam.add('norm', tempModPP['norm'], min=0, max=np.inf,
+                           vary=True)  # Adding the normalization - this is free to vary
+    # Number of components in template model
+    nbrComp = len(np.array([ww for harmKey, ww in tempModPP.items() if harmKey.startswith('amp_')]))
+    for kk in range(1, nbrComp + 1):  # Adding the amplitudes, centroids, and widths of the components, they are fixed
+        initTempModPPparam.add('amp_' + str(kk), tempModPP['amp_' + str(kk)], vary=False)
+        initTempModPPparam.add('cen_' + str(kk), tempModPP['cen_' + str(kk)], vary=False)
+        initTempModPPparam.add('wid_' + str(kk), tempModPP['wid_' + str(kk)], vary=False)
+    initTempModPPparam.add('phShift', 0, vary=True, min=-1.5*np.pi, max=1.5*np.pi)  # Phase shift - parameter of interest
+    initTempModPPparam.add('ampShift', 1, vary=False)
+
+    # Running the extended maximum likelihood
+    def unbinnednllcauchy(param, xx, exposure):
+        return -WrappedCauchy(param, xx).loglikelihoodCAnormalized(exposure)
+
+    results_mle_CANormalized = minimize(unbinnednllcauchy, initTempModPPparam, args=(cycleFoldedPhases, exposureInt),
+                                        method='nelder', max_nfev=1.0e3, nan_policy='propagate')
+
+    nbrFreeParams = 2
+    # In case pulsed fraction should be varied
+    if varyAmps is True:
+        # We still first fit with fourier amplitudes fixed to 1, this serves to derive a good first guess
+        initTempModPPparam.add('ampShift', 1, min=0.0, max=np.inf, vary=True)
+        initTempModPPparam.add('phShift', results_mle_CANormalized.params.valuesdict()['phShift'],
+                               vary=True, min=-1.5 * np.pi,
+                               max=1.5 * np.pi)  # Phase shift - set to best fit value from above
+        initTempModPPparam.add('norm', results_mle_CANormalized.params.valuesdict()['norm'], min=0.0, max=np.inf,
+                               vary=True)  # normalization - set to best fit value from above
+        results_mle_CANormalized = minimize(unbinnednllcauchy, initTempModPPparam,
+                                            args=(cycleFoldedPhases, exposureInt),
+                                            method='nelder', max_nfev=1.0e3, nan_policy='propagate')
+        nbrFreeParams = 3  # In this case we varied a third parameters, the harmonics amplitudes
+
+    phShiBF = results_mle_CANormalized.params.valuesdict()['phShift']  # Best fit phase shift
+    LLmax = -results_mle_CANormalized.residual  # the - sign is to flip the likelihood - no reason for it, just personal choice
+
+    # Calculating the uncertainties on phase-shift
+    ##############################################
+    # Stepping over the phase-shift from best-fit +/- 2pi/phShiftRes (default phShiftRes=1000)
+    phShiftStep = (2 * np.pi) / phShiftRes
+    initParam_forErrCalc = copy.deepcopy(results_mle_CANormalized.params)
+
+    # Our LogL follows a chi2 distribution with 1 d.o.f. (approximately)
+    chi2_1sig1dof = 0.5 * chi2.ppf(0.6827, 1)  # 0.68 represents 1 sigma deviation
+    chi2diff1sig = 0  # initial difference
+    kk = 1  # counter for number of steps we shifted phShift
+    logLikeDist = []  # In case we want to produce a loglikeliood plot
+    phShiftDist = []
+
+    # Calculating the 1-sigma lower-limit uncertainty
+    while chi2diff1sig <= chi2_1sig1dof:
+        initParam_forErrCalc['phShift'].value = phShiBF - kk * phShiftStep
+        initParam_forErrCalc['phShift'].vary = False
+        # Performing the fitting
+        results_mle_forErrCalc = minimize(unbinnednllcauchy, initParam_forErrCalc,
+                                          args=(cycleFoldedPhases, exposureInt),
+                                          method='nedler', max_nfev=1.0e4, nan_policy='propagate')
+        logLikeDist = np.hstack((logLikeDist, -results_mle_forErrCalc.residual))
+        phShiftDist = np.hstack((phShiftDist, phShiBF - kk * phShiftStep))
+        # New difference
+        chi2diff1sig = LLmax - (-results_mle_forErrCalc.residual)
+        # Updating counter
+        kk += 1
+    phShiBF_LL = (kk * phShiftStep + phShiftStep / 2)
+
+    # Calculating the 1-sigma upper-limit uncertainty
+    chi2diff1sig = 0  # Reset initial difference
+    kk = 1  # Reset counter for number of steps we shifted phShift
+    while chi2diff1sig <= chi2_1sig1dof:
+        initParam_forErrCalc['phShift'].value = phShiBF + kk * phShiftStep
+        initParam_forErrCalc['phShift'].vary = False
+        # Performing the fitting
+        results_mle_forErrCalc = minimize(unbinnednllcauchy, initParam_forErrCalc,
+                                          args=(cycleFoldedPhases, exposureInt),
+                                          method='nedler', max_nfev=1.0e4, nan_policy='propagate')
+        logLikeDist = np.hstack((logLikeDist, -results_mle_forErrCalc.residual))
+        phShiftDist = np.hstack((phShiftDist, phShiBF + kk * phShiftStep))
+        # New difference
+        chi2diff1sig = LLmax - (-results_mle_forErrCalc.residual)
+        # Updating counter
+        kk += 1
+    phShiBF_UL = (kk * phShiftStep + phShiftStep / 2)
+
+    # Plotting the Log(L) distribution
+    # For debugging purposes only
+    if plotLLs is True:
+        plotLogLikelihood(phShiftDist, logLikeDist, outFile=outFile)
+
+    # Measuring chi2 of each profile from model template
+    ####################################################
+    binnedProfile = binphases(cycleFoldedPhases, nbrBins)
+    ppBins = binnedProfile["ppBins"]
+    ctRate = binnedProfile["ctsBins"] / (exposureInt / nbrBins)
+    ctRateErr = binnedProfile["ctsBinsErr"] / (exposureInt / nbrBins)
+    # Best fit model
+    bfModel = WrappedCauchy(results_mle_CANormalized.params, ppBins).wrapcauchy()
+    # Chi2 and reduced chi2
+    chi2_pp = np.sum(np.divide(((bfModel - ctRate) ** 2), ctRateErr ** 2))
+    redchi2_pp = np.divide(chi2_pp, np.size(ppBins) - nbrFreeParams)
+
+    # Plotting pulse profile of each ToA along with the best fit template model before and after correcting the phase shift
+    #######################################################################################################################
+    if plotPPs is True:
+        initModel = WrappedCauchy(initTempModPPparam, ppBins).wrapcauchy()
+        plotPPofToAs(ppBins, ctRate, ctRateErr, bfModel, initModel, outFile=outFile)
+
+    ToAPropCauchy = {'phShi': phShiBF, 'phShi_LL': phShiBF_LL, 'phShi_UL': phShiBF_UL, 'reducedChi2': redchi2_pp}
+
+    return ToAPropCauchy
+
+
+def measureToA_vonmises(tempModPP, cycleFoldedPhases, exposureInt, outFile='', phShiftRes=1000, nbrBins=15,
+                        varyAmps=False, plotPPs=False, plotLLs=False):
+    """
+    Measure ToA according to a von Mises template
+    :param tempModPP: best fit von Mises template model
+    :type tempModPP: str
+    :param cycleFoldedPhases: array of cycle folded phases [0,2*np.pi)
+    :type cycleFoldedPhases: numpy.ndarray
+    :param exposureInt: exposure of good time interval during which we accumulated len(cycleFoldedPhases) (seconds)
+    :type exposureInt: int
+    :param outFile: name of pulse profile and loglikelihood plots (pp_"outFile".pdf and LogL_"outFile".pdf)
+    :type outFile: str
+    :param phShiftRes: step resolution at which to calculate uncertainties in ToAs (default = 1000)
+    :type phShiftRes: int
+    :param nbrBins: number of bins in pulse profile (for plotting purposes only, default = 15)
+    :type nbrBins: int
+    :param varyAmps: boolean flag to vary pulse amplitudes (default = False)
+    :type varyAmps: bool
+    :param plotPPs: boolean flag to plot pulse profile and best fit model (default = False)
+    :type plotPPs: bool
+    :param plotLLs: boolean flag to plot likelihood curve (default = False)
+    :type plotLLs: bool
+    :return: ToAPropFourier, a dictionary of ToA properties
+    :rtype: dict
+    """
+    initTempModPPparam = Parameters()  # Initializing an instance of Parameters based on the best-fit template model
+    initTempModPPparam.add('norm', tempModPP['norm'], min=0.0, max=np.inf,
+                           vary=True)  # Adding the normalization - this is free to vary
+    # Number of components in template model
+    nbrComp = len(np.array([ww for harmKey, ww in tempModPP.items() if harmKey.startswith('amp_')]))
+    for kk in range(1, nbrComp + 1):  # Adding the amplitudes, centroids, and widths of the components, they are fixed
+        initTempModPPparam.add('amp_' + str(kk), tempModPP['amp_' + str(kk)], vary=False)
+        initTempModPPparam.add('cen_' + str(kk), tempModPP['cen_' + str(kk)], vary=False)
+        initTempModPPparam.add('wid_' + str(kk), tempModPP['wid_' + str(kk)], vary=False)
+    initTempModPPparam.add('phShift', 0, vary=True, min=-1.5*np.pi, max=1.5*np.pi)  # Phase shift - parameter of interest
+    initTempModPPparam.add('ampShift', 1, vary=False)
+
+    # Running the extended maximum likelihood
+    def unbinnednllvonmises(param, xx, exposure):
+        return -VonMises(param, xx).loglikelihoodVMnormalized(exposure)
+
+    results_mle_VMNormalized = minimize(unbinnednllvonmises, initTempModPPparam, args=(cycleFoldedPhases, exposureInt),
+                                        method='nelder', max_nfev=1.0e3, nan_policy='propagate')
+
+    nbrFreeParams = 2
+    # In case pulsed fraction should be varied
+    if varyAmps is True:
+        # We still first fit with fourier amplitudes fixed to 1, this serves to derive a good first guess
+        initTempModPPparam.add('ampShift', 1, min=0.0, max=np.inf, vary=True)
+        initTempModPPparam.add('phShift', results_mle_VMNormalized.params.valuesdict()['phShift'],
+                               vary=True, min=-1.5 * np.pi,
+                               max=1.5 * np.pi)  # Phase shift - set to best fit value from above
+        initTempModPPparam.add('norm', results_mle_VMNormalized.params.valuesdict()['norm'], min=0.0, max=np.inf,
+                               vary=True)  # normalization - set to best fit value from above
+        results_mle_CANormalized = minimize(unbinnednllvonmises, initTempModPPparam,
+                                            args=(cycleFoldedPhases, exposureInt),
+                                            method='nelder', max_nfev=1.0e3, nan_policy='propagate')
+        nbrFreeParams = 3  # In this case we varied a third parameters, the harmonics amplitudes
+
+    phShiBF = results_mle_VMNormalized.params.valuesdict()['phShift']  # Best fit phase shift
+    LLmax = -results_mle_VMNormalized.residual  # the - sign is to flip the likelihood - no reason for it, just personal choice
+
+    # Calculating the uncertainties on phase-shift
+    ##############################################
+    # Stepping over the phase-shift from best-fit +/- 2pi/phShiftRes (default phShiftRes=1000)
+    phShiftStep = (2 * np.pi) / phShiftRes
+    initParam_forErrCalc = copy.deepcopy(results_mle_VMNormalized.params)
+
+    # Our LogL follows a chi2 distribution with 1 d.o.f. (approximately)
+    chi2_1sig1dof = 0.5 * chi2.ppf(0.6827, 1)  # 0.68 represents 1 sigma deviation
+    chi2diff1sig = 0  # initial difference
+    kk = 1  # counter for number of steps we shifted phShift
+    logLikeDist = []  # In case we want to produce a loglikeliood plot
+    phShiftDist = []
+
+    # Calculating the 1-sigma lower-limit uncertainty
+    while chi2diff1sig <= chi2_1sig1dof:
+        initParam_forErrCalc['phShift'].value = phShiBF - kk * phShiftStep
+        initParam_forErrCalc['phShift'].vary = False
+        # Performing the fitting
+        results_mle_forErrCalc = minimize(unbinnednllvonmises, initParam_forErrCalc,
+                                          args=(cycleFoldedPhases, exposureInt),
+                                          method='nedler', max_nfev=1.0e4, nan_policy='propagate')
+        logLikeDist = np.hstack((logLikeDist, -results_mle_forErrCalc.residual))
+        phShiftDist = np.hstack((phShiftDist, phShiBF - kk * phShiftStep))
+        # New difference
+        chi2diff1sig = LLmax - (-results_mle_forErrCalc.residual)
+        # Updating counter
+        kk += 1
+    phShiBF_LL = (kk * phShiftStep + phShiftStep / 2)
+
+    # Calculating the 1-sigma upper-limit uncertainty
+    chi2diff1sig = 0  # Reset initial difference
+    kk = 1  # Reset counter for number of steps we shifted phShift
+    while chi2diff1sig <= chi2_1sig1dof:
+        initParam_forErrCalc['phShift'].value = phShiBF + kk * phShiftStep
+        initParam_forErrCalc['phShift'].vary = False
+        # Performing the fitting
+        results_mle_forErrCalc = minimize(unbinnednllvonmises, initParam_forErrCalc,
+                                          args=(cycleFoldedPhases, exposureInt),
+                                          method='nedler', max_nfev=1.0e4, nan_policy='propagate')
+        logLikeDist = np.hstack((logLikeDist, -results_mle_forErrCalc.residual))
+        phShiftDist = np.hstack((phShiftDist, phShiBF + kk * phShiftStep))
+        # New difference
+        chi2diff1sig = LLmax - (-results_mle_forErrCalc.residual)
+        # Updating counter
+        kk += 1
+    phShiBF_UL = (kk * phShiftStep + phShiftStep / 2)
+
+    # Plotting the Log(L) distribution
+    # For debugging purposes only
+    if plotLLs is True:
+        plotLogLikelihood(phShiftDist, logLikeDist, outFile=outFile)
+
+    # Measuring chi2 of each profile from model template
+    ####################################################
+    binnedProfile = binphases(cycleFoldedPhases, nbrBins)
+    ppBins = binnedProfile["ppBins"]
+    ctRate = binnedProfile["ctsBins"] / (exposureInt / nbrBins)
+    ctRateErr = binnedProfile["ctsBinsErr"] / (exposureInt / nbrBins)
+    # Best fit model
+    bfModel = VonMises(results_mle_VMNormalized.params, ppBins).vonmises()
+    # Chi2 and reduced chi2
+    chi2_pp = np.sum(np.divide(((bfModel - ctRate) ** 2), ctRateErr ** 2))
+    redchi2_pp = np.divide(chi2_pp, np.size(ppBins) - nbrFreeParams)
+
+    # Plotting pulse profile of each ToA along with the best fit template model before and after correcting the phase shift
+    #######################################################################################################################
+    if plotPPs is True:
+        initModel = VonMises(initTempModPPparam, ppBins).vonmises()
+        plotPPofToAs(ppBins, ctRate, ctRateErr, bfModel, initModel, outFile=outFile)
+
+    ToAPropCauchy = {'phShi': phShiBF, 'phShi_LL': phShiBF_LL, 'phShi_UL': phShiBF_UL, 'reducedChi2': redchi2_pp}
+
+    return ToAPropCauchy
 
 
 ##########################################
@@ -385,7 +669,7 @@ def plotLogLikelihood(phaseShifts, logLikeDist, outFile):
     ax1.xaxis.offsetText.set_fontsize(12)
     ax1.yaxis.offsetText.set_fontsize(12)
 
-    ax1.plot(phaseShifts, logLikeDist, 'k.', lw=3)
+    ax1.plot(phaseShifts / (2 * np.pi), logLikeDist, 'k.', lw=3)
 
     # Finishing touches
     for axis in ['top', 'bottom', 'left', 'right']:
@@ -428,8 +712,13 @@ def plotPPofToAs(ppBins, ctRate, ctRateErr, bfModel, initModel, outFile):
     ax1.xaxis.offsetText.set_fontsize(12)
     ax1.yaxis.offsetText.set_fontsize(12)
 
+    if np.max(ppBins) > 1:  # Plotting a second cycle for cauchy or vonmises (cycle = 2*pi)
+        secondCycle = 2 * np.pi
+    else:  # Plotting a second cycle for fourier (cycle = 1)
+        secondCycle = 1
+
     # Creating two cycles and plotting PP
-    ppBins_plt = np.append(ppBins, ppBins + 1.0)
+    ppBins_plt = np.append(ppBins, ppBins + secondCycle)
     ctRate_plt = np.append(ctRate, ctRate)
     ctRateErr_plt = np.append(ctRateErr, ctRateErr)
 
@@ -445,7 +734,7 @@ def plotPPofToAs(ppBins, ctRate, ctRateErr, bfModel, initModel, outFile):
 
     ax1.legend()
 
-    ax1.set_xlim(0.0, 2)
+    ax1.set_xlim(0.0, 2 * secondCycle)
 
     #############################
     # Finishing touches
