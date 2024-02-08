@@ -400,6 +400,7 @@ def measureToA_cauchy(tempModPP, cycleFoldedPhases, exposureInt, outFile='', phS
     :rtype: dict
     """
     initTempModPPparam = Parameters()  # Initializing an instance of Parameters based on the best-fit template model
+
     initTempModPPparam.add('norm', tempModPP['norm'], min=0, max=np.inf,
                            vary=True)  # Adding the normalization - this is free to vary
     # Number of components in template model

@@ -21,7 +21,9 @@ import sys
 import argparse
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
+import plotly.express as px
 import pandas as pd
+import numpy as np
 
 sys.dont_write_bytecode = True
 
@@ -42,6 +44,9 @@ def diagnoseToAs(ToAs, outputFile='ToADiagnosticsPlot'):
     ToAsProp = pd.read_csv(ToAs, sep='\s+', comment='#')
 
     tToA_MJD = ToAsProp['ToA_mid'].to_numpy()
+    phShi = ToAsProp['phShift'].to_numpy()
+    phShiLL = ToAsProp['phShift_LL'].to_numpy()
+    phShiUL = ToAsProp['phShift_UL'].to_numpy()
     ToAnumber = ToAsProp['ToA'].to_numpy()
     Hpower = ToAsProp['Hpower'].to_numpy()
     redChi2 = ToAsProp['redChi2'].to_numpy()
@@ -51,7 +56,7 @@ def diagnoseToAs(ToAs, outputFile='ToADiagnosticsPlot'):
     count_rate = ToAsProp['count_rate'].to_numpy()
 
     # Creating the figure with plotly - this will redirect to an HTML page - also saved as an HTML file
-    fig = make_subplots(rows=6, cols=2,
+    fig = make_subplots(rows=7, cols=2,
                         shared_xaxes=True, shared_yaxes=True, horizontal_spacing=0.02, vertical_spacing=0.02)
     # vs ToA number
     # ToA interval length and ToA exposure (livetime)
@@ -71,8 +76,17 @@ def diagnoseToAs(ToAs, outputFile='ToADiagnosticsPlot'):
     fig.update_yaxes(title_text="H-test power", row=5, col=1)
     #
     fig.add_trace(go.Scatter(x=ToAnumber, y=redChi2, mode="markers"), row=6, col=1)
-    fig.update_xaxes(title_text="ToA number", row=6, col=1)
     fig.update_yaxes(title_text="Reduced Chi2", row=6, col=1)
+    # Phase shifts
+    phShi_symmetric = np.hypot(phShiLL, phShiUL)
+    fig.add_trace(go.Scatter(x=ToAnumber, y=phShi, mode="markers",
+                             error_y=dict(
+                                 type='data',  # value of error bar given in data coordinates
+                                 array=phShi_symmetric,
+                                 visible=True)
+                             ), row=7, col=1)
+    fig.update_yaxes(title_text="Phase Shifts", row=7, col=1)
+    fig.update_xaxes(title_text="ToA number", row=7, col=1)
     # vs MJD
     # ToA interval length and ToA exposure (livetime)
     fig.add_trace(go.Scatter(x=tToA_MJD, y=ToA_lenInt / 86400, mode="markers"), row=1, col=2)
@@ -86,10 +100,18 @@ def diagnoseToAs(ToAs, outputFile='ToADiagnosticsPlot'):
     fig.add_trace(go.Scatter(x=tToA_MJD, y=Hpower, mode="markers"), row=5, col=2)
     #
     fig.add_trace(go.Scatter(x=tToA_MJD, y=redChi2, mode="markers"), row=6, col=2)
-    fig.update_xaxes(title_text="Days (MJD)", row=6, col=2)
     #
     fig.update_layout(height=1600, width=1600, title_text="ToA properties for file " + ToAs, showlegend=False,
                       font=dict(size=14))
+    # Phase shifts
+    phShi_symmetric = np.hypot(phShiLL, phShiUL)/np.sqrt(2)
+    fig.add_trace(go.Scatter(x=tToA_MJD, y=phShi, mode="markers",
+                             error_y=dict(
+                                 type='data',  # value of error bar given in data coordinates
+                                 array=phShi_symmetric,
+                                 visible=True)
+                             ), row=7, col=2)
+    fig.update_xaxes(title_text="Days (MJD)", row=7, col=2)
     #
     fig.show()
     fig.write_html('./' + outputFile + '.html')
