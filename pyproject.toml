@@ -33,10 +33,10 @@ classifiers = [
 #Changelog = "https://github.com/me/spam/blob/master/CHANGELOG.md"
 
 [project.scripts]
-buildTimeIntervalsForToAs = "crimp.buildtimeintervalsToAs:main"
-createTemplatePulseProfile = "crimp.pulseprofile:main"
-measureToAs = "crimp.measureToAs:main"
-diagnoseToAs = "crimp.diagnoseToAs:main"
-addPhaseColumn = "crimp.eventfile:main"
-ephemIntegerRotation = "crimp.ephemIntegerRotation:main"
-phShiftToTimFile = "crimp.phshiftTotimfile:main"
+timeintervalsfortoas = "crimp.buildtimeintervalsToAs:main"
+templatepulseprofile = "crimp.pulseprofile:main"
+measuretoas = "crimp.measureToAs:main"
+diagnosetaos = "crimp.diagnoseToAs:main"
+addphasecolumn = "crimp.eventfile:main"
+ephemintegerrotation = "crimp.ephemIntegerRotation:main"
+phShifttotimfile = "crimp.phshiftTotimfile:main"
