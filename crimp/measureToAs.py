@@ -326,6 +326,9 @@ def measureToA_fourier(tempModPP, cycleFoldedPhases, exposureInt, outFile='', ph
         chi2diff1sig = LLmax - (-results_mle_forErrCalc.residual)
         # Updating counter
         kk += 1
+        if kk > phShiftRes/2:
+            warnings.warn('Could not estimate lower-bound uncertainty on {}'.format(outFile))
+            break
     phShiBF_LL = (kk * phShiftStep + phShiftStep / 2)
 
     # Calculating the 1-sigma upper-limit uncertainty
@@ -344,6 +347,9 @@ def measureToA_fourier(tempModPP, cycleFoldedPhases, exposureInt, outFile='', ph
         chi2diff1sig = LLmax - (-results_mle_forErrCalc.residual)
         # Updating counter
         kk += 1
+        if kk > phShiftRes/2:
+            warnings.warn('Could not estimate upper-bound uncertainty on {}'.format(outFile))
+            break
     phShiBF_UL = (kk * phShiftStep + phShiftStep / 2)
 
     # Plotting the Log(L) distribution
@@ -464,6 +470,9 @@ def measureToA_cauchy(tempModPP, cycleFoldedPhases, exposureInt, outFile='', phS
         chi2diff1sig = LLmax - (-results_mle_forErrCalc.residual)
         # Updating counter
         kk += 1
+        if kk > phShiftRes/2:
+            warnings.warn('Could not estimate lower-bound uncertainty on {}'.format(outFile))
+            break
     phShiBF_LL = (kk * phShiftStep + phShiftStep / 2)
 
     # Calculating the 1-sigma upper-limit uncertainty
@@ -482,6 +491,9 @@ def measureToA_cauchy(tempModPP, cycleFoldedPhases, exposureInt, outFile='', phS
         chi2diff1sig = LLmax - (-results_mle_forErrCalc.residual)
         # Updating counter
         kk += 1
+        if kk > phShiftRes/2:
+            warnings.warn('Could not estimate upper-bound uncertainty on {}'.format(outFile))
+            break
     phShiBF_UL = (kk * phShiftStep + phShiftStep / 2)
 
     # Plotting the Log(L) distribution
@@ -601,6 +613,9 @@ def measureToA_vonmises(tempModPP, cycleFoldedPhases, exposureInt, outFile='', p
         chi2diff1sig = LLmax - (-results_mle_forErrCalc.residual)
         # Updating counter
         kk += 1
+        if kk > phShiftRes/2:
+            warnings.warn('Could not estimate lower-bound uncertainty on {}'.format(outFile))
+            break
     phShiBF_LL = (kk * phShiftStep + phShiftStep / 2)
 
     # Calculating the 1-sigma upper-limit uncertainty
@@ -619,6 +634,9 @@ def measureToA_vonmises(tempModPP, cycleFoldedPhases, exposureInt, outFile='', p
         chi2diff1sig = LLmax - (-results_mle_forErrCalc.residual)
         # Updating counter
         kk += 1
+        if kk > phShiftRes/2:
+            warnings.warn('Could not estimate upper-bound uncertainty on {}'.format(outFile))
+            break
     phShiBF_UL = (kk * phShiftStep + phShiftStep / 2)
 
     # Plotting the Log(L) distribution
