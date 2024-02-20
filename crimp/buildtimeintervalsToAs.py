@@ -55,17 +55,29 @@
 #############################################################
 
 import argparse
-import warnings
+import logging
 
 import numpy as np
 
 # Custom modules
 from crimp.eventfile import EvtFileOps
 
+# Log config
+############
+logFormatter = logging.Formatter('[%(asctime)s] %(levelname)8s %(message)s ' +
+                                 '(%(filename)s:%(lineno)s)', datefmt='%Y-%m-%d %H:%M:%S')
+logger = logging.getLogger('crimp_log')
+logger.setLevel(logging.DEBUG)
+logger.propagate = False
 
-# Script that creates time intervals to use for ToA calculation
+consoleHandler = logging.StreamHandler()
+consoleHandler.setFormatter(logFormatter)
+consoleHandler.setLevel(logging.WARNING)
+logger.addHandler(consoleHandler)
 
-def timeintervalsToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.5, eneHigh=10, outputFile="timIntToAs"):
+
+def timeintervalsToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.5, eneHigh=10,
+                      outputFile="timIntToAs"):
     """
     Calculates START and END times that will define each TOA
 
@@ -82,20 +94,27 @@ def timeintervalsToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.
     :param outputFile: default = "timIntToAs"
     :type outputFile: str
     """
+
+    # Log to a file
+    ###############
+    fileHandler = logging.FileHandler(outputFile + '.log', mode='w')
+    fileHandler.setFormatter(logFormatter)
+    fileHandler.setLevel(logging.INFO)
+    logger.addHandler(fileHandler)
+
+    logger.info('\n Running timeintervalsToAs with input parameters: \n '
+                'evtFile: ' + str(evtFile) +
+                '\n totCtsEachToA: ' + str(totCtsEachToA) +
+                '\n waitTimeCutoff: ' + str(waitTimeCutoff) +
+                '\n eneLow: ' + str(eneLow) +
+                '\n eneHigh: ' + str(eneHigh) +
+                '\n outputFile: ' + str(outputFile) + '\n')
+
     # Reading data and filtering for energy
     #######################################
     EF = EvtFileOps(evtFile)
-    evtFileKeyWords = EF.readEF()
+    evtFileKeyWords, gtiList = EF.readGTI()
     MJDREF = evtFileKeyWords["MJDREF"]
-
-    # Checking if event file is barycentered 
-    if evtFileKeyWords["TIMESYS"] != "TDB":
-        warnings.warn(
-            "Event file is not barycentered. This script is meant for ToA calculation where all TIMEs should be in TDB. Use with care!",
-            stacklevel=2)
-
-    # Reading GTIs
-    gtiList = EF.readGTI()
 
     # Reading TIME column after energy filtering
     dataTP_eneFlt = EF.filtenergyEF(eneLow=eneLow, eneHigh=eneHigh)
@@ -241,6 +260,10 @@ def timeintervalsToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.
 
     print('Total number of time intervals for ToA calculation: {}'.format(nbrToATOT))
 
+    logger.info('\n End of timeintervalsToAs run. Created the following output files:\n '
+                + str(outputFile) + '_bunches.txt - this could be largely ignored\n '
+                + str(outputFile) + '.txt\n')
+
     return
 
 
@@ -248,16 +271,17 @@ def main():
     parser = argparse.ArgumentParser(
         description="Creating time intervals for individual ToAs - saving info to .txt file")
     parser.add_argument("evtFile", help="Fits event file", type=str)
-    parser.add_argument("-tc", "--totCtsEachToA", help="Desired number of counts for ToA calculation", type=int,
+    parser.add_argument("-tc", "--totCtsEachToA", help="Desired number of counts per ToA", type=int,
                         default=1000)
-    parser.add_argument("-wt", "--waitTimeCutoff", help="Do not allow any gap in ToA_GTI larger than this (in days)",
+    parser.add_argument("-wt", "--waitTimeCutoff", help="Do not allow any gap in GTI larger than this (in days)",
                         type=float, default=1)
-    parser.add_argument("-el", "--eneLow", help="Low energy range for burst search (in keV units, default=0.5)",
+    parser.add_argument("-el", "--eneLow", help="Low energy filter in event file, default=0.5",
                         type=float, default=0.5)
-    parser.add_argument("-eh", "--eneHigh", help="High energy range for burst search (in keV units, default=10)",
+    parser.add_argument("-eh", "--eneHigh", help="High energy filter in event file, default=10",
                         type=float, default=10)
     parser.add_argument("-of", "--outputFile",
-                        help="name of .txt output GTI file that defines ToAs (default = timIntToAs)", type=str,
+                        help="name of .txt output GTI file that defines ToAs. Also, name of .lo file (default = timIntToAs)",
+                        type=str,
                         default='timIntToAs')
     args = parser.parse_args()
 

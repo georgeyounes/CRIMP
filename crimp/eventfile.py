@@ -9,7 +9,7 @@ import sys
 import argparse
 import numpy as np
 import pandas as pd
-import warnings
+import logging
 
 from astropy.table import Table, Column
 from astropy.io import fits
@@ -18,6 +18,13 @@ from astropy.io import fits
 from crimp.calcphase import calcphase
 
 sys.dont_write_bytecode = True
+
+# Log config
+############
+logFormatter = logging.Formatter('[%(asctime)s] %(levelname)8s %(message)s ' +
+                                 '(%(filename)s:%(lineno)s)', datefmt='%Y-%m-%d %H:%M:%S')
+logger = logging.getLogger('crimp_log')
+logger.setLevel(logging.DEBUG)
 
 
 ########################################################################################################
@@ -101,13 +108,18 @@ class EvtFileOps:
             TIMEZERO = hdulist['EVENTS'].header['TIMEZERO']
 
         else:
-            raise Exception('Check TELESCOP keyword in event file. Likely telescope not supported yet')
+            logger.error('Check TELESCOP keyword in event file. Likely telescope not supported yet')
 
         evtFileKeyWords = {'TELESCOPE': TELESCOPE, 'INSTRUME': INSTRUME, 'OBS_ID': OBS_ID, 'TSTART': TSTART,
                            'TSTOP': TSTOP,
                            'LIVETIME': LIVETIME, 'TIMESYS': TIMESYS, 'MJDREF': MJDREF, 'TIMEZERO': TIMEZERO,
                            'DATEOBS': DATEOBS,
                            'DETNAME': DETNAME, 'DATATYPE': DATATYPE, 'CCDSRC': CCDSRC}
+
+        # Checking if event file is barycentered
+        if TIMESYS != "TDB":
+            logger.warning("\n Event file is not barycentered. Proceed with care!")
+
         return evtFileKeyWords
 
     #################################################################
@@ -150,14 +162,12 @@ class EvtFileOps:
             ET_GTI = GTIdata.field("STOP")
             gtiList = (np.vstack((ST_GTI, ET_GTI))).T
             if DATATYPE == "TTE":
-                warnings.warn(
-                    "Default GTI of GBM TTE file is simply start and end time of day. Run appendGTIsToTTE.py for a quick fix.",
-                    stacklevel=2)
-
+                logger.warning(
+                    "Default GTI of GBM TTE file is simply start and end time of day. Run appendGTIsToTTE.py for a quick fix.")
         else:
-            raise Exception('Check TELESCOP keyword in event file. Likely telescope not supported yet')
+            logger.error('Check TELESCOP keyword in event file. Likely telescope not supported yet')
 
-        return gtiList
+        return evtFileKeyWords, gtiList
 
     ################################################################################
     def filtenergyEF(self, eneLow: float, eneHigh: float):  # Filtering event file according to energy
@@ -207,14 +217,14 @@ class EvtFileOps:
             dataTP_eneFlt = dataTP.loc[((dataTP['PI'] >= piLow) & (dataTP['PI'] <= piHigh))]
 
         elif TELESCOPE == 'GLAST':
-            warnings.warn(
-                "GBM only provides PHAs, and their conversion to energy is non-linear, hence, eneLow and eneHigh inputs are really PHA values. Use with care!",
-                stacklevel=2)
+            logger.warning(
+                "GBM only provides PHAs, and their conversion to energy is non-linear, "
+                "hence, eneLow and eneHigh inputs are really PHA values. Use with care!")
             dataTP = pd.DataFrame(np.vstack((tbdata.field('TIME'), tbdata.field('PHA'))).T, columns=['TIME', 'PHA'])
             dataTP_eneFlt = dataTP.loc[((dataTP['PHA'] >= eneLow) & (dataTP['PHA'] <= eneHigh))]
 
         else:
-            raise Exception(
+            logger.error(
                 'Check TELESCOP keyword in event file. Likely telescope not supported yet for energy filtering.')
 
         return dataTP_eneFlt
@@ -232,10 +242,6 @@ class EvtFileOps:
         """
         # Reading some necessary keywords
         evtFileKeyWords = self.readEF()
-
-        # Checking if event file is barycentered 
-        if evtFileKeyWords["TIMESYS"] != "TDB":
-            raise Exception('Event file is not barycentered. Cannot create phase column')
 
         # Calculating phases and appending the barycentered event file
         # Reading the MJDREF keyword
@@ -279,6 +285,8 @@ class EvtFileOps:
             # Updating NON-barycentered event file
             nonBaryNewhdulEFPH = fits.BinTableHDU(data=nonBaryTable, header=nonBaryhdrEventsPH, name='EVENTS')
             fits.update(self.evtFile, nonBaryNewhdulEFPH.data, nonBaryNewhdulEFPH.header, 'EVENTS')
+
+        return evtFileKeyWords
 
 
 def main():

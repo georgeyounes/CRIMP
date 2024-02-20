@@ -50,6 +50,7 @@ import matplotlib.pyplot as plt
 import copy
 import warnings
 import pandas as pd
+import logging
 
 from scipy.stats import chi2
 
@@ -66,6 +67,19 @@ from crimp.periodsearch import PeriodSearch
 from crimp.phshiftTotimfile import phshiftTotimfile
 
 sys.dont_write_bytecode = True
+
+# Log config
+############
+logFormatter = logging.Formatter('[%(asctime)s] %(levelname)8s %(message)s ' +
+                                 '(%(filename)s:%(lineno)s)', datefmt='%Y-%m-%d %H:%M:%S')
+logger = logging.getLogger('crimp_log')
+logger.setLevel(logging.DEBUG)
+logger.propagate = False
+
+consoleHandler = logging.StreamHandler()
+consoleHandler.setFormatter(logFormatter)
+consoleHandler.setLevel(logging.WARNING)
+logger.addHandler(consoleHandler)
 
 
 def measureToAs(evtFile, timMod, tempModPP, toagtifile, eneLow=0.5, eneHigh=10., toaStart=0, toaEnd=None,
@@ -108,15 +122,31 @@ def measureToAs(evtFile, timMod, tempModPP, toagtifile, eneLow=0.5, eneHigh=10.,
     :return: ToAsTable
     :rtype: pandas.DataFrame
     """
+    fileHandler = logging.FileHandler(toaFile + '.log', mode='w')
+    fileHandler.setFormatter(logFormatter)
+    fileHandler.setLevel(logging.INFO)
+    logger.addHandler(fileHandler)
+    logger.info('\n Running measureToAs with input parameters: '
+                '\n evtFile: ' + evtFile +
+                '\n timMod: ' + timMod +
+                '\n tempModPP: ' + tempModPP +
+                '\n toagtifile: ' + toagtifile +
+                '\n eneLow: ' + str(eneLow) +
+                '\n eneHigh: ' + str(eneHigh) +
+                '\n toaStart: ' + str(toaStart) +
+                '\n toaEnd: ' + str(toaEnd) +
+                '\n phShiftRes: ' + str(phShiftRes) +
+                '\n nbrBins: ' + str(nbrBins) +
+                '\n varyAmps: ' + str(varyAmps) +
+                '\n plotPPs: ' + str(plotPPs) +
+                '\n plotLLs: ' + str(plotLLs) +
+                '\n toaFile: ' + toaFile +
+                '\n timFile: ' + timFile + '\n')
+
     # Reading and operating on event file
     #####################################
     EF = EvtFileOps(evtFile)
     evtFileKeyWords = EF.readEF()
-    # Checking if event file is barycentered 
-    if evtFileKeyWords["TIMESYS"] != "TDB":
-        warnings.warn(
-            "Event file is not barycentered. This script is meant for ToA calculation where all TIMEs should be in TDB. Use with care!",
-            stacklevel=2)
     MJDREF = evtFileKeyWords["MJDREF"]
 
     # Reading TIME column after energy filtering
@@ -177,7 +207,7 @@ def measureToAs(evtFile, timMod, tempModPP, toagtifile, eneLow=0.5, eneHigh=10.,
         # Measuring the best fit phase shift through an unbinned extended maximum likelihood fit
         ########################################################################################
         BFtempModPP = readPPtemplate(tempModPP)  # BFtempModPP is a dictionary of parameters of best-fit template model
-
+        logger.info('\n Using best fit model of template {} to measure ToAs'.format(BFtempModPP["model"]))
         if BFtempModPP["model"] == 'fourier':
             ToAProp = measureToA_fourier(BFtempModPP, cycleFoldedPhases, ToA_exposure[ii], outFile=ToA_ID,
                                          phShiftRes=phShiftRes, nbrBins=nbrBins, varyAmps=varyAmps, plotPPs=plotPPs,
@@ -193,8 +223,7 @@ def measureToAs(evtFile, timMod, tempModPP, toagtifile, eneLow=0.5, eneHigh=10.,
                                           phShiftRes=phShiftRes, nbrBins=nbrBins, varyAmps=varyAmps, plotPPs=plotPPs,
                                           plotLLs=plotLLs)
         else:
-            raise Exception(
-                'Model {} is not supported yet; fourier, vonmises, cauchy are supported'.format(BFtempModPP["model"]))
+            logger.error('Model {} is not supported yet; fourier, vonmises, cauchy are supported'.format(BFtempModPP["model"]))
 
         # Calculating Htest power at the epoch frequency
         ################################################
@@ -222,15 +251,18 @@ def measureToAs(evtFile, timMod, tempModPP, toagtifile, eneLow=0.5, eneHigh=10.,
         phShiUL_all[ii - toaStart] = ToAProp['phShi_UL']
 
     f.close()
+    logger.info('\n Wrote ToA properties to {}.txt'.format(toaFile))
 
     # Creating .tim file if specified
     #################################
     if timFile is not None:  # if given convert ToAs.txt to a .tim file
         phshiftTotimfile(toaFile + '.txt', timMod, timFile=timFile, tempModPP=tempModPP, flag='Xray')
+        logger.info('\n Wrote timfile {}.tim'.format(timFile))
 
     # Plotting Phase residuals of all ToAs
     ######################################
     plotPhaseResiduals(ToA_MJD_all, phShiBF_all, phShiLL_all, phShiUL_all, outFile=toaFile)
+    logger.info('\n Created phase residual plot {}_phaseResiduals.pdf'.format(toaFile))
 
     # PANDAS table of ToAs
     ######################
@@ -326,8 +358,13 @@ def measureToA_fourier(tempModPP, cycleFoldedPhases, exposureInt, outFile='', ph
         chi2diff1sig = LLmax - (-results_mle_forErrCalc.residual)
         # Updating counter
         kk += 1
+<<<<<<< HEAD
         if kk > phShiftRes/2:
             warnings.warn('Could not estimate lower-bound uncertainty on {}'.format(outFile))
+=======
+        if kk > phShiftRes / 2:
+            logger.warning('Could not estimate lower-bound uncertainty on {}'.format(outFile))
+>>>>>>> addSimulationScript
             break
     phShiBF_LL = (kk * phShiftStep + phShiftStep / 2)
 
@@ -347,7 +384,11 @@ def measureToA_fourier(tempModPP, cycleFoldedPhases, exposureInt, outFile='', ph
         chi2diff1sig = LLmax - (-results_mle_forErrCalc.residual)
         # Updating counter
         kk += 1
+<<<<<<< HEAD
         if kk > phShiftRes/2:
+=======
+        if kk > phShiftRes / 2:
+>>>>>>> addSimulationScript
             warnings.warn('Could not estimate upper-bound uncertainty on {}'.format(outFile))
             break
     phShiBF_UL = (kk * phShiftStep + phShiftStep / 2)
@@ -415,7 +456,8 @@ def measureToA_cauchy(tempModPP, cycleFoldedPhases, exposureInt, outFile='', phS
         initTempModPPparam.add('amp_' + str(kk), tempModPP['amp_' + str(kk)], vary=False)
         initTempModPPparam.add('cen_' + str(kk), tempModPP['cen_' + str(kk)], vary=False)
         initTempModPPparam.add('wid_' + str(kk), tempModPP['wid_' + str(kk)], vary=False)
-    initTempModPPparam.add('phShift', 0, vary=True, min=-1.5*np.pi, max=1.5*np.pi)  # Phase shift - parameter of interest
+    initTempModPPparam.add('phShift', 0, vary=True, min=-1.5 * np.pi,
+                           max=1.5 * np.pi)  # Phase shift - parameter of interest
     initTempModPPparam.add('ampShift', 1, vary=False)
 
     # Running the extended maximum likelihood
@@ -470,8 +512,13 @@ def measureToA_cauchy(tempModPP, cycleFoldedPhases, exposureInt, outFile='', phS
         chi2diff1sig = LLmax - (-results_mle_forErrCalc.residual)
         # Updating counter
         kk += 1
+<<<<<<< HEAD
         if kk > phShiftRes/2:
             warnings.warn('Could not estimate lower-bound uncertainty on {}'.format(outFile))
+=======
+        if kk > phShiftRes / 2:
+            logger.warning('Could not estimate lower-bound uncertainty on {}'.format(outFile))
+>>>>>>> addSimulationScript
             break
     phShiBF_LL = (kk * phShiftStep + phShiftStep / 2)
 
@@ -491,7 +538,11 @@ def measureToA_cauchy(tempModPP, cycleFoldedPhases, exposureInt, outFile='', phS
         chi2diff1sig = LLmax - (-results_mle_forErrCalc.residual)
         # Updating counter
         kk += 1
+<<<<<<< HEAD
         if kk > phShiftRes/2:
+=======
+        if kk > phShiftRes / 2:
+>>>>>>> addSimulationScript
             warnings.warn('Could not estimate upper-bound uncertainty on {}'.format(outFile))
             break
     phShiBF_UL = (kk * phShiftStep + phShiftStep / 2)
@@ -558,7 +609,8 @@ def measureToA_vonmises(tempModPP, cycleFoldedPhases, exposureInt, outFile='', p
         initTempModPPparam.add('amp_' + str(kk), tempModPP['amp_' + str(kk)], vary=False)
         initTempModPPparam.add('cen_' + str(kk), tempModPP['cen_' + str(kk)], vary=False)
         initTempModPPparam.add('wid_' + str(kk), tempModPP['wid_' + str(kk)], vary=False)
-    initTempModPPparam.add('phShift', 0, vary=True, min=-1.5*np.pi, max=1.5*np.pi)  # Phase shift - parameter of interest
+    initTempModPPparam.add('phShift', 0, vary=True, min=-1.5 * np.pi,
+                           max=1.5 * np.pi)  # Phase shift - parameter of interest
     initTempModPPparam.add('ampShift', 1, vary=False)
 
     # Running the extended maximum likelihood
@@ -613,8 +665,13 @@ def measureToA_vonmises(tempModPP, cycleFoldedPhases, exposureInt, outFile='', p
         chi2diff1sig = LLmax - (-results_mle_forErrCalc.residual)
         # Updating counter
         kk += 1
+<<<<<<< HEAD
         if kk > phShiftRes/2:
             warnings.warn('Could not estimate lower-bound uncertainty on {}'.format(outFile))
+=======
+        if kk > phShiftRes / 2:
+            logger.warning('Could not estimate lower-bound uncertainty on {}'.format(outFile))
+>>>>>>> addSimulationScript
             break
     phShiBF_LL = (kk * phShiftStep + phShiftStep / 2)
 
@@ -634,7 +691,11 @@ def measureToA_vonmises(tempModPP, cycleFoldedPhases, exposureInt, outFile='', p
         chi2diff1sig = LLmax - (-results_mle_forErrCalc.residual)
         # Updating counter
         kk += 1
+<<<<<<< HEAD
         if kk > phShiftRes/2:
+=======
+        if kk > phShiftRes / 2:
+>>>>>>> addSimulationScript
             warnings.warn('Could not estimate upper-bound uncertainty on {}'.format(outFile))
             break
     phShiBF_UL = (kk * phShiftStep + phShiftStep / 2)
