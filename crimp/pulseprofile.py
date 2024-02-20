@@ -56,7 +56,7 @@
 
 import argparse
 import sys
-import warnings
+import logging
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -77,6 +77,19 @@ from crimp.templatemodels import VonMises
 from crimp.binphases import binphases
 
 sys.dont_write_bytecode = True
+
+# Log config
+############
+logFormatter = logging.Formatter('[%(asctime)s] %(levelname)8s %(message)s ' +
+                                 '(%(filename)s:%(lineno)s)', datefmt='%Y-%m-%d %H:%M:%S')
+logger = logging.getLogger('crimp_log')
+logger.setLevel(logging.DEBUG)
+logger.propagate = False
+
+consoleHandler = logging.StreamHandler()
+consoleHandler.setFormatter(logFormatter)
+consoleHandler.setLevel(logging.WARNING)
+logger.addHandler(consoleHandler)
 
 
 class PulseProfileFromEventFile:
@@ -136,16 +149,10 @@ class PulseProfileFromEventFile:
         :rtype: dict
         """
 
-        # Reading some event file keywords
+        # Reading event file and GTIs to calculate an accurate LIVETIME, in case of a merged event file
         EF = EvtFileOps(self.evtFile)
-        evtFileKeyWords = EF.readEF()
-        # Checking if event file is barycentered
-        if evtFileKeyWords["TIMESYS"] != "TDB":
-            raise Warning('Event file is not barycentered, proceed with caution.')
+        evtFileKeyWords, gtiList = EF.readGTI()
         MJDREF = evtFileKeyWords["MJDREF"]
-
-        # Reading GTIs to calculate an accurate LIVETIME, in case of a merged event file
-        gtiList = EF.readGTI()
         LIVETIME = np.sum(gtiList[:, 1] - gtiList[:, 0])
 
         # Reading TIME column after energy filtering
@@ -190,9 +197,32 @@ class PulseProfileFromEventFile:
         :type calcPulsedFraction: bool
         :return: fitResultsDict (dict), bestFitModel (numpy.ndarray), pulsedProperties (dict)
         """
+        logfile = 'logfile' if templateFile is None else templateFile
+        fileHandler = logging.FileHandler(logfile + '.log', mode='w')
+        fileHandler.setFormatter(logFormatter)
+        fileHandler.setLevel(logging.INFO)
+        logger.addHandler(fileHandler)
+
+        logger.info('\n Running method fitpulseprofile with input parameters: '
+                    '\n evtFile: ' + str(self.evtFile) +
+                    '\n Timing model: ' + str(self.timMod) +
+                    '\n eneLow: ' + str(self.eneLow) +
+                    '\n eneHigh: ' + str(self.eneHigh) +
+                    '\n nbrBins: ' + str(self.nbrBins) +
+                    '\n ppmodel: ' + str(ppmodel) +
+                    '\n nbrComp: ' + str(nbrComp) +
+                    '\n initTemplateMod: ' + str(initTemplateMod) +
+                    '\n fixPhases: ' + str(fixPhases) +
+                    '\n figure: ' + str(figure) + '(.pdf)' +
+                    '\n templateFile: ' + str(templateFile) + '(.txt)' +
+                    '\n calcPulsedFraction: ' + str(calcPulsedFraction) + '\n')
+
         pulseProfile = self.createpulseprofile()
 
         if initTemplateMod is None:  # in case an initial template not given, use 'template' keyword to redirect to the appropriate function
+            logger.info('\n No initial template file provided'
+                        '\n Fitting to user chosen model : ' + ppmodel +
+                        '\n using number of components : ' + str(nbrComp))
             if ppmodel.casefold() == 'fourier':
                 fitResultsDict, bestFitModel = ModelPulseProfile(pulseProfile, nbrComp).fouriermodel()
             elif ppmodel.casefold() == 'cauchy':
@@ -202,10 +232,12 @@ class PulseProfileFromEventFile:
                 pulseProfile["ppBins"] *= 2 * np.pi  # need to be normalized to 2pi
                 fitResultsDict, bestFitModel = ModelPulseProfile(pulseProfile, nbrComp).vonmisesmodel()
             else:
-                raise Exception(
-                    'Model {} is not supported yet; fourier, vonmises, cauchy are supported'.format(ppmodel))
+                logger.error('Model {} is not supported yet; fourier, vonmises, cauchy are supported'.format(ppmodel))
 
         else:  # if template is given, continue based on 'model' keyword
+            logger.info('\n Initial template file provided : ' + initTemplateMod +
+                        '\n Using these model parameters as starting point. '
+                        '\n Ignoring input keywords ppmodel = ' + ppmodel + ' and nbrComp = ' + str(nbrComp))
             tempModPPparam = readPPtemplate(initTemplateMod)
             ppmodel = tempModPPparam["model"]
             nbrComp = tempModPPparam["nbrComp"]
@@ -221,7 +253,7 @@ class PulseProfileFromEventFile:
                 fitResultsDict, bestFitModel = ModelPulseProfile(pulseProfile, nbrComp, initTemplateMod,
                                                                  fixPhases).vonmisesmodel()
             else:
-                raise Exception('Model {} is not supported yet; fourier, vonmises, cauchy are supported'.format(
+                logger.error('Model {} is not supported yet; fourier, vonmises, cauchy are supported'.format(
                     tempModPPparam["model"]))
 
         # Write template PP model to .txt file
@@ -247,6 +279,10 @@ class PulseProfileFromEventFile:
             f.write('redchi2 = ' + str(fitResultsDict["redchi2"]) + '\n')
             f.close()
 
+            logger.info('\n Created best fit template file : ' + templateFile + '.txt \n')
+        else:
+            logger.info('\n No template file provided/created\n')
+
         # Calculating the rms pulsed flux and fraction, along with the harmonics fractions
         ##################################################################################
         if calcPulsedFraction is True and ppmodel.casefold() == 'fourier':
@@ -254,8 +290,8 @@ class PulseProfileFromEventFile:
             pulsePropertiesErr = calcuncertaintypulseproperties(pulseProfile, nbrComp)
             pulsedProperties.update(pulsePropertiesErr)
         elif calcPulsedFraction is True and ppmodel.casefold() in ('cauchy', 'vonmises'):
-            warnings.warn('Cannot calculate rms pulsed fraction for ' + ppmodel.casefold() +
-                          '\n Setting pulsedProperties to None')
+            logger.warning('Cannot calculate rms pulsed fraction for ' + ppmodel.casefold() +
+                           '\n Setting pulsedProperties to None')
             pulsedProperties = None
         else:
             pulsedProperties = None
@@ -264,6 +300,9 @@ class PulseProfileFromEventFile:
         #####################################################
         if figure is not None:
             plotpulseprofile(pulseProfile, outFile=figure, fittedModel=bestFitModel)
+            logger.info('\n Created figure of pulse profile and best-fit template : ' + figure + '.pdf \n')
+        else:
+            logger.info('\n No figure file provided/created\n')
 
         return fitResultsDict, bestFitModel, pulsedProperties
 
@@ -707,7 +746,7 @@ def main():
                         help="If supplied, a plot of the pulse profile will be produced, 'figure'.pdf", type=str,
                         default=None)
     parser.add_argument("-tf", "--templateFile", help="'Output' .txt file for best-fit model)", type=str,
-                        default='None')
+                        default=None)
     parser.add_argument("-cp", "--calcPulsedFraction",
                         help="Flag to calculate RMS pulsed fraction of pulse profile, default = False", type=bool,
                         default=False, action=argparse.BooleanOptionalAction)
