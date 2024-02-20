@@ -48,7 +48,6 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 import copy
-import warnings
 import pandas as pd
 import logging
 
@@ -140,8 +139,8 @@ def measureToAs(evtFile, timMod, tempModPP, toagtifile, eneLow=0.5, eneHigh=10.,
                 '\n varyAmps: ' + str(varyAmps) +
                 '\n plotPPs: ' + str(plotPPs) +
                 '\n plotLLs: ' + str(plotLLs) +
-                '\n toaFile: ' + toaFile +
-                '\n timFile: ' + timFile + '\n')
+                '\n output toaFile: ' + toaFile +
+                '\n output timFile: ' + timFile + '\n')
 
     # Reading and operating on event file
     #####################################
@@ -184,6 +183,10 @@ def measureToAs(evtFile, timMod, tempModPP, toagtifile, eneLow=0.5, eneHigh=10.,
     f.write(
         'ToA \t ToA_mid \t ToA_start \t ToA_end \t ToA_lenInt \t ToA_exp \t nbr_events \t count_rate \t phShift \t phShift_LL \t phShift_UL \t Hpower \t redChi2\n')
 
+    # Reading template model
+    BFtempModPP = readPPtemplate(tempModPP)  # BFtempModPP is a dictionary of parameters of best-fit template model
+    logger.info('\n Using best fit model of template {} to measure ToAs'.format(BFtempModPP["model"]))
+
     for ii in range(toaStart, toaEnd):
 
         # Here ii ignores some commented out ToA intervals in "toagtifile" - it is an easy fix though not sure if it is necessary/helpful
@@ -206,8 +209,6 @@ def measureToAs(evtFile, timMod, tempModPP, toagtifile, eneLow=0.5, eneHigh=10.,
 
         # Measuring the best fit phase shift through an unbinned extended maximum likelihood fit
         ########################################################################################
-        BFtempModPP = readPPtemplate(tempModPP)  # BFtempModPP is a dictionary of parameters of best-fit template model
-        logger.info('\n Using best fit model of template {} to measure ToAs'.format(BFtempModPP["model"]))
         if BFtempModPP["model"] == 'fourier':
             ToAProp = measureToA_fourier(BFtempModPP, cycleFoldedPhases, ToA_exposure[ii], outFile=ToA_ID,
                                          phShiftRes=phShiftRes, nbrBins=nbrBins, varyAmps=varyAmps, plotPPs=plotPPs,
@@ -358,13 +359,8 @@ def measureToA_fourier(tempModPP, cycleFoldedPhases, exposureInt, outFile='', ph
         chi2diff1sig = LLmax - (-results_mle_forErrCalc.residual)
         # Updating counter
         kk += 1
-<<<<<<< HEAD
-        if kk > phShiftRes/2:
-            warnings.warn('Could not estimate lower-bound uncertainty on {}'.format(outFile))
-=======
         if kk > phShiftRes / 2:
             logger.warning('Could not estimate lower-bound uncertainty on {}'.format(outFile))
->>>>>>> addSimulationScript
             break
     phShiBF_LL = (kk * phShiftStep + phShiftStep / 2)
 
@@ -384,12 +380,8 @@ def measureToA_fourier(tempModPP, cycleFoldedPhases, exposureInt, outFile='', ph
         chi2diff1sig = LLmax - (-results_mle_forErrCalc.residual)
         # Updating counter
         kk += 1
-<<<<<<< HEAD
-        if kk > phShiftRes/2:
-=======
         if kk > phShiftRes / 2:
->>>>>>> addSimulationScript
-            warnings.warn('Could not estimate upper-bound uncertainty on {}'.format(outFile))
+            logger.warning('Could not estimate upper-bound uncertainty on {}'.format(outFile))
             break
     phShiBF_UL = (kk * phShiftStep + phShiftStep / 2)
 
@@ -512,13 +504,8 @@ def measureToA_cauchy(tempModPP, cycleFoldedPhases, exposureInt, outFile='', phS
         chi2diff1sig = LLmax - (-results_mle_forErrCalc.residual)
         # Updating counter
         kk += 1
-<<<<<<< HEAD
-        if kk > phShiftRes/2:
-            warnings.warn('Could not estimate lower-bound uncertainty on {}'.format(outFile))
-=======
         if kk > phShiftRes / 2:
             logger.warning('Could not estimate lower-bound uncertainty on {}'.format(outFile))
->>>>>>> addSimulationScript
             break
     phShiBF_LL = (kk * phShiftStep + phShiftStep / 2)
 
@@ -538,12 +525,8 @@ def measureToA_cauchy(tempModPP, cycleFoldedPhases, exposureInt, outFile='', phS
         chi2diff1sig = LLmax - (-results_mle_forErrCalc.residual)
         # Updating counter
         kk += 1
-<<<<<<< HEAD
-        if kk > phShiftRes/2:
-=======
         if kk > phShiftRes / 2:
->>>>>>> addSimulationScript
-            warnings.warn('Could not estimate upper-bound uncertainty on {}'.format(outFile))
+            logger.warning('Could not estimate upper-bound uncertainty on {}'.format(outFile))
             break
     phShiBF_UL = (kk * phShiftStep + phShiftStep / 2)
 
@@ -630,7 +613,7 @@ def measureToA_vonmises(tempModPP, cycleFoldedPhases, exposureInt, outFile='', p
                                max=1.5 * np.pi)  # Phase shift - set to best fit value from above
         initTempModPPparam.add('norm', results_mle_VMNormalized.params.valuesdict()['norm'], min=0.0, max=np.inf,
                                vary=True)  # normalization - set to best fit value from above
-        results_mle_CANormalized = minimize(unbinnednllvonmises, initTempModPPparam,
+        results_mle_VMNormalized = minimize(unbinnednllvonmises, initTempModPPparam,
                                             args=(cycleFoldedPhases, exposureInt),
                                             method='nelder', max_nfev=1.0e3, nan_policy='propagate')
         nbrFreeParams = 3  # In this case we varied a third parameters, the harmonics amplitudes
@@ -665,13 +648,8 @@ def measureToA_vonmises(tempModPP, cycleFoldedPhases, exposureInt, outFile='', p
         chi2diff1sig = LLmax - (-results_mle_forErrCalc.residual)
         # Updating counter
         kk += 1
-<<<<<<< HEAD
-        if kk > phShiftRes/2:
-            warnings.warn('Could not estimate lower-bound uncertainty on {}'.format(outFile))
-=======
         if kk > phShiftRes / 2:
             logger.warning('Could not estimate lower-bound uncertainty on {}'.format(outFile))
->>>>>>> addSimulationScript
             break
     phShiBF_LL = (kk * phShiftStep + phShiftStep / 2)
 
@@ -691,12 +669,8 @@ def measureToA_vonmises(tempModPP, cycleFoldedPhases, exposureInt, outFile='', p
         chi2diff1sig = LLmax - (-results_mle_forErrCalc.residual)
         # Updating counter
         kk += 1
-<<<<<<< HEAD
-        if kk > phShiftRes/2:
-=======
         if kk > phShiftRes / 2:
->>>>>>> addSimulationScript
-            warnings.warn('Could not estimate upper-bound uncertainty on {}'.format(outFile))
+            logger.warning('Could not estimate upper-bound uncertainty on {}'.format(outFile))
             break
     phShiBF_UL = (kk * phShiftStep + phShiftStep / 2)
 
