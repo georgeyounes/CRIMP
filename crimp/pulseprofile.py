@@ -12,11 +12,12 @@
 # pulse profile with number of bins = 30 (could be changed as desired). An initial template
 # could be provided (default=None) that would serve as initial guess to the fitting
 # procedure. The output is a .txt file with the template best fit parameters and
-# (optionally) a .pdf file of the profile and the best fit model.
+# (optionally) a .pdf file of the binned pulse profile and the best fit model.
 # Lastly when an initial template is provided the user has the option to fix the phases of
 # the components, i.e., the peaks of the Gaussian/Lorentzian components or the Fourier
-# phases. This is important to maitain absolute timing when deriving ToAs from several
+# phases. This is important to maitain *absolute* timing when deriving ToAs from several
 # different instruments (think XTI, XRT, PN, etc.), which require their own template.
+# A .log file is also created summarizing the run.
 #
 # Then there is a class called ModelPulseProfile which models a pulse profile that was provided
 # as a dictionary with (at least) three keys, 'ppBins', 'countRate', and 'countRateErr';
@@ -51,7 +52,7 @@
 # 3- pulsedProperties: RMS pulsed flux and fraction, if calcPulsedFraction=True, None otherwise
 #
 # To do:
-# This module is a bit of a mess, try to simplify
+# This module is a bit messy, try to simplify
 #############################################################
 
 import argparse
@@ -629,8 +630,6 @@ def calcpulseproperties(pulseProfile, nbrComp):
 def calcuncertaintypulseproperties(pulseProfile, nbrComp):
     """
     Calculate uncertainty on rms pulsed fraction and pulsed flux (total and for individual harmonics)
-    In reality this function never need to be invoked directly. It will be called by calcPulseProperties, which returns
-    the rms pulsed fraction, pulsed flux, and their uncertainties (total and for individual harmonics)
     :param pulseProfile: dictionary of pulse profile; keys are {ppBins, countRate, countRateErr}
     :type pulseProfile: dict
     :param nbrComp: number of Fourier components

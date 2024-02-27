@@ -40,7 +40,8 @@
 # ToAsTable : pandas table of ToAs properties
 #
 # To do:
-# Add ToA measurement for cauchy and von mises
+# Create a class with three methods which measure ToAs for each template (fourier, cauchy, vonmises)
+# Currently they are their own function with the same input parameters.
 ################################################################################
 
 import sys

@@ -7,8 +7,8 @@
 # file is larger than "waitTimeCutoff", force it to start a
 # new ToA. This is important because we typically work with
 # merged event files over years time-scales that encompass a
-# full monitoring program. The code also allows for an energy
-# filtering through the parameters enelow and enehigh.
+# long-term monitoring program. The code also allows for an
+# energy filtering through the parameters enelow and enehigh.
 # 
 # The outputs are two text files: (1) "outFile"_bunches.txt,
 # an intermediary file (that can be largely ignored), and (2)
@@ -16,7 +16,7 @@
 # of each ToA_GTI, the length of the time_interval to
 # accumulate totCtsEachToA, the exact exposure (livetime) of
 # each ToA, the total number of counts in each ToA, and the
-# exact count rate.
+# exact count rate. A log file "outFile".log is also cretead.
 # 
 # Input:
 # 1- evtFile: event file (barycenter-corrected)
@@ -81,11 +81,11 @@ def timeintervalsToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.
     """
     Calculates START and END times that will define each TOA
 
-    :param evtFile:
+    :param evtFile: name of the fits event file
     :type evtFile: str
-    :param totCtsEachToA: default = 1000 (counts)
+    :param totCtsEachToA: max number of counts in each ToA (default = 1000)
     :type totCtsEachToA: int
-    :param waitTimeCutoff: default = 1 (day)
+    :param waitTimeCutoff: max waiting time in days between two GTIs (default = 1)
     :type waitTimeCutoff: float
     :param eneLow: default = 0.5 (keV)
     :type eneLow: float
@@ -258,11 +258,13 @@ def timeintervalsToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.
 
     f.close()
 
-    print('Total number of time intervals for ToA calculation: {}'.format(nbrToATOT))
+    print('Total number of time intervals that define each ToA: {}'.format(nbrToATOT))
 
-    logger.info('\n End of timeintervalsToAs run. Created the following output files:\n '
-                + str(outputFile) + '_bunches.txt - this could be largely ignored\n '
-                + str(outputFile) + '.txt\n')
+    logger.info('\n End of timeintervalsToAs run'
+                '\n Total number of time intervals that define each ToA: {}'
+                '\n Created the following output files: '
+                '\n {}_bunches.txt - this could be largely ignored '
+                '\n {}.txt \n and the current {}.log file'.format(nbrToATOT, outputFile, outputFile, outputFile))
 
     return
 
