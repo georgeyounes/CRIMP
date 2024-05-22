@@ -95,7 +95,7 @@ def simSinFundEvtFile(freq, norm=100, amp=50, phSh=1.2, amp2=20, phSh2=2.2, bgrR
     t0 = 0
     assigned_t_nobgr = ((assigned_phase_all - phSh) / freq) + t0
     assigned_t_nobgr = np.sort(assigned_t_nobgr)
-
+    
     # plt.figure(1, figsize=(12, 10), dpi=80, facecolor='w', edgecolor='k')
 
     # H = plt.hist(assigned_t_nobgr,int(nbrRotPh*(1/freq)))

@@ -101,7 +101,7 @@ class EvtFileOps:
             MJDREF = hdulist['EVENTS'].header['MJDREFI'] + hdulist['EVENTS'].header['MJDREFF']
             TIMEZERO = hdulist['EVENTS'].header['TIMEZERO']
 
-        elif (TELESCOPE == 'SWIFT') or (TELESCOPE == 'IXPE'):
+        elif TELESCOPE in ['SWIFT', 'NuSTAR', 'IXPE']:
             LIVETIME = hdulist['EVENTS'].header['LIVETIME']
             OBS_ID = hdulist['EVENTS'].header['OBS_ID']
             MJDREF = hdulist['EVENTS'].header['MJDREFI'] + hdulist['EVENTS'].header['MJDREFF']
@@ -111,16 +111,49 @@ class EvtFileOps:
             logger.error('Check TELESCOP keyword in event file. Likely telescope not supported yet')
 
         evtFileKeyWords = {'TELESCOPE': TELESCOPE, 'INSTRUME': INSTRUME, 'OBS_ID': OBS_ID, 'TSTART': TSTART,
-                           'TSTOP': TSTOP,
-                           'LIVETIME': LIVETIME, 'TIMESYS': TIMESYS, 'MJDREF': MJDREF, 'TIMEZERO': TIMEZERO,
-                           'DATEOBS': DATEOBS,
-                           'DETNAME': DETNAME, 'DATATYPE': DATATYPE, 'CCDSRC': CCDSRC}
+                           'TSTOP': TSTOP, 'LIVETIME': LIVETIME, 'TIMESYS': TIMESYS, 'MJDREF': MJDREF,
+                           'TIMEZERO': TIMEZERO, 'DATEOBS': DATEOBS, 'DETNAME': DETNAME, 'DATATYPE': DATATYPE,
+                           'CCDSRC': CCDSRC}
 
         # Checking if event file is barycentered
         if TIMESYS != "TDB":
             logger.warning("\n Event file is not barycentered. Proceed with care!")
 
         return evtFileKeyWords
+
+    #################################################################
+    def read_fpmsel(self):
+        """
+        Reads FPM_SEL extension from a NICER event file
+        :return: FPMSEL_table_condensed - same as FPM_SEL but with total number of detectors per time stamp
+        :rtype: pandas.DataFrame
+        """
+        evtFileKeyWords = self.readEF()
+        TELESCOPE = evtFileKeyWords["TELESCOPE"]
+
+        if TELESCOPE == 'NICER':
+            hdulist = fits.open(self.evtFile)
+
+            # Reading the table
+            FPMSEL_table = hdulist["FPM_SEL"].data
+            TIME = FPMSEL_table['TIME']
+            FPMsel = FPMSEL_table['FPM_SEL']
+            FPMon = FPMSEL_table['FPM_ON']
+            # Adding up all selected FPMs
+            totfpmsel = np.zeros(np.size(TIME))
+            for k in range(len(TIME)):
+                totfpmsel[k] = (np.sum(FPMsel[k]))
+            # Adding up all FPMs that were on
+            totfpmon = np.zeros(np.size(TIME))
+            for k in range(len(TIME)):
+                totfpmon[k] = (np.sum(FPMon[k]))
+
+            FPMSEL_table_condensed = pd.DataFrame(np.vstack((TIME, totfpmsel, totfpmon)).T, columns=['TIME', 'TOTFPMSEL', 'TOTFPMON'])
+
+        else:
+            logger.error('No FPM selection is possible for non-NICER observations')
+
+        return FPMSEL_table, FPMSEL_table_condensed
 
     #################################################################
     def readGTI(self):  # Reading fits event file GTI lists
@@ -147,7 +180,7 @@ class EvtFileOps:
                 ET_GTI = GTIdata.field("STOP")
                 gtiList = (np.vstack((ST_GTI, ET_GTI))).T
 
-        elif TELESCOPE in ['NICER', 'SWIFT', 'NUSTAR', 'IXPE']:
+        elif TELESCOPE in ['NICER', 'SWIFT', 'NuSTAR', 'IXPE']:
             hdulist = fits.open(self.evtFile)
             GTIdata = hdulist["GTI"].data
             ST_GTI = GTIdata.field("START")
@@ -170,7 +203,7 @@ class EvtFileOps:
         return evtFileKeyWords, gtiList
 
     ################################################################################
-    def filtenergyEF(self, eneLow: float, eneHigh: float):  # Filtering event file according to energy
+    def filtenergy(self, eneLow: float, eneHigh: float):  # Filtering event file according to energy
         """
         Filters the event list accoring to energy (in keV)
         :param eneLow: low energy cutoff
@@ -257,7 +290,7 @@ class EvtFileOps:
         _, cycleFoldedPhases = calcphase(timeMJD, timMod)
 
         #####################################
-        # adding phase column to barycentered event file fits table, called table
+        # Creating an astropy Table that corresponds to the EVENTS table
         baryTable = Table.read(self.evtFile, format='fits', hdu='EVENTS')
         phCol = Column(name='PHASE', data=cycleFoldedPhases)
         baryTable.add_column(phCol)

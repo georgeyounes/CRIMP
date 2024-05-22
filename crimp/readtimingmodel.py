@@ -329,4 +329,5 @@ class ReadTimingModel:
         timModParamGlitches = ReadTimingModel.readglitches(self)
         timModParamwaves = ReadTimingModel.readwaves(self)
         timModParams = {**timModParamTE, **timModParamGlitches, **timModParamwaves}
+        #print(timModParamwaves)
         return timModParams

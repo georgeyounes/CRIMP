@@ -14,7 +14,6 @@ from math import factorial
 # Custom modules
 from crimp.readtimingmodel import ReadTimingModel
 
-from crimp.ephemTmjd import ephemTmjd
 sys.dont_write_bytecode = True
 
 
@@ -129,8 +128,7 @@ class Phases:
                                          jj * waveFreq * (self.timeMJD - waveEpoch))))
 
         # Normalizing by frequency to create residuals in seconds (per tempo2)
-        freqAtTmjd = ephemTmjd(self.timeMJD, self.timMod)["freqAtTmjd"]
-        return np.multiply(phases_waves_all, freqAtTmjd)
+        return np.multiply(phases_waves_all, self.timModParam['F0'])
 
 
 def calcphase(timeMJD, timMod):

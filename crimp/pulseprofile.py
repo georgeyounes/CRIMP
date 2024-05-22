@@ -157,7 +157,7 @@ class PulseProfileFromEventFile:
         LIVETIME = np.sum(gtiList[:, 1] - gtiList[:, 0])
 
         # Reading TIME column after energy filtering
-        dataTP_eneFlt = EF.filtenergyEF(eneLow=self.eneLow, eneHigh=self.eneHigh)
+        dataTP_eneFlt = EF.filtenergy(eneLow=self.eneLow, eneHigh=self.eneHigh)
         TIME = dataTP_eneFlt['TIME'].to_numpy()
         timeMJD = TIME / 86400 + MJDREF
 
@@ -280,9 +280,13 @@ class PulseProfileFromEventFile:
             f.write('redchi2 = ' + str(fitResultsDict["redchi2"]) + '\n')
             f.close()
 
+            logger.info('\n chi2 = ' + str(fitResultsDict["chi2"]) + '\n'
+                        ' dof = ' + str(fitResultsDict["dof"]) + '\n'
+                        ' redchi2 = ' + str(fitResultsDict["redchi2"]) + '\n')
+
             logger.info('\n Created best fit template file : ' + templateFile + '.txt \n')
         else:
-            logger.info('\n No template file provided/created\n')
+            logger.info('\n No template file created: templateFile is None\n')
 
         # Calculating the rms pulsed flux and fraction, along with the harmonics fractions
         ##################################################################################

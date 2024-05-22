@@ -141,7 +141,7 @@ def measureToAs(evtFile, timMod, tempModPP, toagtifile, eneLow=0.5, eneHigh=10.,
                 '\n plotPPs: ' + str(plotPPs) +
                 '\n plotLLs: ' + str(plotLLs) +
                 '\n output toaFile: ' + toaFile +
-                '\n output timFile: ' + timFile + '\n')
+                '\n output timFile: ' + str(timFile) + '\n')
 
     # Reading and operating on event file
     #####################################
@@ -150,7 +150,7 @@ def measureToAs(evtFile, timMod, tempModPP, toagtifile, eneLow=0.5, eneHigh=10.,
     MJDREF = evtFileKeyWords["MJDREF"]
 
     # Reading TIME column after energy filtering
-    dataTP_eneFlt = EF.filtenergyEF(eneLow=eneLow, eneHigh=eneHigh)
+    dataTP_eneFlt = EF.filtenergy(eneLow=eneLow, eneHigh=eneHigh)
     TIME = dataTP_eneFlt['TIME'].to_numpy()
     TIMEMJD = TIME / 86400 + MJDREF
 
@@ -159,7 +159,6 @@ def measureToAs(evtFile, timMod, tempModPP, toagtifile, eneLow=0.5, eneHigh=10.,
     df_gtiToAParam = pd.read_csv(toagtifile, sep='\s+', comment='#')
 
     ToAStartMJD = df_gtiToAParam['ToA_tstart'].to_numpy()
-
     ToAEndMJD = df_gtiToAParam['ToA_tend'].to_numpy()
     ToA_lenInt = df_gtiToAParam['ToA_lenInt'].to_numpy()
     ToA_exposure = df_gtiToAParam['ToA_exposure'].to_numpy()
@@ -225,7 +224,8 @@ def measureToAs(evtFile, timMod, tempModPP, toagtifile, eneLow=0.5, eneHigh=10.,
                                           phShiftRes=phShiftRes, nbrBins=nbrBins, varyAmps=varyAmps, plotPPs=plotPPs,
                                           plotLLs=plotLLs)
         else:
-            logger.error('Model {} is not supported yet; fourier, vonmises, cauchy are supported'.format(BFtempModPP["model"]))
+            logger.error(
+                'Model {} is not supported yet; fourier, vonmises, cauchy are supported'.format(BFtempModPP["model"]))
 
         # Calculating Htest power at the epoch frequency
         ################################################
@@ -233,8 +233,8 @@ def measureToAs(evtFile, timMod, tempModPP, toagtifile, eneLow=0.5, eneHigh=10.,
         htestAtTmid = PeriodSearch(TIME_toa * 86400, np.atleast_1d(ephemeridesAtTmid["freqAtTmjd"]), nbrHarm=5)
         htestPowAtTmid = htestAtTmid.htest()[0]
 
-        # Dictionary of ToA properties
-        ##############################
+        # Dictionary of ToA properties - updating with few more keys
+        ############################################################
         ToAProp = {'ToA_mid': ToA_mid, 'phShi': ToAProp["phShi"], 'phShi_LL': ToAProp["phShi_LL"],
                    'phShi_UL': ToAProp["phShi_UL"], 'htestPow': htestPowAtTmid,
                    'reducedChi2': ToAProp["reducedChi2"]}
@@ -318,14 +318,15 @@ def measureToA_fourier(tempModPP, cycleFoldedPhases, exposureInt, outFile='', ph
     nbrFreeParams = 2
     # In case pulsed fraction should be varied
     if varyAmps is True:
-        # We still first fit with fourier amplitudes fixed to 1, this serves to derive a good first guess
-        initTempModPPparam.add('ampShift', 1, min=0.0, max=np.inf, vary=True)
-        initTempModPPparam.add('phShift', results_mle_FSNormalized.params.valuesdict()['phShift'],
-                               vary=True, min=-1.5 * np.pi,
-                               max=1.5 * np.pi)  # Phase shift - set to best fit value from above
+        initTempModPPparam_afterfit = copy.deepcopy(results_mle_FSNormalized.params)
+        # We still first fit with fourier amplitudes fixed to 1 (done above), this serves to derive a good first guess
+        initTempModPPparam_afterfit.add('ampShift', 1, min=0.0, max=np.inf, vary=True)
+        initTempModPPparam_afterfit.add('phShift', results_mle_FSNormalized.params.valuesdict()['phShift'],
+                                        vary=True, min=-1.5 * np.pi,
+                                        max=1.5 * np.pi)  # Phase shift - set to best fit value from above
         initTempModPPparam.add('norm', results_mle_FSNormalized.params.valuesdict()['norm'], min=0.0, max=1000.0,
                                vary=True)  # normalization - set to best fit value from above
-        results_mle_FSNormalized = minimize(unbinnednllfourier, initTempModPPparam,
+        results_mle_FSNormalized = minimize(unbinnednllfourier, initTempModPPparam_afterfit,
                                             args=(cycleFoldedPhases, exposureInt),
                                             method='nelder', max_nfev=1.0e3, nan_policy='propagate')
         nbrFreeParams = 3  # In this case we varied a third parameters, the harmonics amplitudes
@@ -463,14 +464,16 @@ def measureToA_cauchy(tempModPP, cycleFoldedPhases, exposureInt, outFile='', phS
     nbrFreeParams = 2
     # In case pulsed fraction should be varied
     if varyAmps is True:
+        initTempModPPparam_afterfit = copy.deepcopy(results_mle_CANormalized.params)
         # We still first fit with fourier amplitudes fixed to 1, this serves to derive a good first guess
-        initTempModPPparam.add('ampShift', 1, min=0.0, max=np.inf, vary=True)
-        initTempModPPparam.add('phShift', results_mle_CANormalized.params.valuesdict()['phShift'],
-                               vary=True, min=-1.5 * np.pi,
-                               max=1.5 * np.pi)  # Phase shift - set to best fit value from above
-        initTempModPPparam.add('norm', results_mle_CANormalized.params.valuesdict()['norm'], min=0.0, max=np.inf,
-                               vary=True)  # normalization - set to best fit value from above
-        results_mle_CANormalized = minimize(unbinnednllcauchy, initTempModPPparam,
+        initTempModPPparam_afterfit.add('ampShift', 1, min=0.0, max=np.inf, vary=True)
+        initTempModPPparam_afterfit.add('phShift', results_mle_CANormalized.params.valuesdict()['phShift'],
+                                        vary=True, min=-1.5 * np.pi,
+                                        max=1.5 * np.pi)  # Phase shift - set to best fit value from above
+        initTempModPPparam_afterfit.add('norm', results_mle_CANormalized.params.valuesdict()['norm'], min=0.0,
+                                        max=np.inf,
+                                        vary=True)  # normalization - set to best fit value from above
+        results_mle_CANormalized = minimize(unbinnednllcauchy, initTempModPPparam_afterfit,
                                             args=(cycleFoldedPhases, exposureInt),
                                             method='nelder', max_nfev=1.0e3, nan_policy='propagate')
         nbrFreeParams = 3  # In this case we varied a third parameters, the harmonics amplitudes
@@ -607,14 +610,16 @@ def measureToA_vonmises(tempModPP, cycleFoldedPhases, exposureInt, outFile='', p
     nbrFreeParams = 2
     # In case pulsed fraction should be varied
     if varyAmps is True:
+        initTempModPPparam_afterfit = copy.deepcopy(results_mle_VMNormalized.params)
         # We still first fit with fourier amplitudes fixed to 1, this serves to derive a good first guess
-        initTempModPPparam.add('ampShift', 1, min=0.0, max=np.inf, vary=True)
-        initTempModPPparam.add('phShift', results_mle_VMNormalized.params.valuesdict()['phShift'],
-                               vary=True, min=-1.5 * np.pi,
-                               max=1.5 * np.pi)  # Phase shift - set to best fit value from above
-        initTempModPPparam.add('norm', results_mle_VMNormalized.params.valuesdict()['norm'], min=0.0, max=np.inf,
-                               vary=True)  # normalization - set to best fit value from above
-        results_mle_VMNormalized = minimize(unbinnednllvonmises, initTempModPPparam,
+        initTempModPPparam_afterfit.add('ampShift', 1, min=0.0, max=np.inf, vary=True)
+        initTempModPPparam_afterfit.add('phShift', results_mle_VMNormalized.params.valuesdict()['phShift'],
+                                        vary=True, min=-1.5 * np.pi,
+                                        max=1.5 * np.pi)  # Phase shift - set to best fit value from above
+        initTempModPPparam_afterfit.add('norm', results_mle_VMNormalized.params.valuesdict()['norm'], min=0.0,
+                                        max=np.inf,
+                                        vary=True)  # normalization - set to best fit value from above
+        results_mle_VMNormalized = minimize(unbinnednllvonmises, initTempModPPparam_afterfit,
                                             args=(cycleFoldedPhases, exposureInt),
                                             method='nelder', max_nfev=1.0e3, nan_policy='propagate')
         nbrFreeParams = 3  # In this case we varied a third parameters, the harmonics amplitudes

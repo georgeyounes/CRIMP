@@ -26,6 +26,7 @@ import sys
 # Custom modules
 from crimp.ephemTmjd import ephemTmjd
 from crimp.calcphase import calcphase
+from crimp.readtimingmodel import ReadTimingModel
 
 sys.dont_write_bytecode = True
 
@@ -33,7 +34,7 @@ sys.dont_write_bytecode = True
 def ephemIntegerRotation(Tmjd, timMod, printOutput=False):
     """
     Function that provides the earliest MJD and corresponding spin frequency
-    to input MJD which, according the input .par file, would result in an
+    to input MJD, which, according to the input .par file, would result in an
     integer number of rotational phases from PEPOCH
 
     :param Tmjd: time for measurement of ephemerides that result
@@ -46,25 +47,29 @@ def ephemIntegerRotation(Tmjd, timMod, printOutput=False):
     :return: ephemerides_intRotation
     :rtype: dict
     """
-    freqAtTmjd = ephemTmjd(Tmjd, timMod)["freqAtTmjd"]
 
-    # Phases that correspond to Tmjd according to timing model
-    phAtTmjd, _ = calcphase(Tmjd, timMod)
+    # F0 of timing solution
+    timModParam = ReadTimingModel(timMod).readfulltimingmodel()
+    F0 = timModParam["F0"]
+
+    # Phase and frequency that correspond to Tmjd according to timing model
+    ph_Tmjd, _ = calcphase(Tmjd, timMod)
+    freq_Tmjd = ephemTmjd(Tmjd, timMod)["freqAtTmjd"]
 
     # Deriving the closest MJD and spin frequency with an integer number of rotations
-    phAtTmjd_Frac = phAtTmjd % 1
-    FracTFromIntRotation = (phAtTmjd_Frac / freqAtTmjd) / 86400
+    ph_Tmjd_Frac = ph_Tmjd % 1
+    FracTFromIntRotation = (ph_Tmjd_Frac / F0) / 86400
 
     Tmjd_intRotation = Tmjd - FracTFromIntRotation
-    freq_intRotation = ephemTmjd(Tmjd_intRotation, timMod)["freqAtTmjd"]
+    freq_Tmjd_intRotation = ephemTmjd(Tmjd_intRotation, timMod)["freqAtTmjd"]
     ph_intRotation, _ = calcphase(Tmjd_intRotation, timMod)
 
     if printOutput is True:
         print('Input Tmjd = {} days. Corresponding spin frequency = {} Hz. Corresponding phase = {} \n'
               'Earliest Tmjd with integer number of rotation = {}. Corresponding '
-              'frequency = {}. Corresponding phase = {}'.format(Tmjd, freqAtTmjd, phAtTmjd, Tmjd_intRotation, freq_intRotation, ph_intRotation))
+              'frequency = {}. Corresponding phase = {}'.format(Tmjd, freq_Tmjd, ph_Tmjd, Tmjd_intRotation, freq_Tmjd_intRotation, ph_intRotation))
 
-    ephemerides_intRotation = {'Tmjd_intRotation': Tmjd_intRotation, 'freq_intRotation': freq_intRotation,
+    ephemerides_intRotation = {'Tmjd_intRotation': Tmjd_intRotation, 'freq_intRotation': freq_Tmjd_intRotation,
                                'ph_intRotation': ph_intRotation}
 
     return ephemerides_intRotation

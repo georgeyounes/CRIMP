@@ -58,6 +58,7 @@ import argparse
 import logging
 
 import numpy as np
+import pandas as pd
 
 # Custom modules
 from crimp.eventfile import EvtFileOps
@@ -77,7 +78,7 @@ logger.addHandler(consoleHandler)
 
 
 def timeintervalsToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.5, eneHigh=10,
-                      outputFile="timIntToAs"):
+                      outputFile="timIntToAs", correxposure=False):
     """
     Calculates START and END times that will define each TOA
 
@@ -93,6 +94,8 @@ def timeintervalsToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.
     :type eneHigh: float
     :param outputFile: default = "timIntToAs"
     :type outputFile: str
+    :param correxposure: flag to correct exposure, hence, count rate, according to selected FPMs, default = False)
+    :type correxposure: Bool
     """
 
     # Log to a file
@@ -114,10 +117,11 @@ def timeintervalsToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.
     #######################################
     EF = EvtFileOps(evtFile)
     evtFileKeyWords, gtiList = EF.readGTI()
+
     MJDREF = evtFileKeyWords["MJDREF"]
 
     # Reading TIME column after energy filtering
-    dataTP_eneFlt = EF.filtenergyEF(eneLow=eneLow, eneHigh=eneHigh)
+    dataTP_eneFlt = EF.filtenergy(eneLow=eneLow, eneHigh=eneHigh)
     TIME = dataTP_eneFlt['TIME'].to_numpy()
 
     # Calculating the wait time until next GTI and exposure of each GTI
@@ -147,8 +151,8 @@ def timeintervalsToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.
     ######################################################################
     ToAs_timeInfo = np.zeros((0, 4))
 
-    for ll in range(0, np.size(ind_gtiTiming) - 1):
-        alltimes_tmp = alltimes[ind_gtiTiming[ll]:ind_gtiTiming[ll + 1]]
+    for kk in range(0, np.size(ind_gtiTiming) - 1):
+        alltimes_tmp = alltimes[ind_gtiTiming[kk]:ind_gtiTiming[kk + 1]]
 
         ToAs_timeInfo_tmp = np.hstack((alltimes_tmp[0, 0], alltimes_tmp[-1, 1], np.sum(alltimes_tmp[:, 3])))
         lenInt_ToABunch = alltimes_tmp[-1, 1] - alltimes_tmp[0, 0]
@@ -175,9 +179,9 @@ def timeintervalsToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.
 
     nbrToATOT = 0
 
-    for kk in range(0, nbrGTIs):
+    for mm in range(0, nbrGTIs):
 
-        timeToA_tmp = (TIME[:] >= ToAs_timeInfo[kk][0]) & (TIME[:] <= ToAs_timeInfo[kk][1])
+        timeToA_tmp = (TIME[:] >= ToAs_timeInfo[mm][0]) & (TIME[:] <= ToAs_timeInfo[mm][1])
         timeToA_tmp = TIME[timeToA_tmp]
 
         nbrToAs = np.int64(np.ceil(len(timeToA_tmp) / totCtsEachToA))
@@ -209,10 +213,10 @@ def timeintervalsToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.
             continue
 
         # In case many ToAs are possible within the desired WT interval
-        for ll in range(0, nbrToAs):
+        for nn in range(0, nbrToAs):
 
-            if ll == (nbrToAs - 1):
-                timeToA = timeToA_tmp[ll * totCtsEachToA:len(timeToA_tmp)]
+            if nn == (nbrToAs - 1):
+                timeToA = timeToA_tmp[nn * totCtsEachToA:len(timeToA_tmp)]
                 # See below for explanation
                 tsToA_4exp = (gtiList[:, 1] > timeToA[0])
                 gtiList_tsToA_tmp = gtiList[tsToA_4exp, :]
@@ -234,7 +238,7 @@ def timeintervalsToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.
                 nbrToATOT += 1
 
             else:
-                timeToA = timeToA_tmp[ll * totCtsEachToA:(ll + 1) * totCtsEachToA]
+                timeToA = timeToA_tmp[nn * totCtsEachToA:(nn + 1) * totCtsEachToA]
                 # Measure exact exposure per ToA
                 # First cut all GTIs that do not encompass Tstart of ToA
                 tsToA_4exp = (gtiList[:, 1] > timeToA[0])
@@ -257,6 +261,47 @@ def timeintervalsToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.
                 nbrToATOT += 1
 
     f.close()
+    # reading the text file we just created as pandas table (i.e., time intervals that define each ToA)
+    timInt_toas = pd.read_csv(outputFile + ".txt", sep='\s+', comment='#')
+
+    # Correcting for NICER exposure according to number of detector on. valid for heasoft 6.32+
+    if evtFileKeyWords["TELESCOPE"] == 'NICER':
+        logger.warning("\n If NICER event files were generaed with HEASOFT version 6.32+,\n"
+                       " it is advisable to correct for the number of selected FPMs with the flag -ce for accurate\n"
+                       " measurement of count rates\n")
+        if correxposure is True:
+            logger.info('\n Assuming HEASOFT 6.32+ was used to reduce NICER data\n'
+                        ' Getting the number of FPM_SEL during each ToA interval\n')
+
+            # Reading the selected FPM per 1-second interval from event file
+            _, FPMSEL_table_condensed = EF.read_fpmsel()
+
+            for pp in range(nbrToATOT):
+                toa_start = (timInt_toas['ToA_tstart'][pp] - MJDREF) * 86400
+                toa_end = (timInt_toas['ToA_tend'][pp] - MJDREF) * 86400
+                # filtering FPM selection table to within each ToA
+                mkf_toa_filtered = FPMSEL_table_condensed.loc[
+                    ((FPMSEL_table_condensed['TIME'] >= toa_start) & (FPMSEL_table_condensed['TIME'] <= toa_end))]
+
+                # summing all detectors
+                nbr_sel_det = np.sum(mkf_toa_filtered['TOTFPMSEL'])
+                # total number of detectors if 52 were operating
+                exp_nbr_det = 52 * timInt_toas['ToA_exposure'][pp]
+                # Measuring correction factor
+                correction_factor = exp_nbr_det / nbr_sel_det
+                # Changing rate values with corrected ones
+                timInt_toas.at[pp, 'ct_rate'] *= correction_factor
+
+            # Dumping pandas dataFrame to text file
+            timInt_toas.to_csv(outputFile + ".txt", sep='\t', index=False)
+
+        else:
+            logger.info('\n No correction of exposure according to number of detectors_selected per ToA interval\n'
+                        ' This should not be an issue assuming HEASOFT 6.31- was used to reduce NICER data\n')
+
+    elif evtFileKeyWords["TELESCOPE"] == 'NuSTAR':
+        logger.warning("\n If NuSTAR event files are merged for detectors FPMA and FPMB, then resulting count rates "
+                       " will be a factor of 2 smaller.\n")
 
     print('Total number of time intervals that define each ToA: {}'.format(nbrToATOT))
 
@@ -266,7 +311,7 @@ def timeintervalsToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.
                 '\n {}_bunches.txt - this could be largely ignored '
                 '\n {}.txt \n and the current {}.log file'.format(nbrToATOT, outputFile, outputFile, outputFile))
 
-    return
+    return timInt_toas
 
 
 def main():
@@ -282,12 +327,17 @@ def main():
     parser.add_argument("-eh", "--eneHigh", help="High energy filter in event file, default=10",
                         type=float, default=10)
     parser.add_argument("-of", "--outputFile",
-                        help="name of .txt output GTI file that defines ToAs. Also, name of .lo file (default = timIntToAs)",
+                        help="name of .txt output GTI file that defines ToAs. Also, name of .log file (default = timIntToAs)",
                         type=str,
                         default='timIntToAs')
+    parser.add_argument("-ce", "--correxposure", help="Flag to correct exposure/rate according to selected FPMs, "
+                                                      "default = False", type=bool, default=False,
+                        action=argparse.BooleanOptionalAction)
+
     args = parser.parse_args()
 
-    timeintervalsToAs(args.evtFile, args.totCtsEachToA, args.waitTimeCutoff, args.eneLow, args.eneHigh, args.outputFile)
+    timeintervalsToAs(args.evtFile, args.totCtsEachToA, args.waitTimeCutoff, args.eneLow, args.eneHigh, args.outputFile,
+                      args.correxposure)
 
 
 if __name__ == '__main__':

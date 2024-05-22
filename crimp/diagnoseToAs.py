@@ -21,7 +21,6 @@ import sys
 import argparse
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
-import plotly.express as px
 import pandas as pd
 import numpy as np
 
@@ -78,7 +77,7 @@ def diagnoseToAs(ToAs, outputFile='ToADiagnosticsPlot'):
     fig.add_trace(go.Scatter(x=ToAnumber, y=redChi2, mode="markers"), row=6, col=1)
     fig.update_yaxes(title_text="Reduced Chi2", row=6, col=1)
     # Phase shifts
-    phShi_symmetric = np.hypot(phShiLL, phShiUL)
+    phShi_symmetric = np.hypot(phShiLL, phShiUL)/np.sqrt(2)
     fig.add_trace(go.Scatter(x=ToAnumber, y=phShi, mode="markers",
                              error_y=dict(
                                  type='data',  # value of error bar given in data coordinates
