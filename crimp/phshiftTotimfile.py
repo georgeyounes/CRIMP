@@ -13,6 +13,11 @@
 # 
 # Return:
 # 1- .tim file as pandas table
+#
+# To dos:
+# This could be improved substantially by writing it as a class, with
+# several methods to (1) create a .tim pandas df, (2) write a .tim df
+# to a .tim file, and (3) read a .tim file
 ####################################################################
 import argparse
 
@@ -63,8 +68,12 @@ def phshiftTotimfile(ToAs, timMod, timFile='residuals', tempModPP='ppTemplateMod
         ToATim = ephemerides_intRot["Tmjd_intRotation"] + deltaT / 86400
         ToATim_err_mus = deltaT_err * 1.0e6
 
-        f.write(' {0} {1} {2} {3} @ {4} {5}\n'.format(tempModPP, str(freqInst), str(round(ToATim, 12)),
-                                                      str(round(ToATim_err_mus, 5)), str('-flag'), flag))
+        # Pulse numbering, though not normalized to first ToA
+        pulsenumber = ephemerides_intRot["ph_intRotation"]
+
+        f.write(' {0} {1} {2} {3} @ {4} {5} {6} {7}\n'.format(tempModPP, str(freqInst), str(round(ToATim, 12)),
+                                                              str(round(ToATim_err_mus, 5)), str('-flag'), flag,
+                                                              str('-pn'), pulsenumber))
 
     f.close()
 
