@@ -23,10 +23,11 @@
 import argparse
 import sys
 
+import numpy as np
+
 # Custom modules
 from crimp.ephemTmjd import ephemTmjd
 from crimp.calcphase import calcphase
-from crimp.readtimingmodel import ReadTimingModel
 
 sys.dont_write_bytecode = True
 
@@ -48,21 +49,18 @@ def ephemIntegerRotation(Tmjd, timMod, printOutput=False):
     :rtype: dict
     """
 
-    # F0 of timing solution
-    timModParam = ReadTimingModel(timMod).readfulltimingmodel()
-    F0 = timModParam["F0"]
-
     # Phase and frequency that correspond to Tmjd according to timing model
     ph_Tmjd, _ = calcphase(Tmjd, timMod)
     freq_Tmjd = ephemTmjd(Tmjd, timMod)["freqAtTmjd"]
 
     # Deriving the closest MJD and spin frequency with an integer number of rotations
     ph_Tmjd_Frac = ph_Tmjd % 1
-    FracTFromIntRotation = (ph_Tmjd_Frac / F0) / 86400
+    FracTFromIntRotation = (ph_Tmjd_Frac / freq_Tmjd) / 86400
 
     Tmjd_intRotation = Tmjd - FracTFromIntRotation
     freq_Tmjd_intRotation = ephemTmjd(Tmjd_intRotation, timMod)["freqAtTmjd"]
     ph_intRotation, _ = calcphase(Tmjd_intRotation, timMod)
+    ph_intRotation = np.round(ph_intRotation)
 
     if printOutput is True:
         print('Input Tmjd = {} days. Corresponding spin frequency = {} Hz. Corresponding phase = {} \n'

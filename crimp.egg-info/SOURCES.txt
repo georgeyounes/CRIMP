@@ -19,6 +19,7 @@ crimp/phshiftTotimfile.py
 crimp/pulseprofile.py
 crimp/readPPtemplate.py
 crimp/readtimingmodel.py
+crimp/simulatemodulatedlc.py
 crimp/templatemodels.py
 crimp.egg-info/PKG-INFO
 crimp.egg-info/SOURCES.txt
@@ -37,6 +38,8 @@ crimp/__pycache__/__init__.cpython-39.pyc
 crimp/__pycache__/buildtimeintervalsToAs.cpython-39.pyc
 crimp/__pycache__/calcphase.cpython-39.pyc
 crimp/__pycache__/diagnoseToAs.cpython-39.pyc
+crimp/__pycache__/ephemIntegerRotation.cpython-39.pyc
+crimp/__pycache__/ephemTmjd.cpython-39.pyc
 crimp/__pycache__/eventfile.cpython-39.pyc
 crimp/__pycache__/measureToAs.cpython-39.pyc
 crimp/__pycache__/pulseprofile.cpython-39.pyc
