@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="4647a280-ca61-4e95-b6f3-47ee58d74c65" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/CRIMP.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/CRIMP.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crimp.egg-info/PKG-INFO" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/crimp.egg-info/SOURCES.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/crimp.egg-info/dependency_links.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/crimp.egg-info/entry_points.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/crimp.egg-info/requires.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/crimp.egg-info/top_level.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/crimp/.idea/crimp.iml" beforeDir="false" afterPath="$PROJECT_DIR$/crimp/.idea/crimp.iml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crimp/buildtimeintervalsToAs.py" beforeDir="false" afterPath="$PROJECT_DIR$/crimp/buildtimeintervalsToAs.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crimp/calcphase.py" beforeDir="false" afterPath="$PROJECT_DIR$/crimp/calcphase.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crimp/ephemIntegerRotation.py" beforeDir="false" afterPath="$PROJECT_DIR$/crimp/ephemIntegerRotation.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crimp/ephemTmjd.py" beforeDir="false" afterPath="$PROJECT_DIR$/crimp/ephemTmjd.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crimp/eventfile.py" beforeDir="false" afterPath="$PROJECT_DIR$/crimp/eventfile.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crimp/measureToAs.py" beforeDir="false" afterPath="$PROJECT_DIR$/crimp/measureToAs.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crimp/periodsearch.py" beforeDir="false" afterPath="$PROJECT_DIR$/crimp/periodsearch.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crimp/phshiftTotimfile.py" beforeDir="false" afterPath="$PROJECT_DIR$/crimp/phshiftTotimfile.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crimp/pulseprofile.py" beforeDir="false" afterPath="$PROJECT_DIR$/crimp/pulseprofile.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crimp/readtimingmodel.py" beforeDir="false" afterPath="$PROJECT_DIR$/crimp/readtimingmodel.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crimp/simulatemodulatedlc.py" beforeDir="false" afterPath="$PROJECT_DIR$/crimp/simulatemodulatedlc.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/crimp/templatemodels.py" beforeDir="false" afterPath="$PROJECT_DIR$/crimp/templatemodels.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pyproject.toml" beforeDir="false" afterPath="$PROJECT_DIR$/pyproject.toml" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="MarkdownSettingsMigration">
+    <option name="stateVersion" value="1" />
+  </component>
+  <component name="ProblemsViewState">
+    <option name="selectedTabId" value="CurrentFile" />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 6
+}</component>
+  <component name="ProjectId" id="2m2CB0H17UVUmEsJdUskSPsgKCr" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/Users/gyounes/bin/GitHub/CRIMP&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
+  }
+}</component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-python-sdk-c69650fc56ca-b11f5e8da5ad-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-233.15619.17" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="4647a280-ca61-4e95-b6f3-47ee58d74c65" name="Changes" comment="" />
+      <created>1726265146230</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1726265146230</updated>
+      <workItem from="1726265147341" duration="517000" />
+      <workItem from="1726265668484" duration="2375000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/crimp/measureToAs.py</url>
+          <line>52</line>
+          <option name="timeStamp" value="1" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
+  </component>
+</project>

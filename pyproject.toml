@@ -25,13 +25,6 @@ classifiers = [
   "Programming Language :: Python"
 ]
 
-#[project.urls]
-#Homepage = "https://example.com"
-#Documentation = "https://readthedocs.org"
-#Repository = "https://github.com/me/spam.git"
-#"Bug Tracker" = "https://github.com/me/spam/issues"
-#Changelog = "https://github.com/me/spam/blob/master/CHANGELOG.md"
-
 [project.scripts]
 timeintervalsfortoas = "crimp.buildtimeintervalsToAs:main"
 templatepulseprofile = "crimp.pulseprofile:main"

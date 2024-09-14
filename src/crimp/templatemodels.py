@@ -112,6 +112,7 @@ class Fourier:
         """
         modelFourSeriesCurve = Fourier(self.theta, self.xx).fourseries()
         # extended maximum likelihood - Dividing Fourier model by norm to normalize it
+
         modelFourSeriesCurveNormalized = modelFourSeriesCurve / self.theta["norm"]
         if np.min(modelFourSeriesCurveNormalized) <= 0:
             # in case of a 0/negative in the Fourier series estimate - results in undefined
