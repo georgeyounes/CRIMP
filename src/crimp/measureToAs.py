@@ -310,8 +310,8 @@ def measureToA_fourier(tempModPP, cycleFoldedPhases, exposureInt, outFile='', ph
     :rtype: dict
     """
     initTempModPPparam = Parameters()  # Initializing an instance of Parameters based on the best-fit template model
-    initTempModPPparam.add('norm', len(cycleFoldedPhases) / exposureInt, min=0.01, max=100, brute_step=1,
-                           vary=True)  # Adding the normalization - this is free to vary
+    initTempModPPparam.add('norm', len(cycleFoldedPhases) / exposureInt, min=0.01, max=100,
+                           vary=True)  # Adding the normalization - this is free to vary , brute_step=1
     # Number of components in template model
     nbrComp = len(np.array([ww for harmKey, ww in tempModPP.items() if harmKey.startswith('amp_')]))
     for kk in range(1, nbrComp + 1):  # Adding the amplitudes and phases of the harmonics, they are fixed
@@ -327,13 +327,17 @@ def measureToA_fourier(tempModPP, cycleFoldedPhases, exposureInt, outFile='', ph
 
     # Run brute force minimization if requested
     if brutemin is True:
+        results_mle_FSNormalized_bm = minimize(unbinnednllfourier, initTempModPPparam,
+                                               args=(cycleFoldedPhases, exposureInt),
+                                               method='brute', max_nfev=1.0e4, nan_policy='propagate')
+
+        results_mle_FSNormalized = minimize(unbinnednllfourier, results_mle_FSNormalized_bm.params,
+                                            args=(cycleFoldedPhases, exposureInt),
+                                            method='nedler', max_nfev=1.0e4, nan_policy='propagate')
+    else:
         results_mle_FSNormalized = minimize(unbinnednllfourier, initTempModPPparam,
                                             args=(cycleFoldedPhases, exposureInt),
-                                            method='brute', max_nfev=1.0e5, nan_policy='propagate')
-
-    results_mle_FSNormalized = minimize(unbinnednllfourier, results_mle_FSNormalized.params,
-                                        args=(cycleFoldedPhases, exposureInt),
-                                        method='nedler', max_nfev=1.0e4, nan_policy='propagate')
+                                            method='nedler', max_nfev=1.0e4, nan_policy='propagate')
 
     nbrFreeParams = 2
     # In case pulsed fraction should be varied
@@ -916,8 +920,8 @@ def main():
     args = parser.parse_args()
 
     measureToAs(args.evtFile, args.timMod, args.tempModPP, args.toagtifile, args.eneLow, args.eneHigh, args.toaStart,
-                args.toaEnd, args.phShiftRes, args.nbrBins, args.varyAmps, args.plotPPs, args.plotLLs, args.toaFile,
-                args.timFile)
+                args.toaEnd, args.phShiftRes, args.nbrBins, args.varyAmps, args.brutemin, args.plotPPs, args.plotLLs,
+                args.toaFile, args.timFile)
 
 
 if __name__ == '__main__':

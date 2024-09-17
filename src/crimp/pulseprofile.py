@@ -377,7 +377,7 @@ class ModelPulseProfile:
         initParams_mle = Parameters()  # Initializing an instance of Parameters
         if self.initTemplateMod is None:  # If no initial template model (i.e., parameter guess) is given, set to default
             # Setting initial guesses to best-guess defaults
-            initParams_mle.add('norm', np.mean(ctRate), min=0.0, max=np.inf)
+            initParams_mle.add('norm', np.mean(ctRate), min=0.0, max=1.0e6)
             for kk in range(1, self.nbrComp + 1):
                 initParams_mle.add('amp_' + str(kk), 0.1 * np.mean(ctRate))
                 initParams_mle.add('ph_' + str(kk), 0)
@@ -388,7 +388,7 @@ class ModelPulseProfile:
         else:  # Setting initial guesses to template parameters
             initParams_mle_temp = readPPtemplate(self.initTemplateMod)
             self.nbrComp = initParams_mle_temp["nbrComp"]
-            initParams_mle.add('norm', initParams_mle_temp['norm'], min=0.0, max=np.inf)
+            initParams_mle.add('norm', initParams_mle_temp['norm'], min=0.0, max=1.0e6)
             for kk in range(1, self.nbrComp + 1):
                 initParams_mle.add('amp_' + str(kk), initParams_mle_temp['amp_' + str(kk)])
                 initParams_mle.add('ph_' + str(kk), initParams_mle_temp['ph_' + str(kk)])
