@@ -14,12 +14,12 @@ Because of my science interest, it is naturally geared towards the analysis of m
 
 ## Acknowledgements
 
-I am grateful to countless discussions I have had with the late Mark Finger, Allyn Tenant (NASA/MSFC), and especially Paul Ray (NRL). Thank you for always being available for a discussion on pulsar timing and to answer the many confusing questions that I have had about the topic over the years.
+I am grateful to countless discussions I have had with the late Mark Finger, Allyn Tenant (NASA/MSFC), and especially Paul Ray (NRL). Thank you for always being available for a discussion on pulsar timing and to answer the many confusing questions that I have had (sure will) about the topic over the years.
 
 
 ## Installation
 
-At the moment, CRIMP can be installed locally after pulling the directory or simply downloading and untarring the directory. Then from the download directory:
+At the moment, CRIMP can be installed locally after pulling the directory or simply downloading and untarring it. Then from the CRIMP root directory:
 
 ```bash
   python -m pip install .
@@ -56,15 +56,15 @@ Template fourier best fit statistics
 ```
 
 Now the fit is much better. The "1e2259_template.txt" will be overwritten with the new resulting best-fit model. Notice that the '-nc' flag was removed; you do not need to, but bear in mind that it is ignored when an initial template ('-it') is provided; i.e., model to be used and number of harmonics in the model shall be read from the initial-template model ".txt" file. The script will also create a simple .log file with a summary of input and output parameters, results, and any warning that you should pay attention to.
-This is what the best-fit mode looks like 
+This is what the best-fit model looks like 
 
 [1e2259_template.pdf](data%2F1e2259_template.pdf)
 
-There are few other flags that can be set in this command, one of which is the model to be used. It can support a Fourier series model (default), a wrapped Gaussian (von-Mises), or a wrapped Cauchy distribution. I typically use the former, unless the source pulse profile is of small duty cycle. consequently, the former is more tested than the two latter.
+There are few other flags that can be set in this command, one of which is the model to be used. It can support a Fourier series model (default), a wrapped Gaussian (von-Mises), or a wrapped Cauchy distribution. I typically use the former, unless the source pulse has a small duty cycle. consequently, the former is more tested than the two latter.
 
 #### 2- Creating time intervals that define TOAs
 
-Typically, you would like to perform pulsar timing over an extended baseline. This could be anywhere from days to decades. Hence, it is more practical to work with a merged event file of your source of interest spanning some amount of time. This can be produced with the [HEASOFT](https://heasarc.gsfc.nasa.gov/docs/software/heasoft/) tools [ftmerge](https://heasarc.gsfc.nasa.gov/lheasoft/help/ftmerge.html), [ftmergesort](https://heasarc.gsfc.nasa.gov/docs/software/lheasoft/help/ftmergesort.html), [niobsmerge](https://heasarc.gsfc.nasa.gov/docs/software/lheasoft/help/niobsmerge.html), etc. Make sure you merge your event files along the TIME column in the EVENTS table **and** START or STOP column in GTI table.
+Typically, you would like to perform pulsar timing over an extended baseline. This could be anywhere from days to decades. Hence, it is more practical to work with a merged event file of your source of interest spanning some amount of time. This can be produced with the [HEASOFT](https://heasarc.gsfc.nasa.gov/docs/software/heasoft/) tools [ftmerge](https://heasarc.gsfc.nasa.gov/lheasoft/help/ftmerge.html), [ftmergesort](https://heasarc.gsfc.nasa.gov/docs/software/lheasoft/help/ftmergesort.html), [niobsmerge](https://heasarc.gsfc.nasa.gov/docs/software/lheasoft/help/niobsmerge.html), etc. Make sure you merge your event files along the TIME column in the EVENTS table **and** START or STOP column in the GTI table.
 Such a file for the magnetar 1E 2259+586 exists in the folder data under "1e2259_nicer.fits" (spanning about 1 year)
 
 We run
@@ -102,11 +102,11 @@ The '-el' and '-eh' flags are the same as above. The '-tf' flag provides the nam
 
 In the case of 1E 2259+586, the pulse is double-peaked, separated by approximately 0.5 in phase, and the two peaks have a similar height. Hence, the maximum likelihood can get stuck in a local minimum around the wrong peak. The '-bm' flag ensures that you grid the full parameter space for the phase-shift to avoid these issues. In the case where the pulse shape of your pulsar is simpler, e.g., single-peaked, this flag can be removed to speed up the TOA calculation.
 
-This script will also produce a plot ('-tf'+"_phaseResiduals.pdf") of the phase residuals in cycles which, for our example of 1E 2259+586, looks like this
+This script will also produce a simple log file ('.log'), and a plot ('-tf'+"_phaseResiduals.pdf") of the phase residuals in cycles which, for our example of 1E 2259+586, is this
 
 [ToAs_2259_phaseResiduals.pdf](data%2FToAs_2259_phaseResiduals.pdf)
 
-Looks like a jump. Evidently, the phase wrap at the end is normal, and it implies you need to add one cycle to those TOAs. We just reproduced the upper-right panel of Figure 2 in [Younes et al. 2020, ApJ...896L..42Y](https://ui.adsabs.harvard.edu/abs/2020ApJ...896L..42Y/abstract).
+Looks like a glitch. Evidently, the phase wrap at the end is normal, and it implies you need to add one cycle to those TOAs. We just reproduced the upper-right panel of Figure 2 in [Younes et al. 2020, ApJ...896L..42Y](https://ui.adsabs.harvard.edu/abs/2020ApJ...896L..42Y/abstract).
 
 From this point on, you can use Tempo2, PINT, or your own tools to fit the TOAs to whatever timing model you would like.
 ## Few words on what is happening under the hood
