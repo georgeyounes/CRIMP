@@ -123,8 +123,8 @@ CRIMP is still in its early development and my wish list is long. Here are a few
 - Add RXTE data to the list of accepted missions.
 - Write module to derive local ephemerides
 - Work out the inclusion of other timing model parameters, e.g., IFUNC, binary models, astrometry (big task, and maybe use [PINT](https://github.com/nanograv/PINT) at this point)
-- Put up in pypi and allows direct pip install
-- Full documentation
+- Upload to pypi and allow direct pip install
+- Full documentation (covering the already available functionality, which is a little more than the above example)
 - More example usage
 
 ## License
