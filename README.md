@@ -19,7 +19,7 @@ I am grateful to countless discussions I have had with the late Mark Finger, All
 
 ## Installation
 
-At the moment, CRIMP can be installed locally after pulling the directory or simply downloading and untarring it. Then from the CRIMP root directory:
+At the moment, CRIMP can be installed locally after cloning the directory or simply downloading and untarring it. Then from the CRIMP root directory:
 
 ```bash
   python -m pip install .
