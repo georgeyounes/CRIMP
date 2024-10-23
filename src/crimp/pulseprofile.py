@@ -428,7 +428,7 @@ class ModelPulseProfile:
         initParams_mle = Parameters()  # Initializing an instance of Parameters
         if self.initTemplateMod is None:  # If no initial template model (i.e., parameter guess) is given, set to default
             # Setting initial guesses to dummy defaults
-            initParams_mle.add('norm', np.min(ctRate), min=0.0, max=np.inf)
+            initParams_mle.add('norm', np.min(ctRate), min=0.0, max=np.max(ctRate))
             for kk in range(1, self.nbrComp + 1):
                 initParams_mle.add('amp_' + str(kk), 1.3 * np.min(ctRate), min=0.0, max=np.inf)
                 initParams_mle.add('cen_' + str(kk), np.pi, min=0.0, max=2 * np.pi)
@@ -440,7 +440,7 @@ class ModelPulseProfile:
         else:  # Setting initial guesses to template parameters
             initParams_mle_temp = readPPtemplate(self.initTemplateMod)
             self.nbrComp = initParams_mle_temp["nbrComp"]
-            initParams_mle.add('norm', initParams_mle_temp['norm'], min=0.0, max=np.inf)
+            initParams_mle.add('norm', initParams_mle_temp['norm'], min=0.0, max=np.max(ctRate))
             for kk in range(1, self.nbrComp + 1):
                 initParams_mle.add('amp_' + str(kk), initParams_mle_temp['amp_' + str(kk)], min=0.0, max=np.inf)
                 initParams_mle.add('cen_' + str(kk), initParams_mle_temp['cen_' + str(kk)], min=0.0, max=2 * np.pi)
@@ -457,7 +457,7 @@ class ModelPulseProfile:
             return -WrappedCauchy(param, xx).loglikelihoodCA(yy, yyErr)
 
         results_mle_CA = minimize(binnednllcauchy, initParams_mle, args=(ppBins, ctRate, ctRateErr),
-                                  method='nedler', max_nfev=1.0e6)
+                                  method='nedler', max_nfev=1.0e6, nan_policy='propagate')
 
         # Calculating the bf Model for the data
         bfModel = WrappedCauchy(results_mle_CA.params, ppBins).wrapcauchy()
@@ -499,7 +499,7 @@ class ModelPulseProfile:
         initParams_mle = Parameters()  # Initializing an instance of Parameters
         if self.initTemplateMod is None:  # If no initial template model (i.e., parameter guess) is given, set to default
             # Setting initial guesses to dummy defaults
-            initParams_mle.add('norm', np.min(ctRate), min=0.0, max=np.inf)
+            initParams_mle.add('norm', np.min(ctRate), min=0, max=np.max(ctRate), vary=True)
             for kk in range(1, self.nbrComp + 1):
                 initParams_mle.add('amp_' + str(kk), 1.3 * np.min(ctRate), min=0.0, max=np.inf)
                 initParams_mle.add('cen_' + str(kk), np.pi, min=0.0, max=2 * np.pi)
@@ -511,7 +511,7 @@ class ModelPulseProfile:
         else:  # Setting initial guesses to template parameters
             initParams_mle_temp = readPPtemplate(self.initTemplateMod)
             self.nbrComp = initParams_mle_temp["nbrComp"]
-            initParams_mle.add('norm', initParams_mle_temp['norm'], min=0.0, max=np.inf)
+            initParams_mle.add('norm', initParams_mle_temp['norm'], min=0.0, max=np.max(ctRate), vary=True)
             for kk in range(1, self.nbrComp + 1):
                 initParams_mle.add('amp_' + str(kk), initParams_mle_temp['amp_' + str(kk)], min=0.0, max=np.inf)
                 initParams_mle.add('cen_' + str(kk), initParams_mle_temp['cen_' + str(kk)], min=0.0, max=2 * np.pi)
@@ -528,7 +528,7 @@ class ModelPulseProfile:
 
         # Running the maximum likelihood
         results_mle_VM = minimize(binnednllvonmises, initParams_mle, args=(ppBins, ctRate, ctRateErr),
-                                  method='nedler', max_nfev=1.0e6)
+                                  method='nedler', max_nfev=1.0e6, nan_policy='propagate')
 
         # Calculating the bf Model for the data
         bfModel = VonMises(results_mle_VM.params, ppBins).vonmises()

@@ -5,19 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="4647a280-ca61-4e95-b6f3-47ee58d74c65" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/CRIMP.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/CRIMP.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/1e2259_template.log" beforeDir="false" afterPath="$PROJECT_DIR$/data/1e2259_template.log" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/1e2259_template.pdf" beforeDir="false" afterPath="$PROJECT_DIR$/data/1e2259_template.pdf" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/1e2259_template.txt" beforeDir="false" afterPath="$PROJECT_DIR$/data/1e2259_template.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/ToAs_2259.log" beforeDir="false" afterPath="$PROJECT_DIR$/data/ToAs_2259.log" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/ToAs_2259.tim" beforeDir="false" afterPath="$PROJECT_DIR$/data/ToAs_2259.tim" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/ToAs_2259.txt" beforeDir="false" afterPath="$PROJECT_DIR$/data/ToAs_2259.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/ToAs_2259_phaseResiduals.pdf" beforeDir="false" afterPath="$PROJECT_DIR$/data/ToAs_2259_phaseResiduals.pdf" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/data/timIntToAs_1e2259.log" beforeDir="false" afterPath="$PROJECT_DIR$/data/timIntToAs_1e2259.log" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/crimp/measureToAs.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/crimp/measureToAs.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/crimp/periodsearch.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/crimp/periodsearch.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/crimp/pulseprofile.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/crimp/pulseprofile.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -86,7 +74,7 @@
       <workItem from="1726265147341" duration="517000" />
       <workItem from="1726265668484" duration="2375000" />
       <workItem from="1726276313139" duration="32927000" />
-      <workItem from="1729184513462" duration="4986000" />
+      <workItem from="1729184513462" duration="8789000" />
     </task>
     <servers />
   </component>
