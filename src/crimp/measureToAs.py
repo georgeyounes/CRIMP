@@ -310,8 +310,7 @@ def measureToA_fourier(tempModPP, cycleFoldedPhases, exposureInt, outFile='', ph
     :rtype: dict
     """
     initTempModPPparam = Parameters()  # Initializing an instance of Parameters based on the best-fit template model
-    initTempModPPparam.add('norm', len(cycleFoldedPhases) / exposureInt, min=0.01, max=100,
-                           vary=True)  # Adding the normalization - this is free to vary , brute_step=1
+    initTempModPPparam.add('norm',  tempModPP['norm'], min=0.01, max=100, vary=True)
     # Number of components in template model
     nbrComp = len(np.array([ww for harmKey, ww in tempModPP.items() if harmKey.startswith('amp_')]))
     for kk in range(1, nbrComp + 1):  # Adding the amplitudes and phases of the harmonics, they are fixed

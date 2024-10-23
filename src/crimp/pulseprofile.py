@@ -260,29 +260,11 @@ class PulseProfileFromEventFile:
         # Write template PP model to .txt file
         ######################################
         if templateFile is not None:
-            bestFitTempModPP = templateFile + '.txt'
-            # results_mle_FS_dict = results_mle_FS.params.valuesdict()  # converting best-fit results to dictionary
 
-            f = open(bestFitTempModPP, 'w+')
-            f.write('model = ' + str(fitResultsDict["model"]) + '\n')
-            f.write('norm = ' + str(fitResultsDict["norm"]) + '\n')
+            writetemplatefile(templateFile, fitResultsDict)
 
-            for nn in range(1, nbrComp + 1):
-                f.write('amp_' + str(nn) + ' = ' + str(fitResultsDict["amp_" + str(nn)]) + '\n')
-                if ppmodel.casefold() == 'fourier':
-                    f.write('ph_' + str(nn) + ' = ' + str(fitResultsDict["ph_" + str(nn)]) + '\n')
-                if ppmodel.casefold() == 'vonmises' or ppmodel.casefold() == 'cauchy':
-                    f.write('cen_' + str(nn) + ' = ' + str(fitResultsDict["cen_" + str(nn)]) + '\n')
-                    f.write('wid_' + str(nn) + ' = ' + str(fitResultsDict["wid_" + str(nn)]) + '\n')
-
-            f.write('chi2 = ' + str(fitResultsDict["chi2"]) + '\n')
-            f.write('dof = ' + str(fitResultsDict["dof"]) + '\n')
-            f.write('redchi2 = ' + str(fitResultsDict["redchi2"]) + '\n')
-            f.close()
-
-            logger.info('\n chi2 = ' + str(fitResultsDict["chi2"]) + '\n'
-                        ' dof = ' + str(fitResultsDict["dof"]) + '\n'
-                        ' redchi2 = ' + str(fitResultsDict["redchi2"]) + '\n')
+            logger.info('\n chi2 = ' + str(fitResultsDict["chi2"]) + '\n dof = ' + str(fitResultsDict["dof"]) +
+                        '\n redchi2 = ' + str(fitResultsDict["redchi2"]) + '\n')
 
             logger.info('\n Created best fit template file : ' + templateFile + '.txt \n')
         else:
@@ -718,6 +700,38 @@ def plotpulseprofile(pulseProfile, outFile='pulseprof', fittedModel=None):
 
     outPlot = outFile + '.pdf'
     fig.savefig(outPlot, format='pdf', dpi=1000)
+
+    return
+
+
+def writetemplatefile(templateFile, fitResultsDict):
+    """
+    Write the results of a template fit to a .txt file
+    :param templateFile:
+    :type templateFile: str
+    :param fitResultsDict:
+    :type fitResultsDict: dict
+    """
+    bestFitTempModPP = templateFile + '.txt'
+    nbrComp = len(np.array([ww for modelKey, ww in fitResultsDict.items() if modelKey.startswith('amp_')]))
+    ppmodel = fitResultsDict["model"]
+
+    f = open(bestFitTempModPP, 'w+')
+    f.write('model = ' + str(fitResultsDict["model"]) + '\n')
+    f.write('norm = ' + str(fitResultsDict["norm"]) + '\n')
+
+    for nn in range(1, nbrComp + 1):
+        f.write('amp_' + str(nn) + ' = ' + str(fitResultsDict["amp_" + str(nn)]) + '\n')
+        if ppmodel.casefold() == 'fourier':
+            f.write('ph_' + str(nn) + ' = ' + str(fitResultsDict["ph_" + str(nn)]) + '\n')
+        if ppmodel.casefold() == 'vonmises' or ppmodel.casefold() == 'cauchy':
+            f.write('cen_' + str(nn) + ' = ' + str(fitResultsDict["cen_" + str(nn)]) + '\n')
+            f.write('wid_' + str(nn) + ' = ' + str(fitResultsDict["wid_" + str(nn)]) + '\n')
+
+    f.write('chi2 = ' + str(fitResultsDict["chi2"]) + '\n')
+    f.write('dof = ' + str(fitResultsDict["dof"]) + '\n')
+    f.write('redchi2 = ' + str(fitResultsDict["redchi2"]) + '\n')
+    f.close()
 
     return
 

@@ -38,24 +38,26 @@ We shall reproduce the results of [Younes et al. 2020, ApJ...896L..42Y](https://
 First, we produce a template pulse profile that shall be used to derive ToAs. For this purpose, we will use the event file from the nicer observation ID 1020600110, which has a long exposure resulting in a high S/N pulse profile. This event file is called "1e2259_ni1020600110.fits" and can be found in the same folder. First, we run
 
 ```bash
->> templatepulseprofile 1e2259_ni1020600110_barycorr.fits 1e2259.par -el 1 -eh 5 -nb 70 -nc 3 -fg 1e2259_template -tf 1e2259_template
+>> templatepulseprofile 1e2259_ni1020600110.fits 1e2259.par -el 1 -eh 5 -nb 70 -nc 6 -fg 1e2259_template -tf 1e2259_template
 
 Template fourier best fit statistics
- chi2 = 223.8298192531961 for dof = 63
- Reduced chi2 = 3.5528542738602553
+ chi2 = 71.21299787883065 for dof = 57
+ Reduced chi2 = 1.249350839979485
 ```
 
-The '-el' and '-eh' flags are event energy cuts in keV, '-nb' flag is for the number of bins in the pulse profile, '-nc' is for the number of Fourier harmonics in the model (by default, the code will fit a Fourier model with 'nc' number of harmonics to the data), '-fg' is to produce a .pdf figure of the pulse profile and best fit model, and '-tf' flag is to produce a .txt file of the best fit results. The command will also print simple statistical properties of the fit. Obivously, this fit did not do well, though maximum likelihood does not easily converge to a global minimum. Rerunning the command with the flag '-it' (initial template) and providing it with the template that was just created:
+The '-el' and '-eh' flags are event energy cuts in keV, '-nb' flag is for the number of bins in the pulse profile, '-nc' is for the number of Fourier harmonics in the model (by default, the code will fit a Fourier model with 'nc' number of harmonics to the data), '-fg' is to produce a .pdf figure of the pulse profile and best fit model, and '-tf' flag is to produce a .txt file of the best fit results. The command will also print simple statistical properties of the fit. Sometimes, the initial fit will not look good, though maximum likelihood does not easily converge to a global minimum. Rerunning the command with the flag '-it' (initial template) and providing it with the template that was just created:
 
 ```bash
->> templatepulseprofile 1e2259_ni1020600110_barycorr.fits 1e2259.par -el 1 -eh 5 -nb 70 -fg 1e2259_template -tf 1e2259_template -it 1e2259_template.txt 
+>> templatepulseprofile 1e2259_ni1020600110.fits 1e2259.par -el 1 -eh 5 -nb 70 -fg 1e2259_template -tf 1e2259_template -it 1e2259_template.txt 
 
 Template fourier best fit statistics
- chi2 = 68.82247214443018 for dof = 63
- Reduced chi2 = 1.092420192768733
+ chi2 = 57.25146669421473 for dof = 57
+ Reduced chi2 = 1.004411696389732
 ```
 
-Now the fit is much better. The "1e2259_template.txt" will be overwritten with the new resulting best-fit model. Notice that the '-nc' flag was removed; you do not need to, but bear in mind that it is ignored when an initial template ('-it') is provided; i.e., model to be used and number of harmonics in the model shall be read from the initial-template model ".txt" file. The script will also create a simple .log file with a summary of input and output parameters, results, and any warning that you should pay attention to.
+The fit is better. Rerunning the above does not change the statistics considerably. Notice here we use 6 Fourier harmonics. One way to choose the appropriate number is through a simple Ftest comparing the fit results for the differing number of harmonics used.
+
+The "1e2259_template.txt" will be overwritten with the new resulting best-fit model. Notice that the '-nc' flag was removed; you do not need to, but bear in mind that it is ignored when an initial template ('-it') is provided; i.e., model to be used and number of harmonics in the model shall be read from the initial-template model ".txt" file. The script will also create a simple .log file with a summary of input and output parameters, results, and any warning that you should pay attention to.
 This is what the best-fit model looks like 
 
 [1e2259_template.pdf](data%2F1e2259_template.pdf)
@@ -79,7 +81,7 @@ We run
 Total number of time intervals that define each ToA: 94
 ```
 
-This command only requires an event file to run. The '-tc' flag defines the total number of counts that should be accumulated for each ToA (in this case 10000 counts). The '-wt' flag enforces a maximum amount of time (in days) during which to accumulate '-tc'. The '-el' and '-eh' flags are the same as above. The '-of' defines the name of the output file, in this case "timIntToAs_1e2259.txt". Two more output files are created, a simple '.log' file, and an intermediary '_bunches.txt' file which can be ignored.
+This command only requires an event file to run. The '-tc' flag defines the total number of counts that should be accumulated for each ToA (in this case 10000 counts). The '-wt' flag enforces the maximum wait time between GTIs before starting a new ToA (in days). The '-el' and '-eh' flags are the same as above. The '-of' defines the name of the output file, in this case "timIntToAs_1e2259.txt". Two more output files are created, a simple '.log' file, and an intermediary '_bunches.txt' file which can be ignored.
 
 The NICER warning above can be safely ignored. It will be covered when detailed documentation is made available.
 

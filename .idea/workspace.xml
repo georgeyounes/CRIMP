@@ -6,31 +6,31 @@
   <component name="ChangeListManager">
     <list default="true" id="4647a280-ca61-4e95-b6f3-47ee58d74c65" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/CRIMP.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/CRIMP.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crimp.egg-info/PKG-INFO" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crimp.egg-info/SOURCES.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crimp.egg-info/dependency_links.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crimp.egg-info/entry_points.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crimp.egg-info/requires.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crimp.egg-info/top_level.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/crimp/.idea/crimp.iml" beforeDir="false" afterPath="$PROJECT_DIR$/crimp/.idea/crimp.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crimp/buildtimeintervalsToAs.py" beforeDir="false" afterPath="$PROJECT_DIR$/crimp/buildtimeintervalsToAs.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crimp/calcphase.py" beforeDir="false" afterPath="$PROJECT_DIR$/crimp/calcphase.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crimp/ephemIntegerRotation.py" beforeDir="false" afterPath="$PROJECT_DIR$/crimp/ephemIntegerRotation.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crimp/ephemTmjd.py" beforeDir="false" afterPath="$PROJECT_DIR$/crimp/ephemTmjd.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crimp/eventfile.py" beforeDir="false" afterPath="$PROJECT_DIR$/crimp/eventfile.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crimp/measureToAs.py" beforeDir="false" afterPath="$PROJECT_DIR$/crimp/measureToAs.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crimp/periodsearch.py" beforeDir="false" afterPath="$PROJECT_DIR$/crimp/periodsearch.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crimp/phshiftTotimfile.py" beforeDir="false" afterPath="$PROJECT_DIR$/crimp/phshiftTotimfile.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crimp/pulseprofile.py" beforeDir="false" afterPath="$PROJECT_DIR$/crimp/pulseprofile.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crimp/readtimingmodel.py" beforeDir="false" afterPath="$PROJECT_DIR$/crimp/readtimingmodel.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crimp/simulatemodulatedlc.py" beforeDir="false" afterPath="$PROJECT_DIR$/crimp/simulatemodulatedlc.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/crimp/templatemodels.py" beforeDir="false" afterPath="$PROJECT_DIR$/crimp/templatemodels.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pyproject.toml" beforeDir="false" afterPath="$PROJECT_DIR$/pyproject.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/1e2259_template.log" beforeDir="false" afterPath="$PROJECT_DIR$/data/1e2259_template.log" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/1e2259_template.pdf" beforeDir="false" afterPath="$PROJECT_DIR$/data/1e2259_template.pdf" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/1e2259_template.txt" beforeDir="false" afterPath="$PROJECT_DIR$/data/1e2259_template.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/ToAs_2259.log" beforeDir="false" afterPath="$PROJECT_DIR$/data/ToAs_2259.log" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/ToAs_2259.tim" beforeDir="false" afterPath="$PROJECT_DIR$/data/ToAs_2259.tim" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/ToAs_2259.txt" beforeDir="false" afterPath="$PROJECT_DIR$/data/ToAs_2259.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/ToAs_2259_phaseResiduals.pdf" beforeDir="false" afterPath="$PROJECT_DIR$/data/ToAs_2259_phaseResiduals.pdf" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/data/timIntToAs_1e2259.log" beforeDir="false" afterPath="$PROJECT_DIR$/data/timIntToAs_1e2259.log" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/crimp/measureToAs.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/crimp/measureToAs.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/crimp/periodsearch.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/crimp/periodsearch.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/crimp/pulseprofile.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/crimp/pulseprofile.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Python Script" />
+      </list>
+    </option>
   </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
@@ -63,6 +63,11 @@
     &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
 }</component>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/src" />
+    </key>
+  </component>
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
@@ -80,6 +85,8 @@
       <updated>1726265146230</updated>
       <workItem from="1726265147341" duration="517000" />
       <workItem from="1726265668484" duration="2375000" />
+      <workItem from="1726276313139" duration="32927000" />
+      <workItem from="1729184513462" duration="4986000" />
     </task>
     <servers />
   </component>
@@ -90,9 +97,14 @@
     <breakpoint-manager>
       <breakpoints>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/crimp/measureToAs.py</url>
+          <url>file://$PROJECT_DIR$/src/crimp/measureToAs.py</url>
           <line>52</line>
           <option name="timeStamp" value="1" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/src/crimp/readPPtemplate.py</url>
+          <line>8</line>
+          <option name="timeStamp" value="2" />
         </line-breakpoint>
       </breakpoints>
     </breakpoint-manager>
