@@ -129,6 +129,10 @@ CRIMP is still in its early development and my wish list is long. Here are a few
 - Full documentation (covering the already available functionality, which is a little more than the above example)
 - More example usage
 
+## Disclaimer
+
+This code is distributed in the hope that it will be useful, but WITHOUT ANY EXPRESSED OR IMPLIED WARRANTY. Use this code solely if you understand what it is doing. Feel free to reach out with any questions.
+
 ## License
 
 [MIT](https://choosealicense.com/licenses/mit/)
