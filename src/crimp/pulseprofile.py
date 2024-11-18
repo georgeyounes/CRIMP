@@ -679,7 +679,6 @@ def plotpulseprofile(pulseProfile, outFile='pulseprof', fittedModel=None):
     ax1.tick_params(axis='both', labelsize=12)
     ax1.set_xlabel(r'$\,\mathrm{Phase\,(cycles)}$', fontsize=12)
     ax1.set_ylabel(r'$\,\mathrm{Rate\,(counts\,s^{-1})}$', fontsize=12)
-    ax1.xaxis.offsetText.set_fontsize(12)
     ax1.ticklabel_format(style='plain', axis='y', scilimits=(0, 0))
     ax1.xaxis.offsetText.set_fontsize(12)
     ax1.yaxis.offsetText.set_fontsize(12)

@@ -1,8 +1,0 @@
-[console_scripts]
-buildToAs = src.measToAs:main
-createPulseProfile = src.pulseProfileOps:main
-createTimeIntervalsForToAs = src.crtTimeIntForToAs:main
-diagnoseToAs = src.diagnoseToAs:main
-
-[spam.magical]
-tomatoes = spam:main_tomatoes

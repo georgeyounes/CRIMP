@@ -1,9 +1,9 @@
-####################################################################################
-# eventfile.py is a module to perform simple operations on X-ray event files,
-# reading useful header words, filter for energy, add a phase column, etc. X-ray
-# instruments that are accepted are Swift/XRT, NICER, XMM/EPIC, IXPE, Fermi/GBM,
-# NuSTAR
-####################################################################################
+"""
+eventfile.py is a module to perform simple operations on X-ray event files,
+reading useful header words, filter for energy, add a phase column, etc. X-ray
+instruments that are accepted are Swift/XRT, NICER, XMM/EPIC, IXPE, Fermi/GBM,
+NuSTAR
+"""
 
 import sys
 import argparse
@@ -74,41 +74,46 @@ class EvtFileOps:
         TSTOP = hdulist['EVENTS'].header['TSTOP']
         TIMESYS = hdulist['EVENTS'].header['TIMESYS']
         DATEOBS = hdulist['EVENTS'].header['DATE-OBS']
-        # All of the below are mission specific
-        OBS_ID = None  # for instance, no OBS_ID for GBM data
-        TIMEZERO = None
-        LIVETIME = None  # no LIVETIME for GBM data either
-        DETNAME = None
-        DATATYPE = None
-        CCDSRC = None  # This is XMM specific
 
-        # initializing some instrument-specific keywords
-        if TELESCOPE == 'GLAST':
-            DETNAME = hdulist['EVENTS'].header['DETNAM']
-            DATATYPE = hdulist['Primary'].header['DATATYPE']
-            MJDREF = hdulist['EVENTS'].header['MJDREFI'] + hdulist['EVENTS'].header['MJDREFF']
+        # Some keywords are mission specific - check for them and move on
+        evt_hd = hdulist['EVENTS'].header
 
-        elif TELESCOPE == 'XMM':
-            LIVETIME = hdulist['EVENTS'].header['LIVETIME']
-            OBS_ID = hdulist['EVENTS'].header['OBS_ID']
-            MJDREF = hdulist['EVENTS'].header['MJDREF']
+        if not 'TIMEZERO' in evt_hd:
+            TIMEZERO = None
+        else:
             TIMEZERO = hdulist['EVENTS'].header['TIMEZERO']
+
+        if not 'OBS_ID' in evt_hd:
+            OBS_ID = None
+        else:
+            OBS_ID = hdulist['EVENTS'].header['OBS_ID']
+
+        if not 'LIVETIME' in evt_hd:
+            LIVETIME = None
+        else:
+            LIVETIME = hdulist['EVENTS'].header['LIVETIME']
+
+        if not 'DETNAME' in evt_hd:
+            DETNAME = None
+        else:
+            DETNAME = hdulist['EVENTS'].header['DETNAME']
+
+        if not 'DATATYPE' in evt_hd:
+            DATATYPE = None
+        else:
+            DATATYPE = hdulist['EVENTS'].header['DATATYPE']
+
+        if not 'CCDSRC' in evt_hd:
+            CCDSRC = None
+        else:
             CCDSRC = hdulist['EVENTS'].header['CCDSRC']
 
-        elif TELESCOPE == 'NICER':
-            LIVETIME = hdulist['EVENTS'].header['ONTIME']
-            OBS_ID = hdulist['EVENTS'].header['OBS_ID']
+        if 'MJDREFI' in evt_hd:
             MJDREF = hdulist['EVENTS'].header['MJDREFI'] + hdulist['EVENTS'].header['MJDREFF']
-            TIMEZERO = hdulist['EVENTS'].header['TIMEZERO']
-
-        elif TELESCOPE in ['SWIFT', 'NuSTAR', 'IXPE']:
-            LIVETIME = hdulist['EVENTS'].header['LIVETIME']
-            OBS_ID = hdulist['EVENTS'].header['OBS_ID']
-            MJDREF = hdulist['EVENTS'].header['MJDREFI'] + hdulist['EVENTS'].header['MJDREFF']
-            TIMEZERO = hdulist['EVENTS'].header['TIMEZERO']
-
+        elif 'MJDREF' in evt_hd:
+            MJDREF = hdulist['EVENTS'].header['MJDREF']
         else:
-            logger.error('Check TELESCOP keyword in event file. Likely telescope not supported yet')
+            logger.error('No reference time in event file, need either MJDREFI or MJDREF keywords')
 
         evtFileKeyWords = {'TELESCOPE': TELESCOPE, 'INSTRUME': INSTRUME, 'OBS_ID': OBS_ID, 'TSTART': TSTART,
                            'TSTOP': TSTOP, 'LIVETIME': LIVETIME, 'TIMESYS': TIMESYS, 'MJDREF': MJDREF,
@@ -210,8 +215,8 @@ class EvtFileOps:
         :type eneLow: float
         :param eneHigh: high energy cutoff
         :type eneHigh: float
-        :return: dataTP_eneFlt, dictionary of TIME and PI, filtered for energy
-        :rtype: dict
+        :return: dataTP_eneFlt, pandas dataframe of TIME and PI, filtered for energy
+        :rtype: pandas.DataFrame
         """
         # Reading columns TIME and PI (pulse-invariant - proxy for photon energy) from binary table
         hdulist = fits.open(self.evtFile)
