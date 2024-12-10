@@ -218,7 +218,7 @@ class WrappedCauchy:
         nbrComp = len(np.array([ww for compKey, ww in self.theta.items() if compKey.startswith('amp_')]))
         normalizingFactor = 2 * np.pi * self.theta["norm"]
         for jj in range(1, nbrComp + 1):
-            normalizingFactor += self.theta["amp_" + str(jj)]
+            normalizingFactor += (self.theta["amp_" + str(jj)] * self.theta["ampShift"])
         modelWrapCauchyCurveNormalized = modelWrapCauchyCurve / normalizingFactor
 
         if np.min(modelWrapCauchyCurveNormalized) <= 0:
@@ -322,7 +322,7 @@ class VonMises:
         nbrComp = len(np.array([ww for compKey, ww in self.theta.items() if compKey.startswith('amp_')]))
         normalizingFactor = 2 * np.pi * self.theta["norm"]
         for jj in range(1, nbrComp + 1):
-            normalizingFactor += self.theta["amp_" + str(jj)]
+            normalizingFactor += (self.theta["amp_" + str(jj)] * self.theta["ampShift"])
         modelVonMisesCurveNormalized = modelVonMisesCurve / normalizingFactor
         if np.min(modelVonMisesCurveNormalized) <= 0:
             # in case of a 0/negative in the Fourier series estimate - results in undefined

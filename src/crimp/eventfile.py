@@ -268,7 +268,7 @@ class EvtFileOps:
         return dataTP_eneFlt
 
     ################################################################################
-    def addphasecolEF(self, timMod: str, nonBaryEvtFile: str = ""):  # Filtering event file according to energy
+    def addphasecolEF(self, timMod: str, nonBaryEvtFile: str = None):  # Filtering event file according to energy
         """
         Adds phase column to event file according to timing model (.par file)
         the phase column will be added to the self.evtFile, but also could be added to a non-barycentered event file
@@ -312,7 +312,8 @@ class EvtFileOps:
         # corrected filtering can get messy. This way, filtering for certain phases and native
         # filtering are done on non-barycentered times and the merged GTIs should be valid.
         # Use with EXTREME care
-        if nonBaryEvtFile:
+        if nonBaryEvtFile is not None:
+
             nonBaryhdulEFPH = fits.open(nonBaryEvtFile, mode='update')
             nonBaryhdrEventsPH = nonBaryhdulEFPH['EVENTS'].header
 
@@ -322,7 +323,7 @@ class EvtFileOps:
 
             # Updating NON-barycentered event file
             nonBaryNewhdulEFPH = fits.BinTableHDU(data=nonBaryTable, header=nonBaryhdrEventsPH, name='EVENTS')
-            fits.update(self.evtFile, nonBaryNewhdulEFPH.data, nonBaryNewhdulEFPH.header, 'EVENTS')
+            fits.update(nonBaryEvtFile, nonBaryNewhdulEFPH.data, nonBaryNewhdulEFPH.header, 'EVENTS')
 
         return evtFileKeyWords
 
@@ -336,7 +337,7 @@ def main():
     parser = argparse.ArgumentParser(description="Create and append event file with Phase column")
     parser.add_argument("evtFile", help="Name of (X-ray) fits event file", type=str)
     parser.add_argument("timMod", help="Timing model for phase folding, e.g., a .par file", type=str)
-    parser.add_argument("-ne", "--nonBaryEvtFile", help="Name of non-barycentered event file", type=str, default="")
+    parser.add_argument("-ne", "--nonBaryEvtFile", help="Name of non-barycentered event file", type=str, default=None)
     args = parser.parse_args()
 
     EvtFileOps(args.evtFile).addphasecolEF(args.timMod, args.nonBaryEvtFile)

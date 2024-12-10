@@ -89,8 +89,8 @@ logger.addHandler(consoleHandler)
 
 
 def measureToAs(evtFile, timMod, tempModPP, toagtifile, eneLow=0.5, eneHigh=10., toaStart=0, toaEnd=None,
-                phShiftRes=1000, nbrBins=15, varyAmps=False, brutemin=False, plotPPs=False, plotLLs=False,
-                toaFile='ToAs', timFile=None):
+                phShiftRes=1000, nbrBins=15, varyAmps=False, readvaryparam=False, brutemin=False, plotPPs=False,
+                plotLLs=False, toaFile='ToAs', timFile=None):
     """
     Measure ToAs given an event file (could be merged along TIME **and** gti), a timing model (.par file),
     a template pulse profile (built with **createTemplatePulseProfile**), and  file containing the details
@@ -117,6 +117,9 @@ def measureToAs(evtFile, timMod, tempModPP, toagtifile, eneLow=0.5, eneHigh=10.,
     :type nbrBins: int
     :param varyAmps: boolean flag to vary pulse amplitudes (default = False)
     :type varyAmps: bool
+    :param readvaryparam: whether to read-in the 'vary' keyword from tempModPP,
+    default=False, i.e., everything is fixed except for the phase-shift
+    :type readvaryparam: bool
     :param brutemin: boolean flag to run the global minimizing running the BRUTE method (only applicable to Fourier templates, default = False)
     :type brutemin: bool
     :param plotPPs: boolean flag to plot pulse profile and best fit model (default = False)
@@ -146,6 +149,7 @@ def measureToAs(evtFile, timMod, tempModPP, toagtifile, eneLow=0.5, eneHigh=10.,
                 '\n phShiftRes: ' + str(phShiftRes) +
                 '\n nbrBins: ' + str(nbrBins) +
                 '\n varyAmps: ' + str(varyAmps) +
+                '\n readvaryparam: ' + str(readvaryparam) +
                 '\n brutemin: ' + str(brutemin) +
                 '\n plotPPs: ' + str(plotPPs) +
                 '\n plotLLs: ' + str(plotLLs) +
@@ -221,17 +225,17 @@ def measureToAs(evtFile, timMod, tempModPP, toagtifile, eneLow=0.5, eneHigh=10.,
         if BFtempModPP["model"] == 'fourier':
             ToAProp = measureToA_fourier(BFtempModPP, cycleFoldedPhases, ToA_exposure[ii], outFile=ToA_ID,
                                          phShiftRes=phShiftRes, nbrBins=nbrBins, varyAmps=varyAmps, brutemin=brutemin,
-                                         plotPPs=plotPPs, plotLLs=plotLLs)
+                                         plotPPs=plotPPs, plotLLs=plotLLs, readvaryparam=readvaryparam)
         elif BFtempModPP["model"] == 'cauchy':
             cycleFoldedPhases *= (2 * np.pi)
             ToAProp = measureToA_cauchy(BFtempModPP, cycleFoldedPhases, ToA_exposure[ii], outFile=ToA_ID,
-                                        phShiftRes=phShiftRes, nbrBins=nbrBins, varyAmps=varyAmps, plotPPs=plotPPs,
-                                        plotLLs=plotLLs)
+                                        phShiftRes=phShiftRes, nbrBins=nbrBins, varyAmps=varyAmps, brutemin=brutemin,
+                                        plotPPs=plotPPs, plotLLs=plotLLs, readvaryparam=readvaryparam)
         elif BFtempModPP["model"] == 'vonmises':
             cycleFoldedPhases *= (2 * np.pi)
             ToAProp = measureToA_vonmises(BFtempModPP, cycleFoldedPhases, ToA_exposure[ii], outFile=ToA_ID,
-                                          phShiftRes=phShiftRes, nbrBins=nbrBins, varyAmps=varyAmps, plotPPs=plotPPs,
-                                          plotLLs=plotLLs)
+                                          phShiftRes=phShiftRes, nbrBins=nbrBins, varyAmps=varyAmps, brutemin=brutemin,
+                                          plotPPs=plotPPs, plotLLs=plotLLs, readvaryparam=readvaryparam)
         else:
             logger.error(
                 'Model {} is not supported yet; fourier, vonmises, cauchy are supported'.format(BFtempModPP["model"]))
@@ -283,7 +287,7 @@ def measureToAs(evtFile, timMod, tempModPP, toagtifile, eneLow=0.5, eneHigh=10.,
 
 
 def measureToA_fourier(tempModPP, cycleFoldedPhases, exposureInt, outFile='', phShiftRes=1000, nbrBins=15,
-                       varyAmps=False, brutemin=False, plotPPs=False, plotLLs=False):
+                       varyAmps=False, brutemin=False, plotPPs=False, plotLLs=False, readvaryparam=False):
     """
     Measure ToA according to a Fourier series template
     :param tempModPP: best fit Fourier template model
@@ -306,19 +310,14 @@ def measureToA_fourier(tempModPP, cycleFoldedPhases, exposureInt, outFile='', ph
     :type plotPPs: bool
     :param plotLLs: boolean flag to plot likelihood curve (default = False)
     :type plotLLs: bool
+    :param readvaryparam: whether to read-in the 'vary' keyword from tempModPP,
+    default=False, i.e., everything is fixed except for the phase-shift
+    :type readvaryparam: bool
     :return: ToAPropFourier, a dictionary of ToA properties
     :rtype: dict
     """
-    initTempModPPparam = Parameters()  # Initializing an instance of Parameters based on the best-fit template model
-    initTempModPPparam.add('norm',  tempModPP['norm'], min=0.01, max=100, vary=True)
-    # Number of components in template model
-    nbrComp = len(np.array([ww for harmKey, ww in tempModPP.items() if harmKey.startswith('amp_')]))
-    for kk in range(1, nbrComp + 1):  # Adding the amplitudes and phases of the harmonics, they are fixed
-        initTempModPPparam.add('amp_' + str(kk), tempModPP['amp_' + str(kk)], vary=False)
-        initTempModPPparam.add('ph_' + str(kk), tempModPP['ph_' + str(kk)], vary=False)
-    initTempModPPparam.add('phShift', 0, vary=True, min=-np.pi, max=np.pi,
-                           brute_step=0.05)  # Phase shift - parameter of interest
-    initTempModPPparam.add('ampShift', 1, vary=False)
+
+    initTempModPPparam, nbrFreeParams = defineinitialfitparam(tempModPP, readvaryparam=readvaryparam)
 
     # Running the extended maximum likelihood
     def unbinnednllfourier(param, xx, exposure):
@@ -338,23 +337,14 @@ def measureToA_fourier(tempModPP, cycleFoldedPhases, exposureInt, outFile='', ph
                                             args=(cycleFoldedPhases, exposureInt),
                                             method='nedler', max_nfev=1.0e4, nan_policy='propagate')
 
-    nbrFreeParams = 2
     # In case pulsed fraction should be varied
     if varyAmps is True:
         initTempModPPparam_afterfit = copy.deepcopy(results_mle_FSNormalized.params)
-        # We still first fit with fourier amplitudes fixed to 1 (done above), this serves to derive a good first guess
         initTempModPPparam_afterfit.add('ampShift', 1, min=0.01, max=100, vary=True)
-        initTempModPPparam_afterfit.add('phShift', results_mle_FSNormalized.params.valuesdict()['phShift'],
-                                        vary=True, min=-np.pi,
-                                        max=np.pi)  # Phase shift - set to best fit value from above
-        initTempModPPparam_afterfit.add('norm', results_mle_FSNormalized.params.valuesdict()['norm'], min=0.01, max=100,
-                                        vary=True)  # normalization - set to best fit value from above
-
         results_mle_FSNormalized = minimize(unbinnednllfourier, initTempModPPparam_afterfit,
                                             args=(cycleFoldedPhases, exposureInt),
                                             method='nedler', max_nfev=1.0e4, nan_policy='propagate')
-
-        nbrFreeParams = 3  # In this case we varied a third parameter, the harmonics amplitudes
+        nbrFreeParams += 1  # In this case we varied another parameter
 
     phShiBF = results_mle_FSNormalized.params.valuesdict()['phShift']  # Best fit phase shift
     LLmax = -results_mle_FSNormalized.residual  # the - sign is to flip the likelihood - no reason for it, just personal choice
@@ -449,7 +439,7 @@ def measureToA_fourier(tempModPP, cycleFoldedPhases, exposureInt, outFile='', ph
 
 
 def measureToA_cauchy(tempModPP, cycleFoldedPhases, exposureInt, outFile='', phShiftRes=1000, nbrBins=15,
-                      varyAmps=False, plotPPs=False, plotLLs=False):
+                      varyAmps=False, brutemin=False, plotPPs=False, plotLLs=False, readvaryparam=False):
     """
     Measure ToA according to a wrapped-cauchy template
     :param tempModPP: best fit Fourier template model
@@ -466,50 +456,48 @@ def measureToA_cauchy(tempModPP, cycleFoldedPhases, exposureInt, outFile='', phS
     :type nbrBins: int
     :param varyAmps: boolean flag to vary pulse amplitudes (default = False)
     :type varyAmps: bool
+    :param brutemin: boolean flag to run the global minimizing running the BRUTE method (default = False)
+    :type brutemin: bool
     :param plotPPs: boolean flag to plot pulse profile and best fit model (default = False)
     :type plotPPs: bool
     :param plotLLs: boolean flag to plot likelihood curve (default = False)
     :type plotLLs: bool
+    :param readvaryparam: whether to read-in the 'vary' keyword from tempModPP,
+    default=False, i.e., everything is fixed except for the phase-shift
+    :type readvaryparam: bool
     :return: ToAPropFourier, a dictionary of ToA properties
     :rtype: dict
     """
-    initTempModPPparam = Parameters()  # Initializing an instance of Parameters based on the best-fit template model
 
-    initTempModPPparam.add('norm', tempModPP['norm'], min=0, max=np.inf,
-                           vary=True)  # Adding the normalization - this is free to vary
-    # Number of components in template model
-    nbrComp = len(np.array([ww for harmKey, ww in tempModPP.items() if harmKey.startswith('amp_')]))
-    for kk in range(1, nbrComp + 1):  # Adding the amplitudes, centroids, and widths of the components, they are fixed
-        initTempModPPparam.add('amp_' + str(kk), tempModPP['amp_' + str(kk)], vary=False)
-        initTempModPPparam.add('cen_' + str(kk), tempModPP['cen_' + str(kk)], vary=False)
-        initTempModPPparam.add('wid_' + str(kk), tempModPP['wid_' + str(kk)], vary=False)
-    initTempModPPparam.add('phShift', 0, vary=True, min=-1.5 * np.pi,
-                           max=1.5 * np.pi)  # Phase shift - parameter of interest
-    initTempModPPparam.add('ampShift', 1, vary=False)
+    initTempModPPparam, nbrFreeParams = defineinitialfitparam(tempModPP, readvaryparam=readvaryparam)
 
     # Running the extended maximum likelihood
     def unbinnednllcauchy(param, xx, exposure):
         return -WrappedCauchy(param, xx).loglikelihoodCAnormalized(exposure)
 
-    results_mle_CANormalized = minimize(unbinnednllcauchy, initTempModPPparam, args=(cycleFoldedPhases, exposureInt),
-                                        method='nelder', max_nfev=1.0e3, nan_policy='propagate')
+    # Run brute force minimization if requested
+    if brutemin is True:
+        results_mle_CANormalized_bm = minimize(unbinnednllcauchy, initTempModPPparam,
+                                               args=(cycleFoldedPhases, exposureInt),
+                                               method='brute', max_nfev=1.0e4, nan_policy='propagate')
 
-    nbrFreeParams = 2
+        results_mle_CANormalized = minimize(unbinnednllcauchy, results_mle_CANormalized_bm.params,
+                                            args=(cycleFoldedPhases, exposureInt),
+                                            method='nedler', max_nfev=1.0e4, nan_policy='propagate')
+
+    else:
+        results_mle_CANormalized = minimize(unbinnednllcauchy, initTempModPPparam,
+                                            args=(cycleFoldedPhases, exposureInt),
+                                            method='nedler', max_nfev=1.0e4, nan_policy='propagate')
+
     # In case pulsed fraction should be varied
     if varyAmps is True:
         initTempModPPparam_afterfit = copy.deepcopy(results_mle_CANormalized.params)
-        # We still first fit with fourier amplitudes fixed to 1, this serves to derive a good first guess
         initTempModPPparam_afterfit.add('ampShift', 1, min=0.0, max=np.inf, vary=True)
-        initTempModPPparam_afterfit.add('phShift', results_mle_CANormalized.params.valuesdict()['phShift'],
-                                        vary=True, min=-1.5 * np.pi,
-                                        max=1.5 * np.pi)  # Phase shift - set to best fit value from above
-        initTempModPPparam_afterfit.add('norm', results_mle_CANormalized.params.valuesdict()['norm'], min=0.0,
-                                        max=np.inf,
-                                        vary=True)  # normalization - set to best fit value from above
         results_mle_CANormalized = minimize(unbinnednllcauchy, initTempModPPparam_afterfit,
                                             args=(cycleFoldedPhases, exposureInt),
                                             method='nelder', max_nfev=1.0e3, nan_policy='propagate')
-        nbrFreeParams = 3  # In this case we varied a third parameters, the harmonics amplitudes
+        nbrFreeParams += 1  # In this case we varied another parameter
 
     phShiBF = results_mle_CANormalized.params.valuesdict()['phShift']  # Best fit phase shift
     LLmax = -results_mle_CANormalized.residual  # the - sign is to flip the likelihood - no reason for it, just personal choice
@@ -596,7 +584,7 @@ def measureToA_cauchy(tempModPP, cycleFoldedPhases, exposureInt, outFile='', phS
 
 
 def measureToA_vonmises(tempModPP, cycleFoldedPhases, exposureInt, outFile='', phShiftRes=1000, nbrBins=15,
-                        varyAmps=False, plotPPs=False, plotLLs=False):
+                        varyAmps=False, brutemin=False, plotPPs=False, plotLLs=False, readvaryparam=False):
     """
     Measure ToA according to a von Mises template
     :param tempModPP: best fit von Mises template model
@@ -613,49 +601,47 @@ def measureToA_vonmises(tempModPP, cycleFoldedPhases, exposureInt, outFile='', p
     :type nbrBins: int
     :param varyAmps: boolean flag to vary pulse amplitudes (default = False)
     :type varyAmps: bool
+    :param brutemin: boolean flag to run the global minimizing running the BRUTE method (default = False)
+    :type brutemin: bool
     :param plotPPs: boolean flag to plot pulse profile and best fit model (default = False)
     :type plotPPs: bool
     :param plotLLs: boolean flag to plot likelihood curve (default = False)
     :type plotLLs: bool
+    :param readvaryparam: whether to read-in the 'vary' keyword from tempModPP,
+    default=False, i.e., everything is fixed except for the phase-shift
+    :type readvaryparam: bool
     :return: ToAPropFourier, a dictionary of ToA properties
     :rtype: dict
     """
-    initTempModPPparam = Parameters()  # Initializing an instance of Parameters based on the best-fit template model
-    initTempModPPparam.add('norm', tempModPP['norm'], min=0.0, max=np.inf,
-                           vary=True)  # Adding the normalization - this is free to vary
-    # Number of components in template model
-    nbrComp = len(np.array([ww for harmKey, ww in tempModPP.items() if harmKey.startswith('amp_')]))
-    for kk in range(1, nbrComp + 1):  # Adding the amplitudes, centroids, and widths of the components, they are fixed
-        initTempModPPparam.add('amp_' + str(kk), tempModPP['amp_' + str(kk)], vary=False)
-        initTempModPPparam.add('cen_' + str(kk), tempModPP['cen_' + str(kk)], vary=False)
-        initTempModPPparam.add('wid_' + str(kk), tempModPP['wid_' + str(kk)], vary=False)
-    initTempModPPparam.add('phShift', 0, vary=True, min=-1.5 * np.pi,
-                           max=1.5 * np.pi)  # Phase shift - parameter of interest
-    initTempModPPparam.add('ampShift', 1, vary=False)
+
+    initTempModPPparam, nbrFreeParams = defineinitialfitparam(tempModPP, readvaryparam=readvaryparam)
 
     # Running the extended maximum likelihood
     def unbinnednllvonmises(param, xx, exposure):
         return -VonMises(param, xx).loglikelihoodVMnormalized(exposure)
 
-    results_mle_VMNormalized = minimize(unbinnednllvonmises, initTempModPPparam, args=(cycleFoldedPhases, exposureInt),
-                                        method='nelder', max_nfev=1.0e3, nan_policy='propagate')
+    if brutemin is True:
+        results_mle_VMNormalized_bm = minimize(unbinnednllvonmises, initTempModPPparam,
+                                               args=(cycleFoldedPhases, exposureInt),
+                                               method='brute', max_nfev=1.0e4, nan_policy='propagate')
 
-    nbrFreeParams = 2
+        results_mle_VMNormalized = minimize(unbinnednllvonmises, results_mle_VMNormalized_bm.params,
+                                            args=(cycleFoldedPhases, exposureInt),
+                                            method='nedler', max_nfev=1.0e4, nan_policy='propagate')
+
+    else:
+        results_mle_VMNormalized = minimize(unbinnednllvonmises, initTempModPPparam,
+                                            args=(cycleFoldedPhases, exposureInt),
+                                            method='nedler', max_nfev=1.0e4, nan_policy='propagate')
+
     # In case pulsed fraction should be varied
     if varyAmps is True:
         initTempModPPparam_afterfit = copy.deepcopy(results_mle_VMNormalized.params)
-        # We still first fit with fourier amplitudes fixed to 1, this serves to derive a good first guess
         initTempModPPparam_afterfit.add('ampShift', 1, min=0.0, max=np.inf, vary=True)
-        initTempModPPparam_afterfit.add('phShift', results_mle_VMNormalized.params.valuesdict()['phShift'],
-                                        vary=True, min=-1.5 * np.pi,
-                                        max=1.5 * np.pi)  # Phase shift - set to best fit value from above
-        initTempModPPparam_afterfit.add('norm', results_mle_VMNormalized.params.valuesdict()['norm'], min=0.0,
-                                        max=np.inf,
-                                        vary=True)  # normalization - set to best fit value from above
         results_mle_VMNormalized = minimize(unbinnednllvonmises, initTempModPPparam_afterfit,
                                             args=(cycleFoldedPhases, exposureInt),
                                             method='nelder', max_nfev=1.0e3, nan_policy='propagate')
-        nbrFreeParams = 3  # In this case we varied a third parameters, the harmonics amplitudes
+        nbrFreeParams += 1  # In this case we varied another parameter
 
     phShiBF = results_mle_VMNormalized.params.valuesdict()['phShift']  # Best fit phase shift
     LLmax = -results_mle_VMNormalized.residual  # the - sign is to flip the likelihood - no reason for it, just personal choice
@@ -726,6 +712,7 @@ def measureToA_vonmises(tempModPP, cycleFoldedPhases, exposureInt, outFile='', p
     ctRateErr = binnedProfile["ctsBinsErr"] / (exposureInt / nbrBins)
     # Best fit model
     bfModel = VonMises(results_mle_VMNormalized.params, ppBins).vonmises()
+
     # Chi2 and reduced chi2
     chi2_pp = np.sum(np.divide(((bfModel - ctRate) ** 2), ctRateErr ** 2))
     redchi2_pp = np.divide(chi2_pp, np.size(ppBins) - nbrFreeParams)
@@ -739,6 +726,117 @@ def measureToA_vonmises(tempModPP, cycleFoldedPhases, exposureInt, outFile='', p
     ToAPropCauchy = {'phShi': phShiBF, 'phShi_LL': phShiBF_LL, 'phShi_UL': phShiBF_UL, 'reducedChi2': redchi2_pp}
 
     return ToAPropCauchy
+
+
+##########################################
+# A simple function to read in the initial template best fit parameters
+def defineinitialfitparam(tempModPP, readvaryparam=False):
+    """
+    Define the template model parameters for initiating the ToA calculation
+    :param tempModPP: template model parameter file
+    :type tempModPP: dict
+    :param readvaryparam: whether to read-in the 'vary' keyword from tempModPP,
+    default=False, i.e., everything is fixed except for the phase-shift
+    :type readvaryparam: bool
+    :return: initTempModPPparam
+    :rtype: Parameters instance of lmfit
+    """
+
+    if tempModPP["model"] == 'fourier':
+
+        if not readvaryparam:
+            initTempModPPparam = Parameters()  # Initializing an instance of Parameters based on the best-fit template model
+            initTempModPPparam.add('norm', tempModPP['norm']['value'], min=0, max=np.inf, vary=True)
+            # Number of components in template model
+            nbrComp = len(np.array([ww for harmKey, ww in tempModPP.items() if harmKey.startswith('amp_')]))
+            for kk in range(1, nbrComp + 1):  # Adding the amplitudes and phases of the harmonics, they are fixed
+                initTempModPPparam.add('amp_' + str(kk), tempModPP['amp_' + str(kk)]['value'], vary=False)
+                initTempModPPparam.add('ph_' + str(kk), tempModPP['ph_' + str(kk)]['value'], vary=False)
+            initTempModPPparam.add('phShift', 0, vary=True, min=-np.pi, max=np.pi,
+                                   brute_step=0.05)  # Phase shift - parameter of interest
+            initTempModPPparam.add('ampShift', 1, vary=False, min=0, max=100)
+
+            nbrFreeParams = 2  # phshift and model normalization
+
+        elif readvaryparam:
+            initTempModPPparam = Parameters()  # Initializing an instance of Parameters based on the best-fit template model
+            initTempModPPparam.add('norm', tempModPP['norm']['value'], min=0, max=np.inf,
+                                   vary=tempModPP['norm']['vary'])
+            # setting up the number of free parameters
+            if tempModPP['norm']['vary']:
+                nbrFreeParams = 1
+            else:
+                nbrFreeParams = 0
+            # Number of components in template model
+            nbrComp = len(np.array([ww for harmKey, ww in tempModPP.items() if harmKey.startswith('amp_')]))
+            for kk in range(1, nbrComp + 1):  # Adding the amplitudes and phases of the harmonics, they are fixed
+                initTempModPPparam.add('amp_' + str(kk), tempModPP['amp_' + str(kk)]['value'],
+                                       vary=tempModPP['amp_' + str(kk)]['vary'], min=0, max=1000)
+                initTempModPPparam.add('ph_' + str(kk), tempModPP['ph_' + str(kk)]['value'],
+                                       vary=tempModPP['ph_' + str(kk)]['vary'], min=-np.pi, max=np.pi)
+
+                # properly dealing with number of free parameters
+                for key in ('amp_' + str(kk), 'ph_' + str(kk)):
+                    if tempModPP[key]['vary']:
+                        nbrFreeParams += 1
+
+            initTempModPPparam.add('phShift', 0, vary=True, min=-np.pi, max=np.pi,
+                                   brute_step=0.05)  # Phase shift - parameter of interest
+            initTempModPPparam.add('ampShift', 1, vary=False, min=0, max=100)
+
+    elif tempModPP["model"] in ('vonmises', 'cauchy'):
+
+        if not readvaryparam:
+            initTempModPPparam = Parameters()  # Initializing an instance of Parameters based on the best-fit template model
+            initTempModPPparam.add('norm', tempModPP['norm']['value'], min=0.0, max=np.inf,
+                                   vary=True)  # Adding the normalization - this is free to vary
+
+            # Number of components in template model
+            nbrComp = len(np.array([ww for harmKey, ww in tempModPP.items() if harmKey.startswith('amp_')]))
+            for kk in range(1,
+                            nbrComp + 1):  # Adding the amplitudes, centroids, and widths of the components, they are fixed
+                initTempModPPparam.add('amp_' + str(kk), tempModPP['amp_' + str(kk)]['value'], vary=False)
+                initTempModPPparam.add('cen_' + str(kk), tempModPP['cen_' + str(kk)]['value'], vary=False)
+                initTempModPPparam.add('wid_' + str(kk), tempModPP['wid_' + str(kk)]['value'], vary=False)
+            initTempModPPparam.add('phShift', 0, vary=True, min=-1.5 * np.pi,
+                                   max=1.5 * np.pi, brute_step=0.05)  # Phase shift - parameter of interest
+            initTempModPPparam.add('ampShift', 1, vary=False, min=-np.pi, max=np.pi)
+
+            nbrFreeParams = 2  # phshift and model normalization
+
+        elif readvaryparam:
+            initTempModPPparam = Parameters()  # Initializing an instance of Parameters based on the best-fit template model
+            initTempModPPparam.add('norm', tempModPP['norm']['value'], min=0.0, max=np.inf,
+                                   vary=tempModPP['norm']['vary'])  # Adding the normalization - this is free to vary
+            # setting up the number of free parameters
+            if tempModPP['norm']['vary']:
+                nbrFreeParams = 1
+            else:
+                nbrFreeParams = 0
+            # Number of components in template model
+            nbrComp = len(np.array([ww for harmKey, ww in tempModPP.items() if harmKey.startswith('amp_')]))
+            for kk in range(1, nbrComp + 1):  # Adding the amplitudes, centroids, and widths of the components, they are fixed
+                initTempModPPparam.add('amp_' + str(kk), tempModPP['amp_' + str(kk)]['value'],
+                                       vary=tempModPP['amp_' + str(kk)]['vary'], min=0, max=np.inf)
+                initTempModPPparam.add('cen_' + str(kk), tempModPP['cen_' + str(kk)]['value'],
+                                       vary=tempModPP['cen_' + str(kk)]['vary'],
+                                       min=-0.6+tempModPP['cen_' + str(kk)]['value'],
+                                       max=0.6+tempModPP['cen_' + str(kk)]['value'], brute_step=0.05)
+                initTempModPPparam.add('wid_' + str(kk), tempModPP['wid_' + str(kk)]['value'],
+                                       vary=tempModPP['wid_' + str(kk)]['vary'], min=0, max=100*np.pi)  # basically inf
+
+                # properly dealing with number of free parameters
+                for key in ('amp_' + str(kk), 'cen_' + str(kk), 'wid_' + str(kk)):
+                    if tempModPP[key]['vary']:
+                        nbrFreeParams += 1
+            initTempModPPparam.add('phShift', 0, vary=True, min=-1.5 * np.pi,
+                                   max=1.5 * np.pi, brute_step=0.05)  # Phase shift - parameter of interest
+            initTempModPPparam.add('ampShift', 1, vary=False)
+
+    else:
+        logger.error('Unknown template model. Only fourier, cauchy, or vonmises are supported')
+
+    return initTempModPPparam, nbrFreeParams
 
 
 ##########################################
@@ -904,6 +1002,9 @@ def main():
     parser.add_argument("-va", "--varyAmps",
                         help="Flag to allow the pulsed fraction of the template pulse profile to vary (not the shape!), default = False",
                         type=bool, default=False, action=argparse.BooleanOptionalAction)
+    parser.add_argument("-rv", "--readvaryparam",
+                        help="Flag to read-in the 'vary' keyword for each parameter in the template from the template "
+                             "model. default = False", type=bool, default=False, action=argparse.BooleanOptionalAction)
     parser.add_argument("-bm", "--brutemin",
                         help="boolean flag to run the global minimizing running the BRUTE method, default = False",
                         type=bool, default=False, action=argparse.BooleanOptionalAction)
@@ -919,8 +1020,8 @@ def main():
     args = parser.parse_args()
 
     measureToAs(args.evtFile, args.timMod, args.tempModPP, args.toagtifile, args.eneLow, args.eneHigh, args.toaStart,
-                args.toaEnd, args.phShiftRes, args.nbrBins, args.varyAmps, args.brutemin, args.plotPPs, args.plotLLs,
-                args.toaFile, args.timFile)
+                args.toaEnd, args.phShiftRes, args.nbrBins, args.varyAmps, args.readvaryparam, args.brutemin,
+                args.plotPPs, args.plotLLs, args.toaFile, args.timFile)
 
 
 if __name__ == '__main__':

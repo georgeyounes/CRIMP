@@ -367,19 +367,38 @@ class ModelPulseProfile:
                                vary=False)  # For consistency, we define a phase shift for the fourier model, though not required here
             initParams_mle.add('ampShift', 1,
                                vary=False)  # For consistency, we define an amplitude shift for the fourier model, though not required here
+            # Number of free parameterd
+            nbrFreeParams = 2 * self.nbrComp + 1
+
         else:  # Setting initial guesses to template parameters
             initParams_mle_temp = readPPtemplate(self.initTemplateMod)
             self.nbrComp = initParams_mle_temp["nbrComp"]
-            initParams_mle.add('norm', initParams_mle_temp['norm'], min=0.0, max=1.0e6)
+            initParams_mle.add('norm', initParams_mle_temp['norm']['value'], min=0.0, max=1.0e6,
+                               vary=initParams_mle_temp['norm']['vary'])
+
+            # setting up the number of free parameters
+            if initParams_mle_temp['norm']['vary']:
+                nbrFreeParams = 1
+            else:
+                nbrFreeParams = 0
+
             for kk in range(1, self.nbrComp + 1):
-                initParams_mle.add('amp_' + str(kk), initParams_mle_temp['amp_' + str(kk)])
-                initParams_mle.add('ph_' + str(kk), initParams_mle_temp['ph_' + str(kk)])
+                initParams_mle.add('amp_' + str(kk), initParams_mle_temp['amp_' + str(kk)]['value'],
+                                   vary=initParams_mle_temp['amp_' + str(kk)]['vary'])
+                initParams_mle.add('ph_' + str(kk), initParams_mle_temp['ph_' + str(kk)]['value'],
+                                   vary=initParams_mle_temp['ph_' + str(kk)]['vary'])
+
                 if self.fixPhases is True:  # In case component phases should be fixed
                     initParams_mle['ph_' + str(kk)].vary = False
+
+                # properly dealing with number of free parameters
+                for key in ('amp_' + str(kk), 'ph_' + str(kk)):
+                    if initParams_mle_temp[key]['vary']:
+                        nbrFreeParams += 1
             initParams_mle.add('phShift', 0,
                                vary=False)  # For consistency with our model definition, we define a dummy phase shift
             initParams_mle.add('ampShift', 1,
-                               vary=False)  # For consistency with our model definition, we define a dummy phase shift
+                               vary=False)  # For consistency with our model definition, we define a dummy amp shift
 
         # Running the maximum likelihood
         def binnednllfourier(param, xx, yy, yyErr):
@@ -393,8 +412,7 @@ class ModelPulseProfile:
 
         # Measuring chi2 and reduced chi2 of template best fit
         ######################################################
-        nbrFreeParam = self.nbrComp * 2 + 1
-        chi2Results = measurechi2(self.pulseProfile, bfModel, nbrFreeParam)
+        chi2Results = measurechi2(self.pulseProfile, bfModel, nbrFreeParams)
         print('Template {} best fit statistics\n chi2 = {} for dof = {}\n Reduced chi2 = {}'.format(template,
                                                                                                     chi2Results["chi2"],
                                                                                                     chi2Results["dof"],
@@ -437,16 +455,37 @@ class ModelPulseProfile:
                                vary=False)  # For consistency with our model definition, we define a dummy phase/centroid shift
             initParams_mle.add('ampShift', 1,
                                vary=False)  # For consistency with our model definition, we define a dummy amplitude shift
+            # Number of free parameterd
+            nbrFreeParams = 2 * self.nbrComp + 1
+
         else:  # Setting initial guesses to template parameters
             initParams_mle_temp = readPPtemplate(self.initTemplateMod)
             self.nbrComp = initParams_mle_temp["nbrComp"]
-            initParams_mle.add('norm', initParams_mle_temp['norm'], min=0.0, max=np.max(ctRate))
+            initParams_mle.add('norm', initParams_mle_temp['norm']['value'], min=0.0, max=np.max(ctRate),
+                               vary=initParams_mle_temp['norm']['vary'])
+
+            # setting up the number of free parameters
+            if initParams_mle_temp['norm']['vary']:
+                nbrFreeParams = 1
+            else:
+                nbrFreeParams = 0
+
             for kk in range(1, self.nbrComp + 1):
-                initParams_mle.add('amp_' + str(kk), initParams_mle_temp['amp_' + str(kk)], min=0.0, max=np.inf)
-                initParams_mle.add('cen_' + str(kk), initParams_mle_temp['cen_' + str(kk)], min=0.0, max=2 * np.pi)
-                initParams_mle.add('wid_' + str(kk), initParams_mle_temp['wid_' + str(kk)], min=0.0, max=np.inf)
+                initParams_mle.add('amp_' + str(kk), initParams_mle_temp['amp_' + str(kk)]['value'], min=0.0, max=np.inf,
+                                   vary=initParams_mle_temp['amp_' + str(kk)]['vary'])
+                initParams_mle.add('cen_' + str(kk), initParams_mle_temp['cen_' + str(kk)]['value'], min=0.0, max=2 * np.pi,
+                                   vary=initParams_mle_temp['cen_' + str(kk)]['vary'])
+                initParams_mle.add('wid_' + str(kk), initParams_mle_temp['wid_' + str(kk)]['value'], min=0.0, max=np.inf,
+                                   vary=initParams_mle_temp['wid_' + str(kk)]['vary'])
+
                 if self.fixPhases is True:  # In case component phases should be fixed
                     initParams_mle['cen_' + str(kk)].vary = False
+
+                # properly dealing with number of free parameters
+                for key in ('amp_' + str(kk), 'cen_' + str(kk), 'wid_' + str(kk)):
+                    if initParams_mle_temp[key]['vary']:
+                        nbrFreeParams += 1
+
             initParams_mle.add('phShift', 0,
                                vary=False)  # For consistency with our model definition, we define a dummy phase/centroid shift
             initParams_mle.add('ampShift', 1,
@@ -464,8 +503,7 @@ class ModelPulseProfile:
 
         # Measuring chi2 and reduced chi2 of template best fit
         ######################################################
-        nbrFreeParam = self.nbrComp * 2 + 1
-        chi2Results = measurechi2(self.pulseProfile, bfModel, nbrFreeParam)
+        chi2Results = measurechi2(self.pulseProfile, bfModel, nbrFreeParams)
         print('Template {} best fit statistics\n chi2 = {} for dof = {}\n Reduced chi2 = {}'.format(template,
                                                                                                     chi2Results["chi2"],
                                                                                                     chi2Results["dof"],
@@ -508,16 +546,39 @@ class ModelPulseProfile:
                                vary=False)  # For consistency with our model definition, we define a dummy phase/centroid shift
             initParams_mle.add('ampShift', 1,
                                vary=False)  # For consistency with our model definition, we define a dummy amplitude shift
+            # Number of free parameterd
+            nbrFreeParams = 2 * self.nbrComp + 1
+
         else:  # Setting initial guesses to template parameters
             initParams_mle_temp = readPPtemplate(self.initTemplateMod)
             self.nbrComp = initParams_mle_temp["nbrComp"]
-            initParams_mle.add('norm', initParams_mle_temp['norm'], min=0.0, max=np.max(ctRate), vary=True)
+            initParams_mle.add('norm', initParams_mle_temp['norm']['value'], min=0.0, max=np.max(ctRate),
+                               vary=initParams_mle_temp['norm']['vary'])
+            # setting up the number of free parameters
+            if initParams_mle_temp['norm']['vary']:
+                nbrFreeParams = 1
+            else:
+                nbrFreeParams = 0
+
             for kk in range(1, self.nbrComp + 1):
-                initParams_mle.add('amp_' + str(kk), initParams_mle_temp['amp_' + str(kk)], min=0.0, max=np.inf)
-                initParams_mle.add('cen_' + str(kk), initParams_mle_temp['cen_' + str(kk)], min=0.0, max=2 * np.pi)
-                initParams_mle.add('wid_' + str(kk), initParams_mle_temp['wid_' + str(kk)], min=0.0, max=np.inf)
+                initParams_mle.add('amp_' + str(kk), initParams_mle_temp['amp_' + str(kk)]['value'], min=0.0,
+                                   max=np.inf,
+                                   vary=initParams_mle_temp['amp_' + str(kk)]['vary'])
+                initParams_mle.add('cen_' + str(kk), initParams_mle_temp['cen_' + str(kk)]['value'], min=0.0,
+                                   max=2 * np.pi,
+                                   vary=initParams_mle_temp['cen_' + str(kk)]['vary'])
+                initParams_mle.add('wid_' + str(kk), initParams_mle_temp['wid_' + str(kk)]['value'], min=0.0,
+                                   max=np.inf,
+                                   vary=initParams_mle_temp['wid_' + str(kk)]['vary'])
+
                 if self.fixPhases is True:  # In case component phases should be fixed
                     initParams_mle['cen_' + str(kk)].vary = False
+
+                # properly dealing with number of free parameters
+                for key in ('amp_' + str(kk), 'cen_' + str(kk), 'wid_' + str(kk)):
+                    if initParams_mle_temp[key]['vary']:
+                        nbrFreeParams += 1
+
             initParams_mle.add('phShift', 0,
                                vary=False)  # For consistency with our model definition, we define a dummy phase/centroid shift
             initParams_mle.add('ampShift', 1,
@@ -535,8 +596,7 @@ class ModelPulseProfile:
 
         # Measuring chi2 and reduced chi2 of template best fit
         ######################################################
-        nbrFreeParam = self.nbrComp * 2 + 1
-        chi2Results = measurechi2(self.pulseProfile, bfModel, nbrFreeParam)
+        chi2Results = measurechi2(self.pulseProfile, bfModel, nbrFreeParams)
         print('Template {} best fit statistics\n chi2 = {} for dof = {}\n Reduced chi2 = {}'.format(template,
                                                                                                     chi2Results["chi2"],
                                                                                                     chi2Results["dof"],
@@ -716,20 +776,20 @@ def writetemplatefile(templateFile, fitResultsDict):
     ppmodel = fitResultsDict["model"]
 
     f = open(bestFitTempModPP, 'w+')
-    f.write('model = ' + str(fitResultsDict["model"]) + '\n')
-    f.write('norm = ' + str(fitResultsDict["norm"]) + '\n')
+    f.write('model ' + str(fitResultsDict["model"]) + '\n')
+    f.write('norm ' + str(fitResultsDict["norm"]) + ' vary True \n')
 
     for nn in range(1, nbrComp + 1):
-        f.write('amp_' + str(nn) + ' = ' + str(fitResultsDict["amp_" + str(nn)]) + '\n')
+        f.write('amp_' + str(nn) + ' ' + str(fitResultsDict["amp_" + str(nn)]) + ' vary True \n')
         if ppmodel.casefold() == 'fourier':
-            f.write('ph_' + str(nn) + ' = ' + str(fitResultsDict["ph_" + str(nn)]) + '\n')
+            f.write('ph_' + str(nn) + ' ' + str(fitResultsDict["ph_" + str(nn)]) + ' vary True \n')
         if ppmodel.casefold() == 'vonmises' or ppmodel.casefold() == 'cauchy':
-            f.write('cen_' + str(nn) + ' = ' + str(fitResultsDict["cen_" + str(nn)]) + '\n')
-            f.write('wid_' + str(nn) + ' = ' + str(fitResultsDict["wid_" + str(nn)]) + '\n')
+            f.write('cen_' + str(nn) + ' ' + str(fitResultsDict["cen_" + str(nn)]) + ' vary True \n')
+            f.write('wid_' + str(nn) + ' ' + str(fitResultsDict["wid_" + str(nn)]) + ' vary True \n')
 
-    f.write('chi2 = ' + str(fitResultsDict["chi2"]) + '\n')
-    f.write('dof = ' + str(fitResultsDict["dof"]) + '\n')
-    f.write('redchi2 = ' + str(fitResultsDict["redchi2"]) + '\n')
+    f.write('chi2 ' + str(fitResultsDict["chi2"]) + '\n')
+    f.write('dof ' + str(fitResultsDict["dof"]) + '\n')
+    f.write('redchi2 ' + str(fitResultsDict["redchi2"]) + '\n')
     f.close()
 
     return
