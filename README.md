@@ -121,7 +121,6 @@ CRIMP also allows for the variation of the pulsed fraction in the template when 
 CRIMP is still in its early development and my wish list is long. Here are a few things I would like to do, in no particular order:
 
 - Add a simple TOA fitting algorithm.
-- Develop more the use of the other two templates (an easy task at this point, but needs to be tested).
 - Add RXTE data to the list of accepted missions.
 - Write module to derive local ephemerides
 - Work out the inclusion of other timing model parameters, e.g., IFUNC, binary models, astrometry (big task, and maybe use [PINT](https://github.com/nanograv/PINT) at this point)

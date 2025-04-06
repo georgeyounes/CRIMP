@@ -50,7 +50,7 @@ class EvtFileOps:
 
     def __init__(self, evtFile: str):
         """
-        Constructs the necessary attribute for the Phases object.
+        Constructs the necessary attribute
 
         :param evtFile: name of the fits event file
         :type evtFile: str
@@ -93,6 +93,11 @@ class EvtFileOps:
         else:
             LIVETIME = hdulist['EVENTS'].header['LIVETIME']
 
+        if not 'ONTIME' in evt_hd:
+            ONTIME = None
+        else:
+            ONTIME = hdulist['EVENTS'].header['ONTIME']
+
         if not 'DETNAME' in evt_hd:
             DETNAME = None
         else:
@@ -116,9 +121,9 @@ class EvtFileOps:
             logger.error('No reference time in event file, need either MJDREFI or MJDREF keywords')
 
         evtFileKeyWords = {'TELESCOPE': TELESCOPE, 'INSTRUME': INSTRUME, 'OBS_ID': OBS_ID, 'TSTART': TSTART,
-                           'TSTOP': TSTOP, 'LIVETIME': LIVETIME, 'TIMESYS': TIMESYS, 'MJDREF': MJDREF,
-                           'TIMEZERO': TIMEZERO, 'DATEOBS': DATEOBS, 'DETNAME': DETNAME, 'DATATYPE': DATATYPE,
-                           'CCDSRC': CCDSRC}
+                           'TSTOP': TSTOP, 'LIVETIME': LIVETIME, 'ONTIME': ONTIME, 'TIMESYS': TIMESYS,
+                           'MJDREF': MJDREF, 'TIMEZERO': TIMEZERO, 'DATEOBS': DATEOBS, 'DETNAME': DETNAME,
+                           'DATATYPE': DATATYPE, 'CCDSRC': CCDSRC}
 
         # Checking if event file is barycentered
         if TIMESYS != "TDB":
@@ -210,7 +215,7 @@ class EvtFileOps:
     ################################################################################
     def filtenergy(self, eneLow: float, eneHigh: float):  # Filtering event file according to energy
         """
-        Filters the event list accoring to energy (in keV)
+        Filters the event list according to energy (in keV)
         :param eneLow: low energy cutoff
         :type eneLow: float
         :param eneHigh: high energy cutoff

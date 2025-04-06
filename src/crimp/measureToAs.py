@@ -311,7 +311,7 @@ def measureToA_fourier(tempModPP, cycleFoldedPhases, exposureInt, outFile='', ph
     :param plotLLs: boolean flag to plot likelihood curve (default = False)
     :type plotLLs: bool
     :param readvaryparam: whether to read-in the 'vary' keyword from tempModPP,
-    default=False, i.e., everything is fixed except for the phase-shift
+    default=False, i.e., everything is fixed except for the phase-shift and a constant normalization
     :type readvaryparam: bool
     :return: ToAPropFourier, a dictionary of ToA properties
     :rtype: dict
@@ -463,7 +463,7 @@ def measureToA_cauchy(tempModPP, cycleFoldedPhases, exposureInt, outFile='', phS
     :param plotLLs: boolean flag to plot likelihood curve (default = False)
     :type plotLLs: bool
     :param readvaryparam: whether to read-in the 'vary' keyword from tempModPP,
-    default=False, i.e., everything is fixed except for the phase-shift
+    default=False, i.e., everything is fixed except for the phase-shift and a constant normalization
     :type readvaryparam: bool
     :return: ToAPropFourier, a dictionary of ToA properties
     :rtype: dict
@@ -608,7 +608,7 @@ def measureToA_vonmises(tempModPP, cycleFoldedPhases, exposureInt, outFile='', p
     :param plotLLs: boolean flag to plot likelihood curve (default = False)
     :type plotLLs: bool
     :param readvaryparam: whether to read-in the 'vary' keyword from tempModPP,
-    default=False, i.e., everything is fixed except for the phase-shift
+    default=False, i.e., everything is fixed except for the phase-shift and a constant normalization
     :type readvaryparam: bool
     :return: ToAPropFourier, a dictionary of ToA properties
     :rtype: dict
