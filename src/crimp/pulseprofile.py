@@ -743,8 +743,8 @@ def plotpulseprofile(pulseProfile, outFile='pulseprof', fittedModel=None):
     ax1.xaxis.offsetText.set_fontsize(12)
     ax1.yaxis.offsetText.set_fontsize(12)
 
-    plt.step(ppBins_plt, ctRate_plt, 'k+-', where='mid')
-    plt.errorbar(ppBins_plt, ctRate_plt, yerr=ctRateErr_plt, fmt='ok')
+    ax1.step(ppBins_plt, ctRate_plt, 'k+-', where='mid')
+    ax1.errorbar(ppBins_plt, ctRate_plt, yerr=ctRateErr_plt, fmt='ok')
 
     if fittedModel is not None:  # Creating the best fit model for the data
         fittedModel_plt = np.append(fittedModel, fittedModel)

@@ -77,33 +77,36 @@ class Phases:
         :rtype: float
         """
         nbrGlitches = len([gg for glKey, gg in self.timModParam.items() if glKey.startswith('GLEP_')])
-        phases_gl_all = 0  # initializing the jump in phase due to all glitches combined
+        phases_gl_all = np.zeros(len(self.timeMJD))
 
         for jj in range(1, nbrGlitches + 1):
 
+            # Epoch of glitch
             glep = self.timModParam["GLEP_" + str(jj)]
-            # Creating boolean list based on whether any times are after glitch
-            timesAfterGlitch = (self.timeMJD >= glep)
 
-            # If any time instance in the array timeMJD is after the glitch,
+            # Filter times after the glitch
+            mask = self.timeMJD >= glep
+            timesAfterGlitch = self.timeMJD[mask]
+
+            # If any timeMJD is after the glitch,
             # calculate phase jumps according to the glitch model
-            if timesAfterGlitch.any():
+            if timesAfterGlitch.size > 0:
                 glph = self.timModParam["GLPH_" + str(jj)]
                 glf0 = self.timModParam["GLF0_" + str(jj)]
                 glf1 = self.timModParam["GLF1_" + str(jj)]
                 glf2 = self.timModParam["GLF2_" + str(jj)]
                 glf0d = self.timModParam["GLF0D_" + str(jj)]
                 gltd = self.timModParam["GLTD_" + str(jj)]
-                # Calculating phases
-                # Here we calculate phase jumps according to each glitch model for all time column,
-                # then we multiply by 0 if times are < glep and 1 if times are > glep using the boolean list created above
-                phases_gl = (glph + (glf0 * ((self.timeMJD - glep) * 86400)) +
-                             (0.5 * glf1 * ((self.timeMJD - glep) * 86400) ** 2) +
-                             ((1 / 6) * glf2 * ((self.timeMJD - glep) * 86400) ** 3) +
-                             (glf0d * (gltd * 86400) * (1 - np.exp(
-                                 -((self.timeMJD - glep) * 86400) / (gltd * 86400))))) * timesAfterGlitch
 
-                phases_gl_all += phases_gl
+                dt_sec = (timesAfterGlitch - glep) * 86400
+                phases_gl = (
+                        glph +
+                        glf0 * dt_sec +
+                        0.5 * glf1 * dt_sec ** 2 +
+                        (1 / 6) * glf2 * dt_sec ** 3 +
+                        glf0d * (gltd * 86400) * (1 - np.exp(-(timesAfterGlitch - glep) / gltd))
+                )
+                phases_gl_all[mask] += phases_gl
 
         return phases_gl_all
 
@@ -133,7 +136,7 @@ class Phases:
 
 def calcphase(timeMJD, timMod):
     """
-    Function that adds all above phase calculations
+    Function that adds all above (taylor expansion, glitches, waves) phase calculations
 
     :param timeMJD: time array in modified julian day
     :type timeMJD: float
