@@ -107,7 +107,7 @@ def phshiftTotimfile(ToAs, timMod, timfile='residuals', tempModPP='ppTemplateMod
     pulsenumber = np.zeros(nbrToAs)
 
     for ii in range(nbrToAs):
-        ephemerides_intRot = ephemIntegerRotation([tToA_MJD[ii]], timMod)
+        ephemerides_intRot = ephemIntegerRotation(np.array([tToA_MJD[ii]]), timMod)
 
         # Time corresponding to phase shift 
         deltaT = dph[ii] * (1 / ephemerides_intRot["freq_intRotation"])
