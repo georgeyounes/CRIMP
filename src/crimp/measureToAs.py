@@ -271,7 +271,7 @@ def measureToAs(evtFile, timMod, tempModPP, toagtifile, eneLow=0.5, eneHigh=10.,
     # Creating .tim file if specified
     #################################
     if timFile is not None:  # if given convert ToAs.txt to a .tim file
-        phshiftTotimfile(toaFile + '.txt', timMod, toaFile, tempModPP=tempModPP)
+        phshiftTotimfile(toaFile + '.txt', timMod, timFile, tempModPP=tempModPP)
         logger.info('\n Wrote timfile {}.tim'.format(timFile))
 
     # Plotting Phase residuals of all ToAs
