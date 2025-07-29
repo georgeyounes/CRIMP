@@ -50,7 +50,7 @@ def ephemIntegerRotation(Tmjd, timMod, printOutput=False):
     """
 
     # Phase and frequency that correspond to Tmjd according to timing model
-    ph_Tmjd, _ = calcphase([Tmjd], timMod)
+    ph_Tmjd, _ = calcphase(np.array([Tmjd]), timMod)
     freq_Tmjd = ephemTmjd(Tmjd, timMod)["freqAtTmjd"]
 
     # Deriving the closest MJD and spin frequency with an integer number of rotations
@@ -59,7 +59,7 @@ def ephemIntegerRotation(Tmjd, timMod, printOutput=False):
 
     Tmjd_intRotation = Tmjd - FracTFromIntRotation
     freq_Tmjd_intRotation = ephemTmjd(Tmjd_intRotation, timMod)["freqAtTmjd"]
-    ph_intRotation, _ = calcphase([Tmjd_intRotation], timMod)
+    ph_intRotation, _ = calcphase(np.array([Tmjd_intRotation]), timMod)
     ph_intRotation = np.round(ph_intRotation)
 
     if printOutput is True:
