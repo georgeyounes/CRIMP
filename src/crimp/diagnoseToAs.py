@@ -40,7 +40,7 @@ def diagnoseToAs(ToAs, outputFile='ToADiagnosticsPlot'):
     :rtype: pandas.DataFrame
     """
     # ToA table as created with measureToAs.py
-    ToAsProp = pd.read_csv(ToAs, sep='\s+', comment='#')
+    ToAsProp = pd.read_csv(ToAs, sep=r'\s+', comment='#')
 
     tToA_MJD = ToAsProp['ToA_mid'].to_numpy()
     phShi = ToAsProp['phShift'].to_numpy()

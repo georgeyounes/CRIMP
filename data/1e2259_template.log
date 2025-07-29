@@ -1,4 +1,4 @@
-[2024-10-23 12:28:45]     INFO 
+[2025-07-29 12:26:35]     INFO 
  Running method fitpulseprofile with input parameters: 
  evtFile: 1e2259_ni1020600110.fits
  Timing model: 1e2259.par
@@ -13,18 +13,18 @@
  templateFile: 1e2259_template(.txt)
  calcPulsedFraction: False
  (pulseprofile.py:207)
-[2024-10-23 12:28:45]     INFO 
+[2025-07-29 12:26:35]     INFO 
  Initial template file provided : 1e2259_template.txt
  Using these model parameters as starting point. 
  Ignoring input keywords ppmodel = fourier and nbrComp = 6 (pulseprofile.py:239)
-[2024-10-23 12:28:45]     INFO 
+[2025-07-29 12:26:35]     INFO 
  chi2 = 57.248605638631226
  dof = 57
  redchi2 = 1.0043615024321269
  (pulseprofile.py:266)
-[2024-10-23 12:28:45]     INFO 
+[2025-07-29 12:26:35]     INFO 
  Created best fit template file : 1e2259_template.txt 
  (pulseprofile.py:269)
-[2024-10-23 12:28:45]     INFO 
+[2025-07-29 12:26:35]     INFO 
  Created figure of pulse profile and best-fit template : 1e2259_template.pdf 
  (pulseprofile.py:290)

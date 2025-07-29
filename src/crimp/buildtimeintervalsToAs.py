@@ -262,7 +262,7 @@ def timeintervalsToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.
 
     f.close()
     # reading the text file we just created as pandas table (i.e., time intervals that define each ToA)
-    timInt_toas = pd.read_csv(outputFile + ".txt", sep='\s+', comment='#')
+    timInt_toas = pd.read_csv(outputFile + ".txt", sep=r'\s+', comment='#')
 
     # Correcting for NICER exposure according to number of detector on. valid for heasoft 6.32+
     if evtFileKeyWords["TELESCOPE"] == 'NICER':

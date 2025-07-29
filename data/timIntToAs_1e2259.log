@@ -1,4 +1,4 @@
-[2024-10-23 12:20:08]     INFO 
+[2025-07-29 12:27:39]     INFO 
  Running timeintervalsToAs with input parameters: 
  evtFile: 1e2259_nicer.fits
  totCtsEachToA: 10000
@@ -7,16 +7,16 @@
  eneHigh: 5.0
  outputFile: timIntToAs_1e2259
  (buildtimeintervalsToAs.py:108)
-[2024-10-23 12:20:08]  WARNING 
+[2025-07-29 12:27:39]  WARNING 
  If NICER event files were generaed with HEASOFT version 6.32+,
  it is advisable to correct for the number of selected FPMs with the flag -ce for accurate
  measurement of count rates
  (buildtimeintervalsToAs.py:269)
-[2024-10-23 12:20:08]     INFO 
+[2025-07-29 12:27:39]     INFO 
  No correction of exposure according to number of detectors_selected per ToA interval
  This should not be an issue assuming HEASOFT 6.31- was used to reduce NICER data
  (buildtimeintervalsToAs.py:299)
-[2024-10-23 12:20:08]     INFO 
+[2025-07-29 12:27:39]     INFO 
  End of timeintervalsToAs run
  Total number of time intervals that define each ToA: 94
  Created the following output files: 

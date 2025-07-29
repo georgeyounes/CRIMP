@@ -42,7 +42,7 @@ class TimFile:
         :rtype: pandas.DataFrame
         """
         # Opening the fits file
-        ToAs_Tim = pd.read_csv(self.timfile, sep='\s+', comment=comment, skiprows=skiprows, header=None)
+        ToAs_Tim = pd.read_csv(self.timfile, sep=r'\s+', comment=comment, skiprows=skiprows, header=None)
 
         return ToAs_Tim
 
@@ -85,7 +85,7 @@ def phshiftTotimfile(ToAs, timMod, timfile='residuals', tempModPP='ppTemplateMod
     :return: .tim file as pandas DataFrame
     :rtype: pandas.DataFrame
     """
-    df_phShs = pd.read_csv(ToAs, sep='\s+', comment='#')
+    df_phShs = pd.read_csv(ToAs, sep=r'\s+', comment='#')
     tToA_MJD = df_phShs['ToA_mid'].to_numpy()
     dph = df_phShs['phShift'].to_numpy() / (2 * np.pi)
     dph_err = np.hypot(df_phShs['phShift_LL'].to_numpy() / (2 * np.pi),

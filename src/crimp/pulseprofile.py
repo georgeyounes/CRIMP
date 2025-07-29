@@ -1,59 +1,59 @@
-####################################################################################
-# pulseprofile.py is a module that essentially serves to create a template model
-# of a high S/N pulse profile. This template model is what is used as anchor to derive
-# phase-shifts, i.e., ToAs, from an events fits file (see measureToAs.py).
-# The module is composed of a class "PulseProfileFromEventFile" that runs on event files.
-# It has two methods, one to simply create a pulse profile of the event file given a
-# .par file, and the other to perform the fit. By default, the model is a Fourier series,
-# with n=2 harmonics. These are optional arguments, and may be specified by the user.
-# So far only a Fourier, a wrapped Gaussian (von Mises), or a wrapped Cauchy (Lorentzian)
-# templates are allowed with a generic number of harmonics/components "nbrComp". The
-# fitting procedure is done with a maximum likelihood using a gaussian pdf, on a binned
-# pulse profile with number of bins = 30 (could be changed as desired). An initial template
-# could be provided (default=None) that would serve as initial guess to the fitting
-# procedure. The output is a .txt file with the template best fit parameters and
-# (optionally) a .pdf file of the binned pulse profile and the best fit model.
-# Lastly when an initial template is provided the user has the option to fix the phases of
-# the components, i.e., the peaks of the Gaussian/Lorentzian components or the Fourier
-# phases. This is important to maitain *absolute* timing when deriving ToAs from several
-# different instruments (think XTI, XRT, PN, etc.), which require their own template.
-# A .log file is also created summarizing the run.
-#
-# Then there is a class called ModelPulseProfile which models a pulse profile that was provided
-# as a dictionary with (at least) three keys, 'ppBins', 'countRate', and 'countRateErr';
-# numpy arrays with same length.
-#
-# Finally, there are several other ancilliary functions which calculate pulse properties
-# (rms pulsed fraction+), chi2 of best-fit model, and create a plot of pulse profile
-#
-# Input for 'main' function (ie, PulseProfileFromEventFile.fitPulseProfile):
-# 1- evtFile: any event file - could be merged (along **TIME** and **GTI** - the latter is
-#                                               used to get an accurate exposure)
-# 2- timMod: timing model (.par file)
-# 3- eneLow: low energy cutoff in keV (default = 0.5 keV)
-# 4- eneHigh: high energy cutoff in keV (default = 10 keV)
-# 5- nbrBins: number of bins in pulse profile (default = 30)
-# 6- ppmodel: which model to use (default = fourier, vonmises, cauchy are also allowed)
-# 7- nbrComp: number of components in template model (default = 2)
-# 8- initTemplateMod: initial template with best-guess for model parameters (default = None)
-#                     if this is provided, the "ppmodel" and "nbrComp" inputs will be ignored
-#                     and instead read-in from this initial template. The user could simply
-#                     run this script with default values to create a template, then modify
-#                     it as necessary.
-# 9- fixPhases: if True then phases will be fixed to initial value - only applicable if
-#                initTemplateMod is provided (default = False)
-# 10- figure: if provided a 'figure'.pdf plot of pulse profile will be created (default=None)
-# 11- templateFile: if provided a 'templateFile'.txt will be created of best fit model parameters (default = None)
-# 12- calcPulsedFraction: if True, the pulsed fraction will be calculated.
-# 
-# output:
-# 1- fitResultsDict : dictionary of best fit parameters
-# 2- bestFitModel: best fit model as array with same length as pulse profile
-# 3- pulsedProperties: RMS pulsed flux and fraction, if calcPulsedFraction=True, None otherwise
-#
-# To do:
-# This module is a bit messy, try to simplify
-#############################################################
+"""
+pulseprofile.py is a module that essentially serves to create a template model
+of a high S/N pulse profile. This template model is what is used as anchor to derive
+phase-shifts, i.e., ToAs, from an events fits file (see measureToAs.py).
+The module is composed of a class "PulseProfileFromEventFile" that runs on event files.
+It has two methods, one to simply create a pulse profile of the event file given a
+.par file, and the other to perform the fit. By default, the model is a Fourier series,
+with n=2 harmonics. These are optional arguments, and may be specified by the user.
+So far only a Fourier, a wrapped Gaussian (von Mises), or a wrapped Cauchy (Lorentzian)
+templates are allowed with a generic number of harmonics/components "nbrComp". The
+fitting procedure is done with a maximum likelihood using a gaussian pdf, on a binned
+pulse profile with number of bins = 30 (could be changed as desired). An initial template
+could be provided (default=None) that would serve as initial guess to the fitting
+procedure. The output is a .txt file with the template best fit parameters and
+(optionally) a .pdf file of the binned pulse profile and the best fit model.
+Lastly when an initial template is provided the user has the option to fix the phases of
+the components, i.e., the peaks of the Gaussian/Lorentzian components or the Fourier
+phases. This is important to maitain *absolute* timing when deriving ToAs from several
+different instruments (think XTI, XRT, PN, etc.), which require their own template.
+A .log file is also created summarizing the run.
+
+Then there is a class called ModelPulseProfile which models a pulse profile that was provided
+as a dictionary with (at least) three keys, 'ppBins', 'countRate', and 'countRateErr';
+numpy arrays with same length.
+
+Finally, there are several other ancilliary functions which calculate pulse properties
+(rms pulsed fraction+), chi2 of best-fit model, and create a plot of pulse profile
+
+Input for 'main' function (ie, PulseProfileFromEventFile.fitPulseProfile):
+1- evtFile: any event file - could be merged (along **TIME** and **GTI** - the latter is
+                                               used to get an accurate exposure)
+2- timMod: timing model (.par file)
+3- eneLow: low energy cutoff in keV (default = 0.5 keV)
+4- eneHigh: high energy cutoff in keV (default = 10 keV)
+5- nbrBins: number of bins in pulse profile (default = 30)
+6- ppmodel: which model to use (default = fourier, vonmises, cauchy are also allowed)
+7- nbrComp: number of components in template model (default = 2)
+8- initTemplateMod: initial template with best-guess for model parameters (default = None)
+                     if this is provided, the "ppmodel" and "nbrComp" inputs will be ignored
+                     and instead read-in from this initial template. The user could simply
+                     run this script with default values to create a template, then modify
+                     it as necessary.
+9- fixPhases: if True then phases will be fixed to initial value - only applicable if
+                initTemplateMod is provided (default = False)
+10- figure: if provided a 'figure'.pdf plot of pulse profile will be created (default=None)
+11- templateFile: if provided a 'templateFile'.txt will be created of best fit model parameters (default = None)
+12- calcPulsedFraction: if True, the pulsed fraction will be calculated.
+
+output:
+1- fitResultsDict : dictionary of best fit parameters
+2- bestFitModel: best fit model as array with same length as pulse profile
+3- pulsedProperties: RMS pulsed flux and fraction, if calcPulsedFraction=True, None otherwise
+
+To do:
+This module is a bit messy, try to simplify
+"""
 
 import argparse
 import sys

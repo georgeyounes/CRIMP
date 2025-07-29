@@ -1,54 +1,55 @@
-###############################################################################
-# This code calculates ToAs in a similar fashion to Ray et al. 2018, but with
-# some small differences. It takes a (barycentered-corrected) event file, a
-# timing model (.par file), a template model (.txt file, e.g., from pulseprofile.py),
-# and a .txt file defining the ToAs (e.g., ToAs start and end times - could be
-# built with buildtimeintervalsToAs.py). The user could apply an energy filtering
-# to the event file through eneLow and eneHigh. A subset of ToAs could be measured
-# if desired through 'toaStart' and/or 'toaEnd'. Most of the calculations are done
-# in the template-appropriate functions, e.g., "measToA_fourier". The appropriate
-# TIME array is folded using the .par file, and fit with the provided template model.
-# For this step, we use the extended MLE method, all model parameters are fixed,
-# except for the normalization and a phase-shift. The uncertainties on the phase-shift
-# are measured by stepping away from the best fit phase-shift in steps of 2pi/phShiftRes
-# (default=1000) and calculating the corresponding maximum likelihood; +/-1 sigma
-# uncertainty is when the latter drops by +/-0.5 (given that our Likelihood follows
-# a chi2 distribution with 1 dof). For debugging/testing/analysis purposes, the
-# user may choose to plot the pulse profile (and specify the nbrBins in the plot)
-# and/or the log-likelihood around the best fit phase-shift (which should be quite
-# symmetric). The argument "brutemin" will use the global minimization BRUTE method
-# (check scipy or lmfit for details) to home in on the global minimum. This is useful
-# in the case of, e.g., double-peaked profiles with similar amplitudes and shape
-# (i.e., subtle differences). A global search ensures that you are not getting stuck
-# in a local minimum (e.g., on the wrong peak). This option is currently only available
-# when using a Fourier template.
-#
-# Input:
-# 1- evtFile : barycenter-corrected event file (could be merged along TIME *and* GTIs)
-# 2- timMod : *.par timing model (TEMPO2 format is okay)
-# 3- tempModPP : *.txt file of the tempolate pulse profile (could be biult with pulseprofile.py)
-# 4- toagtifile : *.txt file with ToA properties (could be built with buildtimeintervalsToAs.py)
-# 5 eneLow : low energy limit (in keV)
-# 6 eneHigh : high energy limit (in keV)
-# 7 toaStart : Number of ToA to start from (based on ToAs from toagtifile)
-# 8 toaEnd : Number of ToA to end (based on ToAs from toagtifile)
-# 9- phShiftRes : Phase-shift step resolution (2*pi/phShiftRes, default = 1000)
-# 10- nbrBins : for plotting purposes of pulse profile (default=15)
-# 11- varyAmps : vary component amplitude in template pulse profile (i.e., vary pulsed fraction, default=False)
-# 12- brutemin: run global minimizing through the BRUTE method (default = False, only for Fourier templates)
-# 13- plotPPs : plot all pulse profiles (only for debugging, default=False)
-# 14- plotLLs : plot all logLikelihoods (only for debugging, default=False)
-# 15- toaFile : name of output ToA file (default = ToAs(.txt))
-# 16- timFile : name of output .tim file compatible with tempo2/PINT - (default = None)
-#
-# output:
-# ToAsTable : pandas table of ToAs properties
-#
-# To do:
-# This module is a bit messy. It can benefit from some cleaning:
-# - Create a class with three methods which measure ToAs for each template (fourier, cauchy, vonmises)
-# - Eliminate repetitive code in each method (e.g. ToA error calculation could be its own small function)
-################################################################################
+"""
+This code calculates ToAs in a similar fashion to Ray et al. 2018, but with
+some small differences. It takes a (barycentered-corrected) event file, a
+timing model (.par file), a template model (.txt file, e.g., from pulseprofile.py),
+and a .txt file defining the ToAs (e.g., ToAs start and end times - could be
+built with buildtimeintervalsToAs.py). The user could apply an energy filtering
+to the event file through eneLow and eneHigh. A subset of ToAs could be measured
+if desired through 'toaStart' and/or 'toaEnd'. Most of the calculations are done
+in the template-appropriate functions, e.g., "measToA_fourier". The appropriate
+TIME array is folded using the .par file, and fit with the provided template model.
+For this step, we use the extended MLE method, all model parameters are fixed,
+except for the normalization and a phase-shift. The uncertainties on the phase-shift
+are measured by stepping away from the best fit phase-shift in steps of 2pi/phShiftRes
+(default=1000) and calculating the corresponding maximum likelihood; +/-1 sigma
+uncertainty is when the latter drops by +/-0.5 (given that our Likelihood follows
+a chi2 distribution with 1 dof). For debugging/testing/analysis purposes, the
+user may choose to plot the pulse profile (and specify the nbrBins in the plot)
+and/or the log-likelihood around the best fit phase-shift (which should be quite
+symmetric). The argument "brutemin" will use the global minimization BRUTE method
+(check scipy or lmfit for details) to home in on the global minimum. This is useful
+in the case of, e.g., double-peaked profiles with similar amplitudes and shape
+(i.e., subtle differences). A global search ensures that you are not getting stuck
+in a local minimum (e.g., on the wrong peak). This option is currently only available
+when using a Fourier template.
+
+Input:
+1- evtFile : barycenter-corrected event file (could be merged along TIME *and* GTIs)
+2- timMod : *.par timing model (TEMPO2 format is okay)
+3- tempModPP : *.txt file of the tempolate pulse profile (could be biult with pulseprofile.py)
+4- toagtifile : *.txt file with ToA properties (could be built with buildtimeintervalsToAs.py)
+5 eneLow : low energy limit (in keV)
+6 eneHigh : high energy limit (in keV)
+7 toaStart : Number of ToA to start from (based on ToAs from toagtifile)
+8 toaEnd : Number of ToA to end (based on ToAs from toagtifile)
+9- phShiftRes : Phase-shift step resolution (2*pi/phShiftRes, default = 1000)
+10- nbrBins : for plotting purposes of pulse profile (default=15)
+11- varyAmps : vary component amplitude in template pulse profile (i.e., vary pulsed fraction, default=False)
+12- brutemin: run global minimizing through the BRUTE method (default = False, only for Fourier templates)
+13- plotPPs : plot all pulse profiles (only for debugging, default=False)
+14- plotLLs : plot all logLikelihoods (only for debugging, default=False)
+15- toaFile : name of output ToA file (default = ToAs(.txt))
+16- timFile : name of output .tim file compatible with tempo2/PINT - (default = None)
+
+output:
+ToAsTable : pandas table of ToAs properties
+
+To do:
+This module is a bit messy. It can benefit from some cleaning:
+- Create a class with three methods which measure ToAs for each template (fourier, cauchy, vonmises)
+- Eliminate repetitive code in each method (e.g. ToA error calculation could be its own small function)
+- I keep track of the number of free parameters; could be directly read from lmfit output
+"""
 
 import sys
 import argparse
@@ -169,7 +170,7 @@ def measureToAs(evtFile, timMod, tempModPP, toagtifile, eneLow=0.5, eneHigh=10.,
 
     # Reading ToA intervals from text file
     ######################################
-    df_gtiToAParam = pd.read_csv(toagtifile, sep='\s+', comment='#')
+    df_gtiToAParam = pd.read_csv(toagtifile, sep=r'\s+', comment='#')
 
     ToAStartMJD = df_gtiToAParam['ToA_tstart'].to_numpy()
     ToAEndMJD = df_gtiToAParam['ToA_tend'].to_numpy()
@@ -281,7 +282,7 @@ def measureToAs(evtFile, timMod, tempModPP, toagtifile, eneLow=0.5, eneHigh=10.,
 
     # PANDAS table of ToAs
     ######################
-    ToAsTable = pd.read_csv(toaFile + '.txt', sep='\s+', comment='#')
+    ToAsTable = pd.read_csv(toaFile + '.txt', sep=r'\s+', comment='#')
 
     return ToAsTable
 
@@ -746,7 +747,8 @@ def defineinitialfitparam(tempModPP, readvaryparam=False):
 
         if not readvaryparam:
             initTempModPPparam = Parameters()  # Initializing an instance of Parameters based on the best-fit template model
-            initTempModPPparam.add('norm', tempModPP['norm']['value'], min=0, max=np.inf, vary=True)
+            initTempModPPparam.add('norm', tempModPP['norm']['value'], min=tempModPP['norm']['value']/5,
+                                   max=tempModPP['norm']['value']*5, vary=True)
             # Number of components in template model
             nbrComp = len(np.array([ww for harmKey, ww in tempModPP.items() if harmKey.startswith('amp_')]))
             for kk in range(1, nbrComp + 1):  # Adding the amplitudes and phases of the harmonics, they are fixed
@@ -755,13 +757,12 @@ def defineinitialfitparam(tempModPP, readvaryparam=False):
             initTempModPPparam.add('phShift', 0, vary=True, min=-np.pi, max=np.pi,
                                    brute_step=0.05)  # Phase shift - parameter of interest
             initTempModPPparam.add('ampShift', 1, vary=False, min=0, max=100)
-
             nbrFreeParams = 2  # phshift and model normalization
 
         elif readvaryparam:
             initTempModPPparam = Parameters()  # Initializing an instance of Parameters based on the best-fit template model
-            initTempModPPparam.add('norm', tempModPP['norm']['value'], min=0, max=np.inf,
-                                   vary=tempModPP['norm']['vary'])
+            initTempModPPparam.add('norm', tempModPP['norm']['value'], min=tempModPP['norm']['value']/5,
+                                   max=tempModPP['norm']['value']*5, vary=tempModPP['norm']['vary'])
             # setting up the number of free parameters
             if tempModPP['norm']['vary']:
                 nbrFreeParams = 1
@@ -788,8 +789,8 @@ def defineinitialfitparam(tempModPP, readvaryparam=False):
 
         if not readvaryparam:
             initTempModPPparam = Parameters()  # Initializing an instance of Parameters based on the best-fit template model
-            initTempModPPparam.add('norm', tempModPP['norm']['value'], min=0.0, max=np.inf,
-                                   vary=True)  # Adding the normalization - this is free to vary
+            initTempModPPparam.add('norm', tempModPP['norm']['value'], min=tempModPP['norm']['value']/5,
+                                   max=tempModPP['norm']['value']*5, vary=True)  # Adding the normalization - this is free to vary
 
             # Number of components in template model
             nbrComp = len(np.array([ww for harmKey, ww in tempModPP.items() if harmKey.startswith('amp_')]))
@@ -806,8 +807,8 @@ def defineinitialfitparam(tempModPP, readvaryparam=False):
 
         elif readvaryparam:
             initTempModPPparam = Parameters()  # Initializing an instance of Parameters based on the best-fit template model
-            initTempModPPparam.add('norm', tempModPP['norm']['value'], min=0.0, max=np.inf,
-                                   vary=tempModPP['norm']['vary'])  # Adding the normalization - this is free to vary
+            initTempModPPparam.add('norm', tempModPP['norm']['value'], min=tempModPP['norm']['value']/5,
+                                   max=tempModPP['norm']['value']*5, vary=tempModPP['norm']['vary'])  # Adding the normalization - this is free to vary
             # setting up the number of free parameters
             if tempModPP['norm']['vary']:
                 nbrFreeParams = 1
@@ -817,13 +818,14 @@ def defineinitialfitparam(tempModPP, readvaryparam=False):
             nbrComp = len(np.array([ww for harmKey, ww in tempModPP.items() if harmKey.startswith('amp_')]))
             for kk in range(1, nbrComp + 1):  # Adding the amplitudes, centroids, and widths of the components, they are fixed
                 initTempModPPparam.add('amp_' + str(kk), tempModPP['amp_' + str(kk)]['value'],
-                                       vary=tempModPP['amp_' + str(kk)]['vary'], min=0, max=np.inf)
+                                       vary=tempModPP['amp_' + str(kk)]['vary'], min=0,
+                                       max=5*tempModPP['amp_' + str(kk)]['value'])
                 initTempModPPparam.add('cen_' + str(kk), tempModPP['cen_' + str(kk)]['value'],
                                        vary=tempModPP['cen_' + str(kk)]['vary'],
                                        min=-0.6+tempModPP['cen_' + str(kk)]['value'],
                                        max=0.6+tempModPP['cen_' + str(kk)]['value'], brute_step=0.05)
                 initTempModPPparam.add('wid_' + str(kk), tempModPP['wid_' + str(kk)]['value'],
-                                       vary=tempModPP['wid_' + str(kk)]['vary'], min=0, max=100*np.pi)  # basically inf
+                                       vary=tempModPP['wid_' + str(kk)]['vary'], min=0, max=30*np.pi)  # basically inf
 
                 # properly dealing with number of free parameters
                 for key in ('amp_' + str(kk), 'cen_' + str(kk), 'wid_' + str(kk)):
