@@ -19,37 +19,7 @@ phases. This is important to maitain *absolute* timing when deriving ToAs from s
 different instruments (think XTI, XRT, PN, etc.), which require their own template.
 A .log file is also created summarizing the run.
 
-Then there is a class called ModelPulseProfile which models a pulse profile that was provided
-as a dictionary with (at least) three keys, 'ppBins', 'countRate', and 'countRateErr';
-numpy arrays with same length.
-
-Finally, there are several other ancilliary functions which calculate pulse properties
-(rms pulsed fraction+), chi2 of best-fit model, and create a plot of pulse profile
-
-Input for 'main' function (ie, PulseProfileFromEventFile.fitPulseProfile):
-1- evtFile: any event file - could be merged (along **TIME** and **GTI** - the latter is
-                                               used to get an accurate exposure)
-2- timMod: timing model (.par file)
-3- eneLow: low energy cutoff in keV (default = 0.5 keV)
-4- eneHigh: high energy cutoff in keV (default = 10 keV)
-5- nbrBins: number of bins in pulse profile (default = 30)
-6- ppmodel: which model to use (default = fourier, vonmises, cauchy are also allowed)
-7- nbrComp: number of components in template model (default = 2)
-8- initTemplateMod: initial template with best-guess for model parameters (default = None)
-                     if this is provided, the "ppmodel" and "nbrComp" inputs will be ignored
-                     and instead read-in from this initial template. The user could simply
-                     run this script with default values to create a template, then modify
-                     it as necessary.
-9- fixPhases: if True then phases will be fixed to initial value - only applicable if
-                initTemplateMod is provided (default = False)
-10- figure: if provided a 'figure'.pdf plot of pulse profile will be created (default=None)
-11- templateFile: if provided a 'templateFile'.txt will be created of best fit model parameters (default = None)
-12- calcPulsedFraction: if True, the pulsed fraction will be calculated.
-
-output:
-1- fitResultsDict : dictionary of best fit parameters
-2- bestFitModel: best fit model as array with same length as pulse profile
-3- pulsedProperties: RMS pulsed flux and fraction, if calcPulsedFraction=True, None otherwise
+Best run through the command line as "templatepulseprofile"
 
 To do:
 This module is a bit messy, try to simplify
@@ -150,16 +120,14 @@ class PulseProfileFromEventFile:
         :rtype: dict
         """
 
-        # Reading event file and GTIs to calculate an accurate LIVETIME, in case of a merged event file
+        # Reading event file and GTIs to calculate an accurate LIVETIME
+        ###############################################################
         EF = EvtFileOps(self.evtFile)
-        evtFileKeyWords, gtiList = EF.readGTI()
-        MJDREF = evtFileKeyWords["MJDREF"]
-        LIVETIME = np.sum(gtiList[:, 1] - gtiList[:, 0])
-
+        _, gtiList = EF.readGTI()
+        LIVETIME = np.sum(gtiList[:, 1] - gtiList[:, 0]) * 86400  # converting to seconds
         # Reading TIME column after energy filtering
-        dataTP_eneFlt = EF.filtenergy(eneLow=self.eneLow, eneHigh=self.eneHigh)
-        TIME = dataTP_eneFlt['TIME'].to_numpy()
-        timeMJD = TIME / 86400 + MJDREF
+        dataTP_eneFlt = EF.build_time_energy_df().filtenergy(eneLow=self.eneLow, eneHigh=self.eneHigh)
+        timeMJD = dataTP_eneFlt.time_energy_df['TIME'].to_numpy()
 
         # Calculating PHASE according to timing model
         #############################################
@@ -832,10 +800,6 @@ def main():
     ppfromevt.fitpulseprofile(args.ppmodel, args.nbrComp, args.initTemplateMod, args.fixPhases, args.figure,
                               args.templateFile, args.calcPulsedFraction)
 
-
-##############
-# End Script #
-##############
 
 if __name__ == '__main__':
     main()

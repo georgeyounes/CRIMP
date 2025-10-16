@@ -1,26 +1,13 @@
-############################################################
-# A rudimentary simulation of a time series which follows a
-# simple sine wave. It only requires an input frequency. The
-# user can specify the source count rate, exposure, rms
-# pulsed fraction of the signal, the background count rate,
-# an instrument resolution or the total number of phase bins
-# in intial wave function to draw counts from. The output
-# is a dictionary of two TIME arrays, one includes background
-# (assigned_t_wBgr) and one without (assigned_t_nobgr)
-#
-# Input:
-# 1- freq : frequency of input signal
-# 2- srcrate : source count rate (default = 1 cts/s)
-# 3- exposure : desired exposure in seconds (default = 10000)
-# 4- pulsedfraction : desired rms pulsed fraction (default=0.2) 
-# 5- bgrRate : background count rate (default = 0.05)
-# 6- resolution : resolution of instrument (default = 0.073)
-# 7- nbrPhaseBins : Number of phase bins to draw source counts from (default = None, i.e., (1/(resolution*freq))
-# 
-# output:
-# 1- assigned_t_wBgr : time of events including background
-# 2- assigned_t_nobgr : time of events excluding background
-############################################################
+"""
+A rudimentary simulation of a time series which follows a
+simple sine wave. It only requires an input frequency. The
+user can specify the source count rate, exposure, rms
+pulsed fraction of the signal, the background count rate,
+an instrument resolution or the total number of phase bins
+in intial wave function to draw counts from. The output
+is a dictionary of two TIME arrays, one includes background
+(assigned_t_wBgr) and one without (assigned_t_nobgr)
+"""
 
 import numpy as np
 import sys
@@ -29,8 +16,31 @@ import argparse
 sys.dont_write_bytecode = True
 
 
-def simulatemodulatedlc(freq, srcrate=1, exposure=10000, pulsedfraction=0.2, bgrrate=0.05, resolution=0.073,
-                        nbrPhaseBins=None):
+def simulatemodulatedlc(freq, srcrate: float = 1,
+                        exposure: float = 10000,
+                        pulsedfraction: float = 0.2,
+                        bgrrate: float = 0.05,
+                        resolution: float = 0.073,
+                        nbrPhaseBins: float | None = None):
+    """
+    Simulate modulated light curve
+    :param freq: Frequency of modulation
+    :type freq: float
+    :param srcrate: Source count rate
+    :type srcrate: float
+    :param exposure: Total exposure time
+    :type exposure: float
+    :param pulsedfraction: Fraction of pulsed to total count
+    :type pulsedfraction: float between 0 and 1
+    :param bgrrate: Background count rate
+    :type bgrrate: float
+    :param resolution: Resolution of instrument
+    :type resolution: float
+    :param nbrPhaseBins: Total number of phase bins in pulse profile to draw from (equates to resolution of instrument)
+    :type nbrPhaseBins: float | None
+    :return: dictionary of two time arrays {'assigned_t_wBgr', 'assigned_t_nobgr'} with and without background counts
+    :rtype: dict
+    """
     nbrRotPh = int(exposure * freq)
     # here there should be a warning or even an error if nbrRotPh is not > 100, i.e., exposure > 100*P
     # if not, and the desirved exposure is not a perfect integer multiplied by period, this approximation will lead to inaccurate results
@@ -78,15 +88,7 @@ def simulatemodulatedlc(freq, srcrate=1, exposure=10000, pulsedfraction=0.2, bgr
     return assigned_t
 
 
-#################
-## End Program ##
-#################
-
-if __name__ == '__main__':
-    #############################
-    ## Parsing input arguments ##
-    #############################
-
+def main():
     parser = argparse.ArgumentParser(description="Simulating an event file following a sinusoidal function")
     parser.add_argument("freq", help="Frequency of signal", type=float)
     parser.add_argument("-sr", "--srcrate", metavar='', help="Source count rate /s, default=1.", type=float, default=1.)
@@ -104,3 +106,7 @@ if __name__ == '__main__':
 
     simulatemodulatedlc(args.freq, args.srcrate, args.exposure, args.pulsedfraction, args.bgrrate, args.resolution,
                         args.nbrPhaseBins)
+
+
+if __name__ == '__main__':
+    main()

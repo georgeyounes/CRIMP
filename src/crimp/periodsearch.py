@@ -1,18 +1,14 @@
-#############################################################
-# Simple implementation of the Z2 and H-test statistics to
-# search for periodicity. Inputs are a time array, frequency
-# array, and the number of harmonics. It outputs an array of
-# the power at each frequency. Check Buccheri et al. (1983)
-# for more details on the Ztest and Jagar et al. (1989) for
-# more details on the Htest, and many more recent literature.
-# Now, it supports the 2d_Z^2 test in the method "twod_ztest"
-# which requires an additional input array of frequency
-# derivatives
-#
-# Warning: these methods are not optimized for speed, and are
-# best utilized if you have a rough idea where the spin frequency
-# (frequency-derivative) of your object-of-interest is.
-#############################################################
+"""
+Simple implementation of the Z2 and H-test statistics to
+search for periodicity. Check Buccheri et al. (1983)
+for more details on the Ztest and Jagar et al. (1989) for
+more details on the Htest, and many more recent literature.
+It also supports the 2d_Z^2 test in the method "twod_ztest"
+
+Warning: these methods are not optimized for speed, and are
+best utilized if you have a rough idea where the spin frequency
+(frequency-derivative) of your object-of-interest is
+"""
 
 import sys
 import numpy as np
@@ -23,23 +19,23 @@ sys.dont_write_bytecode = True
 
 class PeriodSearch:
     """
-            A class to perform simple periodicity searches
+    A class to perform simple periodicity searches
 
-            Attributes
-            ----------
-            time : numpy.ndarray
-                array of photon arrival times
-            freq : numpy.ndarray
-                array of frequencies
-            nbrHarm : int
-                number of harmonics for the Z^2-test or H-test
+    Attributes
+    ----------
+    time : numpy.ndarray
+        array of photon arrival times
+    freq : numpy.ndarray
+        array of frequencies
+    nbrHarm : int
+        number of harmonics for the Z^2-test or H-test
 
-            Methods
-            -------
-            ztest(): calculate Z^2 power at each frequency
-            twod_ztest(freq_dot): calculate Z^2 power at each pair of frequency, frequency derivative
-            htest(): calculate H power at each frequency
-            """
+    Methods
+    -------
+    ztest(): calculate Z^2 power at each frequency
+    twod_ztest(freq_dot): calculate Z^2 power at each pair of frequency, frequency derivative
+    htest(): calculate H power at each frequency
+    """
 
     def __init__(self, time, freq, nbrHarm: int = 2):
         """
@@ -81,9 +77,9 @@ class PeriodSearch:
         :type freq_dot: numpy.ndarray
         :return: Z2pow_2d, array of Z^2-power for each pair of freq,freq_dot
         :rtype: numpy.ndarray
-        :return: Z2pow_2d_df, Pandas dataframe of Z^2-power for each pair of freq,freq_dot
-        :rtype: pandas.DataFrame
-
+        returns
+            - Z2pow_2d (numpy.ndarray): array of Z^2-power for each pair of freq, freq_dot values
+            - Z2pow_2d_df (pandas.DataFrame): dataframe of ['Freq', 'Freq_dot', 'Z2pow']
         """
         Z2pow_2d = np.zeros((len(self.freq) * len(freq_dot), 3))
         mm = 0

@@ -1,6 +1,6 @@
 """
 This code calculates ToAs in a similar fashion to Ray et al. 2018, but with
-some small differences. It takes a (barycentered-corrected) event file, a
+some small differences. It takes a (barycenter-corrected) event file, a
 timing model (.par file), a template model (.txt file, e.g., from pulseprofile.py),
 and a .txt file defining the ToAs (e.g., ToAs start and end times - could be
 built with buildtimeintervalsToAs.py). The user could apply an energy filtering
@@ -20,35 +20,15 @@ symmetric). The argument "brutemin" will use the global minimization BRUTE metho
 (check scipy or lmfit for details) to home in on the global minimum. This is useful
 in the case of, e.g., double-peaked profiles with similar amplitudes and shape
 (i.e., subtle differences). A global search ensures that you are not getting stuck
-in a local minimum (e.g., on the wrong peak). This option is currently only available
-when using a Fourier template.
+in a local minimum (e.g., on the wrong peak).
 
-Input:
-1- evtFile : barycenter-corrected event file (could be merged along TIME *and* GTIs)
-2- timMod : *.par timing model (TEMPO2 format is okay)
-3- tempModPP : *.txt file of the tempolate pulse profile (could be biult with pulseprofile.py)
-4- toagtifile : *.txt file with ToA properties (could be built with buildtimeintervalsToAs.py)
-5 eneLow : low energy limit (in keV)
-6 eneHigh : high energy limit (in keV)
-7 toaStart : Number of ToA to start from (based on ToAs from toagtifile)
-8 toaEnd : Number of ToA to end (based on ToAs from toagtifile)
-9- phShiftRes : Phase-shift step resolution (2*pi/phShiftRes, default = 1000)
-10- nbrBins : for plotting purposes of pulse profile (default=15)
-11- varyAmps : vary component amplitude in template pulse profile (i.e., vary pulsed fraction, default=False)
-12- brutemin: run global minimizing through the BRUTE method (default = False, only for Fourier templates)
-13- plotPPs : plot all pulse profiles (only for debugging, default=False)
-14- plotLLs : plot all logLikelihoods (only for debugging, default=False)
-15- toaFile : name of output ToA file (default = ToAs(.txt))
-16- timFile : name of output .tim file compatible with tempo2/PINT - (default = None)
-
-output:
-ToAsTable : pandas table of ToAs properties
+Can be run via command line as "measuretoas"
 
 To do:
-This module is a bit messy. It can benefit from some cleaning:
+This module is a bit messy (to say the least :)). It can benefit from some cleaning, e.g.,
 - Create a class with three methods which measure ToAs for each template (fourier, cauchy, vonmises)
 - Eliminate repetitive code in each method (e.g. ToA error calculation could be its own small function)
-- I keep track of the number of free parameters; could be directly read from lmfit output
+- I keep track of the number of free parameters manually; could be directly read from lmfit output
 """
 
 import sys
@@ -71,7 +51,7 @@ from crimp.readPPtemplate import readPPtemplate
 from crimp.templatemodels import Fourier, WrappedCauchy, VonMises
 from crimp.ephemTmjd import ephemTmjd
 from crimp.periodsearch import PeriodSearch
-from crimp.phshiftTotimfile import phshiftTotimfile
+from crimp.timfile import phshiftTotimfile
 
 sys.dont_write_bytecode = True
 
@@ -157,16 +137,12 @@ def measureToAs(evtFile, timMod, tempModPP, toagtifile, eneLow=0.5, eneHigh=10.,
                 '\n output toaFile: ' + toaFile +
                 '\n output timFile: ' + str(timFile) + '\n')
 
-    # Reading and operating on event file
-    #####################################
+    # Reading data and filtering for energy
+    #######################################
     EF = EvtFileOps(evtFile)
-    evtFileKeyWords = EF.readEF()
-    MJDREF = evtFileKeyWords["MJDREF"]
-
     # Reading TIME column after energy filtering
-    dataTP_eneFlt = EF.filtenergy(eneLow=eneLow, eneHigh=eneHigh)
-    TIME = dataTP_eneFlt['TIME'].to_numpy()
-    TIMEMJD = TIME / 86400 + MJDREF
+    dataTP_eneFlt = EF.build_time_energy_df().filtenergy(eneLow=eneLow, eneHigh=eneHigh)
+    TIMEMJD = dataTP_eneFlt.time_energy_df['TIME'].to_numpy()
 
     # Reading ToA intervals from text file
     ######################################
@@ -992,8 +968,8 @@ def main():
     parser.add_argument("toagtifile",
                         help="User supplied .txt file with ToA interval information (built with buildtimeintervalsToAs.py)",
                         type=str)
-    parser.add_argument("-el", "--eneLow", help="Low energy filter in event file, default=0.5", type=float, default=0.5)
-    parser.add_argument("-eh", "--eneHigh", help="High energy filter in event file, default=10", type=float, default=10)
+    parser.add_argument("-el", "--enelow", help="Low energy filter in event file, default=0.5", type=float, default=0.5)
+    parser.add_argument("-eh", "--enehigh", help="High energy filter in event file, default=10", type=float, default=10)
     parser.add_argument("-ts", "--toaStart", help="Number of ToA to start from, default first ToA", type=int, default=0)
     parser.add_argument("-te", "--toaEnd", help="Number of ToA to end, default full length of ToA list", type=int,
                         default=None)
@@ -1021,7 +997,7 @@ def main():
                         type=str, default=None)
     args = parser.parse_args()
 
-    measureToAs(args.evtFile, args.timMod, args.tempModPP, args.toagtifile, args.eneLow, args.eneHigh, args.toaStart,
+    measureToAs(args.evtFile, args.timMod, args.tempModPP, args.toagtifile, args.enelow, args.enehigh, args.toaStart,
                 args.toaEnd, args.phShiftRes, args.nbrBins, args.varyAmps, args.readvaryparam, args.brutemin,
                 args.plotPPs, args.plotLLs, args.toaFile, args.timFile)
 

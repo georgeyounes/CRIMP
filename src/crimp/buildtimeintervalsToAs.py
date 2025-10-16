@@ -1,58 +1,50 @@
-#############################################################
-# A code to create START and END times that will define each
-# TOA. It takes as input a (barycenter-corrected) event file,
-# the desired number of counts in each ToA (totCtsEachToA),
-# and a desired max waiting time between GTIs (waitTimeCutoff).
-# In essence, if the waiting time between two GTIs in an event
-# file is larger than "waitTimeCutoff", force it to start a
-# new ToA. This is important because we typically work with
-# merged event files over years time-scales that encompass a
-# long-term monitoring program. The code also allows for an
-# energy filtering through the parameters enelow and enehigh.
-# 
-# The outputs are two text files: (1) "outFile"_bunches.txt,
-# an intermediary file (that can be largely ignored), and (2)
-# a "outFile".txt file that summarizes the T_start and T_end
-# of each ToA_GTI, the length of the time_interval to
-# accumulate totCtsEachToA, the exact exposure (livetime) of
-# each ToA, the total number of counts in each ToA, and the
-# exact count rate. A log file "outFile".log is also cretead.
-# 
-# Input:
-# 1- evtFile: event file (barycenter-corrected)
-# 2- totCtsEachToA: desired number of counts in each ToA_GTI (default = 1000)
-#                   (last bin within a valid time interval might not provide exactly totCtsEachToA)
-# 3- waitTimeCutoff: GTI gap cutoff to start new ToA (in days, default = 1)
-# 4- eneLow: low energy limit (in keV, default = 0.5)
-# 5- eneHigh: high energy limit (in keV, default = 10)
-# 6- outputFile: name of output file (default = "timIntToAs")
-#
-# Return: None
-#
-# output:
-# 1- timIntForBunchToAs.txt: intermediate file for housekeeping
-# 2- timIntToAs.txt: time info relevant for ToA measurement
-#
-# Warning:
-# In the case of fragmented observations, say, hypothetically,
-# you have few tens of seconds of exposure (livetime) on your
-# source every day for 2 weeks, if your "waitTimeCutoff" is >1 day,
-# you may continuously accumulate counts until you reach the desired
-# "totCtsEachToA", e.g., say 2 weeks (which also assumes low source
-# count rate and/or large number of desired counts to derive a ToA).
-# This is because "waitTimeCutoff" is based on GTI separation, and
-# not "time-passed". This might not be ideal for noisy pulsars,
-# or when you are trying to find glitches. This script does not deal
-# with such monitoring instances, simply since they are very rare
-# (I have not encoutered such a case). Yet, the "ToA_lenInt" column
-# in the timIntToAs.txt file will provide this information, and if
-# the interval length for the ToA is larger than your desired length,
-# you could simply comment it out with "#" or just delete it. If you
-# can afford it, lowering your "totCtsEachToA" might fix this problem.
-# I have thought of a few ways to deal with this, though none is ideal
-# for various reasons that I won't go into here.
-# Again, hopefully, you will never have to worry about this.
-#############################################################
+"""
+A code to create START and END times that will define each
+TOA. It takes as input a (barycenter-corrected) event file,
+the desired number of counts in each ToA (totCtsEachToA),
+and a desired max waiting time between GTIs (waitTimeCutoff).
+In essence, if the waiting time between two GTIs in an event
+file is larger than "waitTimeCutoff", force it to start a
+new ToA. This is important because we typically work with
+merged event files over years time-scales that encompass a
+long-term monitoring program. The code also allows for an
+energy filtering through the parameters enelow and enehigh.
+
+The outputs are two text files: (1) "outFile"_bunches.txt,
+an intermediary file (that can be largely ignored), and (2)
+a "outFile".txt file that summarizes the T_start and T_end
+of each ToA_GTI, the length of the time_interval to
+accumulate totCtsEachToA, the exact exposure (livetime) of
+each ToA, the total number of counts in each ToA, and the
+exact count rate. A log file "outFile".log is also cretead.
+
+The code will clean the output file slightly in the sense that
+it will merge any time intervals that have counts < max_counts
+**and** delta_t < max_wait with the previous one. By default,
+max_counts = totCtsEachToA/2 and max_wait = waitTimeCutoff
+
+The code can be run from the command line as "timeintervalsfortoas"
+
+Warning:
+In the case of fragmented observations, say, hypothetically, you
+have few tens of seconds of exposure (livetime) on your source every
+day for 2 weeks, if your "waitTimeCutoff" is >1 day, say 2 days,
+you will continue to accumulate counts beyond 2 days (this also
+assumes low source count rate and/or large number of desired counts
+to derive a ToA). This is because "waitTimeCutoff" is based on GTI
+separation, and not "time-passed". This might not be ideal for noisy
+pulsars, or when you are trying to find glitches. This script does
+not deal with such monitoring instances, simply since they are very
+rare (I have not encoutered such a case). Yet, the "ToA_lenInt" column
+in the timIntToAs.txt file will provide this information (length of
+time from start to end of each ToA), and if the interval length for
+the ToA is larger than your desired length, you could simply comment
+it out with "#" or just delete it. If you can afford it, lowering
+your "totCtsEachToA" might fix this problem. I have thought of a few
+ways to deal with this, though none is ideal for various reasons that
+I won't go into here, and in fact, will raise other issues.
+Again, hopefully, you will never have to worry about this.
+"""
 
 import argparse
 import logging
@@ -78,10 +70,10 @@ logger.addHandler(consoleHandler)
 
 
 def timeintervalsToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.5, eneHigh=10,
+                      max_counts: int | None = None, max_wait: float | None = None,
                       outputFile="timIntToAs", correxposure=False):
     """
     Calculates START and END times that will define each TOA
-
     :param evtFile: name of the fits event file
     :type evtFile: str
     :param totCtsEachToA: max number of counts in each ToA (default = 1000)
@@ -92,14 +84,24 @@ def timeintervalsToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.
     :type eneLow: float
     :param eneHigh: default = 10 (keV)
     :type eneHigh: float
+    :param max_counts: max counts < which merge time interval with previous ones (default = totCtsEachToA/2)
+    :type max_counts: int
+    :param max_wait: max wait < which merge time interval with previous ones (default = waitTimeCutoff)
+    :type max_wait: float
     :param outputFile: default = "timIntToAs"
     :type outputFile: str
     :param correxposure: flag to correct exposure, hence, count rate, according to selected FPMs, default = False)
     :type correxposure: Bool
+    :return: dataframe of TOA properties
+    :rtype: pandas.DataFrame
     """
+    # Establishing max_counts and max_wait for TOA interval cleaning
+    if max_counts is None:
+        max_counts = totCtsEachToA/2
+    if max_wait is None:
+        max_wait = waitTimeCutoff
 
     # Log to a file
-    ###############
     fileHandler = logging.FileHandler(outputFile + '.log', mode='w')
     fileHandler.setFormatter(logFormatter)
     fileHandler.setLevel(logging.INFO)
@@ -111,18 +113,17 @@ def timeintervalsToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.
                 '\n waitTimeCutoff: ' + str(waitTimeCutoff) +
                 '\n eneLow: ' + str(eneLow) +
                 '\n eneHigh: ' + str(eneHigh) +
+                '\n max_counts: ' + str(max_counts) +
+                '\n max_wait: ' + str(max_wait) +
                 '\n outputFile: ' + str(outputFile) + '\n')
 
     # Reading data and filtering for energy
     #######################################
     EF = EvtFileOps(evtFile)
     evtFileKeyWords, gtiList = EF.readGTI()
-
-    MJDREF = evtFileKeyWords["MJDREF"]
-
     # Reading TIME column after energy filtering
-    dataTP_eneFlt = EF.filtenergy(eneLow=eneLow, eneHigh=eneHigh)
-    TIME = dataTP_eneFlt['TIME'].to_numpy()
+    dataTP_eneFlt = EF.build_time_energy_df().filtenergy(eneLow=eneLow, eneHigh=eneHigh)
+    TIME = dataTP_eneFlt.time_energy_df['TIME'].to_numpy()
 
     # Calculating the wait time until next GTI and exposure of each GTI
     ###################################################################
@@ -138,7 +139,7 @@ def timeintervalsToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.
     ind_gtiTiming = []
 
     for jj in range(0, np.shape(alltimes)[0]):
-        if alltimes[jj, 2] > waitTimeCutoff * 86400:
+        if alltimes[jj, 2] > waitTimeCutoff:
             ind_gtiTiming = np.append(ind_gtiTiming, jj + 1)
 
     if np.size(ind_gtiTiming) == 0:
@@ -168,16 +169,14 @@ def timeintervalsToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.
     f.write('ToABunch_tstart \t ToABunch_tend \t ToABunch_exp \t ToABunch_lenInt\n')
     for ll in range(0, nbrGTIs):
         f.write(str(ToAs_timeInfo[ll][0]) + '\t' + str(ToAs_timeInfo[ll][1]) + '\t' + str(
-            ToAs_timeInfo[ll][2]) + '\t' + str(ToAs_timeInfo[ll][3]) + '\n')
+            ToAs_timeInfo[ll][2] * 86400) + '\t' + str(ToAs_timeInfo[ll][3]) + '\n')
 
     f.close()
 
     # Utilizing the above to create final GTI .txt file that can be used to derive ToAs
     ###################################################################################
     f = open(outputFile + ".txt", "w+")
-    f.write('ToA \t ToA_tstart \t ToA_tend \t ToA_lenInt \t ToA_exposure \t Events \t ct_rate\n')
-
-    nbrToATOT = 0
+    f.write('ToA_tstart \t ToA_tend \t ToA_lenInt \t ToA_exposure \t Events \t ct_rate\n')
 
     for mm in range(0, nbrGTIs):
 
@@ -201,12 +200,11 @@ def timeintervalsToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.
             # See below for explanation
             expToA_final = np.sum(gtiList_fullToA_tmp[:, -1] - gtiList_fullToA_tmp[:, 0])
             f.write(
-                str('{}'.format(nbrToATOT)) + '\t' + str('{:0.9f}'.format(timeToA[0] / 86400 + MJDREF)) + '\t' + str(
-                    '{:0.9f}'.format(timeToA[-1] / 86400 + MJDREF)) + '\t' + str(
+                str('{:0.9f}'.format(timeToA[0])) + '\t' + str(
+                    '{:0.9f}'.format(timeToA[-1])) + '\t' + str(
                     '{:0.9f}'.format(timeToA[-1] - timeToA[0])) + '\t' + str(
-                    '{:0.9f}'.format(expToA_final)) + '\t' + str(len(timeToA)) + '\t' + str(
-                    '{:0.9f}'.format(len(timeToA) / expToA_final)) + '\n')
-            nbrToATOT += 1
+                    '{:0.9f}'.format(expToA_final * 86400)) + '\t' + str(len(timeToA)) + '\t' + str(
+                    '{:0.9f}'.format(len(timeToA) / (expToA_final * 86400))) + '\n')
             continue
 
         elif nbrToAs == 0:  # This may occur in rare occasions, e.g., one small GTI exists and 0 counts were registered
@@ -229,13 +227,11 @@ def timeintervalsToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.
                 gtiList_fullToA_tmp[-1, -1] = timeToA[-1]
                 # See below for explanation
                 expToA_final = np.sum(gtiList_fullToA_tmp[:, -1] - gtiList_fullToA_tmp[:, 0])
-                f.write(str('{}'.format(nbrToATOT)) + '\t' + str(
-                    '{:0.9f}'.format(timeToA[0] / 86400 + MJDREF)) + '\t' + str(
-                    '{:0.9f}'.format(timeToA[-1] / 86400 + MJDREF)) + '\t' + str(
+                f.write(str('{:0.9f}'.format(timeToA[0])) + '\t' + str(
+                    '{:0.9f}'.format(timeToA[-1])) + '\t' + str(
                     '{:0.9f}'.format(timeToA[-1] - timeToA[0])) + '\t' + str(
-                    '{:0.9f}'.format(expToA_final)) + '\t' + str(len(timeToA)) + '\t' + str(
-                    '{:0.9f}'.format(len(timeToA) / expToA_final)) + '\n')
-                nbrToATOT += 1
+                    '{:0.9f}'.format(expToA_final * 86400)) + '\t' + str(len(timeToA)) + '\t' + str(
+                    '{:0.9f}'.format(len(timeToA) / (expToA_final * 86400))) + '\n')
 
             else:
                 timeToA = timeToA_tmp[nn * totCtsEachToA:(nn + 1) * totCtsEachToA]
@@ -252,17 +248,22 @@ def timeintervalsToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.
                 gtiList_fullToA_tmp[-1, -1] = timeToA[-1]
                 # Sum all ToA GTI columns
                 expToA_final = np.sum(gtiList_fullToA_tmp[:, 1] - gtiList_fullToA_tmp[:, 0])
-                f.write(str('{}'.format(nbrToATOT)) + '\t' + str(
-                    '{:0.9f}'.format(timeToA[0] / 86400 + MJDREF)) + '\t' + str(
-                    '{:0.9f}'.format(timeToA[-1] / 86400 + MJDREF)) + '\t' + str(
+                f.write(str('{:0.9f}'.format(timeToA[0])) + '\t' + str(
+                    '{:0.9f}'.format(timeToA[-1])) + '\t' + str(
                     '{:0.9f}'.format(timeToA[-1] - timeToA[0])) + '\t' + str(
-                    '{:0.9f}'.format(expToA_final)) + '\t' + str(len(timeToA)) + '\t' + str(
-                    '{:0.9f}'.format(len(timeToA) / expToA_final)) + '\n')
-                nbrToATOT += 1
+                    '{:0.9f}'.format(expToA_final * 86400)) + '\t' + str(len(timeToA)) + '\t' + str(
+                    '{:0.9f}'.format(len(timeToA) / (expToA_final * 86400))) + '\n')
 
     f.close()
+
     # reading the text file we just created as pandas table (i.e., time intervals that define each ToA)
-    timInt_toas = pd.read_csv(outputFile + ".txt", sep=r'\s+', comment='#')
+    timInt_toas = pd.read_csv(outputFile + ".txt", sep=r'\s+')
+
+    # Row cleaning, i.e., merge TOA time intervals with counts < max_counts and waitime < max_wait
+    timInt_toas = merge_adjacent_intervals(timInt_toas, max_counts, max_wait)
+
+    # Total number of TOA - this should be final after cleaning
+    nbrToATOT = len(timInt_toas)
 
     # Correcting for NICER exposure according to number of detector on. valid for heasoft 6.32+
     if evtFileKeyWords["TELESCOPE"] == 'NICER':
@@ -277,12 +278,11 @@ def timeintervalsToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.
             _, FPMSEL_table_condensed = EF.read_fpmsel()
 
             for pp in range(nbrToATOT):
-                toa_start = (timInt_toas['ToA_tstart'][pp] - MJDREF) * 86400
-                toa_end = (timInt_toas['ToA_tend'][pp] - MJDREF) * 86400
+                toa_start = timInt_toas['ToA_tstart'][pp]
+                toa_end = timInt_toas['ToA_tend'][pp]
                 # filtering FPM selection table to within each ToA
                 mkf_toa_filtered = FPMSEL_table_condensed.loc[
                     ((FPMSEL_table_condensed['TIME'] >= toa_start) & (FPMSEL_table_condensed['TIME'] <= toa_end))]
-
                 # summing all detectors
                 nbr_sel_det = np.sum(mkf_toa_filtered['TOTFPMSEL'])
                 # total number of detectors if 52 were operating
@@ -292,9 +292,6 @@ def timeintervalsToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.
                 # Changing rate values with corrected ones
                 timInt_toas.at[pp, 'ct_rate'] *= correction_factor
 
-            # Dumping pandas dataFrame to text file
-            timInt_toas.to_csv(outputFile + ".txt", sep='\t', index=False)
-
         else:
             logger.info('\n No correction of exposure according to number of detectors_selected per ToA interval\n'
                         ' This should not be an issue assuming HEASOFT 6.31- was used to reduce NICER data\n')
@@ -303,7 +300,10 @@ def timeintervalsToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.
         logger.warning("\n If NuSTAR event files are merged for detectors FPMA and FPMB, then resulting count rates "
                        " will be a factor of 2 smaller.\n")
 
-    print('Total number of time intervals that define each ToA: {}'.format(nbrToATOT))
+    print('Total number of time intervals that define the TOAs: {}'.format(nbrToATOT))
+
+    # Dumping pandas dataFrame to same output text file with row cleaning and rate correction applied file
+    timInt_toas.to_csv(outputFile + ".txt", sep='\t', index=True, index_label='ToA')
 
     logger.info('\n End of timeintervalsToAs run'
                 '\n Total number of time intervals that define each ToA: {}'
@@ -312,6 +312,59 @@ def timeintervalsToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.
                 '\n {}.txt \n and the current {}.log file'.format(nbrToATOT, outputFile, outputFile, outputFile))
 
     return timInt_toas
+
+
+def merge_adjacent_intervals(
+        df: pd.DataFrame,
+        events_max: int,
+        dtstart_max_days: float,
+) -> pd.DataFrame:
+    """
+    Merge row jj into the previous row jj-1 if Events[jj] < events_max *and*
+    ToA_tstart[jj] - ToA_tstart[jj-1] < dtstart_max_days
+    :param df: interval TOAs with columns ['ToA_tstart','ToA_tend','ToA_lenInt','ToA_exposure','Events','ct_rate'], can be built with timeintervalsToAs()
+    :type df: pandas.DataFrame
+    :param events_max: if row events < events_max attempt merging if dtstart_max_days condition is also true
+    :type events_max: int
+    :param dtstart_max_days: if diff time (days) between consecutive rows < dtstart_max_days (days) merge if events_max condition is also true
+    :type dtstart_max_days: float
+    :return: dataframe of cleaned TOAs
+    :rtype: pandas.DataFrame
+    """
+    cols = ['ToA_tstart', 'ToA_tend', 'ToA_lenInt', 'ToA_exposure', 'Events', 'ct_rate']
+    if df.empty:
+        return pd.DataFrame(columns=cols)
+
+    out = []
+    cur = df.iloc[0].copy()  # current merged segment
+
+    for i in range(1, len(df)):
+        row = df.iloc[i]
+        cond_events = row['Events'] < events_max
+        cond_dtstart = (row['ToA_tstart'] - cur['ToA_tstart']) < dtstart_max_days
+
+        if cond_events and cond_dtstart:
+            # merge into current segment
+            new_tstart = cur['ToA_tstart']
+            new_tend = row['ToA_tend']
+            new_expo = cur['ToA_exposure'] + row['ToA_exposure']
+            new_events = cur['Events'] + row['Events']
+            new_len = new_tend - new_tstart
+            new_rate = new_events / new_expo if new_expo != 0 else float('nan')
+
+            cur['ToA_tstart'] = new_tstart
+            cur['ToA_tend'] = new_tend
+            cur['ToA_lenInt'] = new_len
+            cur['ToA_exposure'] = new_expo
+            cur['Events'] = new_events
+            cur['ct_rate'] = new_rate
+        else:
+            # finalize current segment and start a new one
+            out.append(cur[cols].copy())
+            cur = row.copy()
+
+    out.append(cur[cols].copy())
+    return pd.DataFrame(out, columns=cols).reset_index(drop=True)
 
 
 def main():
@@ -326,6 +379,12 @@ def main():
                         type=float, default=0.5)
     parser.add_argument("-eh", "--eneHigh", help="High energy filter in event file, default=10",
                         type=float, default=10)
+    parser.add_argument("-mc", "--max_counts",
+                        help="max counts < which merge time interval with previous ones, default = totCtsEachToA / 2",
+                        type=int, default=None)
+    parser.add_argument("-mw", "--max_wait",
+                        help="max wait < which merge time interval with previous ones, default = waitTimeCutoff",
+                        type=float, default=None)
     parser.add_argument("-of", "--outputFile",
                         help="name of .txt output GTI file that defines ToAs. Also, name of .log file (default = timIntToAs)",
                         type=str,
@@ -336,8 +395,8 @@ def main():
 
     args = parser.parse_args()
 
-    timeintervalsToAs(args.evtFile, args.totCtsEachToA, args.waitTimeCutoff, args.eneLow, args.eneHigh, args.outputFile,
-                      args.correxposure)
+    timeintervalsToAs(args.evtFile, args.totCtsEachToA, args.waitTimeCutoff, args.eneLow, args.eneHigh,
+                      args.max_counts, args.max_wait, args.outputFile, args.correxposure)
 
 
 if __name__ == '__main__':

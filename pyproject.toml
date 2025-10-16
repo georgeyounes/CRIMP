@@ -4,10 +4,18 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "crimp"
-version = "1.0.1"
+version = "2.0.0"
 dependencies = [
   "lmfit",
-  "plotly"
+  "plotly",
+  "numpy",
+  "matplotlib",
+  "pandas",
+  "scipy",
+  "astropy",
+  "corner",
+  "emcee",
+  "pyyaml"
 ]
 requires-python = ">=3.8"
 authors = [
@@ -21,7 +29,7 @@ readme = "README.md"
 license = {file = "LICENSE.txt"}
 keywords = ["pulsar", "magnetar", "timing", "toa", "pulse"]
 classifiers = [
-  "Development Status :: 3 - Alpha",
+  "Development Status :: 4 - Beta",
   "Programming Language :: Python"
 ]
 
@@ -32,4 +40,7 @@ measuretoas = "crimp.measureToAs:main"
 diagnosetoas = "crimp.diagnoseToAs:main"
 addphasecolumn = "crimp.eventfile:main"
 ephemintegerrotation = "crimp.ephemIntegerRotation:main"
-phshifttotimfile = "crimp.phshiftTotimfile:main"
+phshifttotimfile = "crimp.timfile:main"
+fittoas = "crimp.fit_toas:main"
+localephemerides = "crimp.get_local_ephem:main"
+pulseprofile_plots = "crimp.plotting_pp:main"

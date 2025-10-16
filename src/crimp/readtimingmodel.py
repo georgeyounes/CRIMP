@@ -1,333 +1,393 @@
-####################################################################################
-# readtimingmodel.py is a script that reads in a .par file. It is made to be as
-# compatible with tempo2 as possible. It reads in all glitches, frequency derivatives,
-# and any wave functions, which are typically used to align pulses in noisy systems,
-# i.e., magnetars and isolated neutron stars. Returns a dictionary 'timModParam' of
-# parameters. As a reminder this tool does not yet accomodate IFUNC, proper motion,
-# binary systems, or parallax. These may get included in later versions, likely in
-# that order.
-#####################################################################################
+"""
+readtimingmodel.py is a module that reads in a .par file. It is made to be as
+compatible with tempo2 and PINT as possible. It reads in all glitches, frequency
+derivatives, and any wave functions, which are typically used to align pulses in
+noisy systems, i.e., magnetars and isolated neutron stars. Returns a dictionary
+'timModParam' of parameter values, 'timModFlags' parameter flags (for fitting
+purposes), and a nested dictionary 'timModBoth' of both. As a reminder this tool
+does not yet accomodate IFUNC, proper motion, binary systems, or parallax. These
+*may* get included in later versions, likely in that order
+"""
 
 import sys
 import numpy as np
+import re
+from typing import Dict, Any, Tuple, Optional
 
 sys.dont_write_bytecode = True
 
 
 class ReadTimingModel:
     """
-        A class to read in a .par file into a dictionary
+    A class to read in a .par file into dictionaries.
 
-        Attributes
-        ----------
-        timMod : str
-            timing model, i.e., .par file
-
-        Methods
-        -------
-        readtaylorexpansion():
-            Read Taylor expansion related parameters (F0, F1, F2, etc.)
-        readglitches():
-            Read glitch related parameters
-        readwaves():
-            Read wave related parameters
-        """
+    Returns:
+      - readtaylorexpansion(): (values, flags, both)
+      - readglitches():        (values, flags, both)
+      - readwaves():           (values, flags, both)  # flags only for WAVE_OM
+      - readfulltimingmodel(): (timModParams, timModFlags, timModBoth),
+      - readstatistics(): (stats)  # dict of CHI2R, NTOA, and TRES
+    """
 
     def __init__(self, timMod: str):
-        """
-        Constructs all the necessary attributes for the ReadTimingModel object
-
-        Parameters
-        ----------
-            timMod : str
-                timing model, i.e., .par file
-        """
         self.timMod = timMod
 
+    # ---------- helpers ----------
+    @staticmethod
+    def _parse_value_and_flag(tokens) -> Tuple[np.float64, int]:
+        """
+        tokens: sequence of strings where tokens[0] is the numeric value,
+                tokens[1] (optional) is a 0/1 flag.
+        Returns (value, flag) with default flag=0 if absent or unparsable.
+        """
+        val = np.float64(tokens[0])
+        flag = 0
+        if len(tokens) > 1:
+            try:
+                fi = int(float(tokens[1]))
+                if fi in (0, 1):
+                    flag = fi
+            except (ValueError, OverflowError):
+                flag = 0
+        return val, flag
+
+    # ---------- Taylor expansion ----------
     def readtaylorexpansion(self):
         """
-        Reading taylor expansion parameters from .par file
-        :return: timModParamTE, dictionary of taylor expansion parameters
-        :rtype: dict
+        Read Taylor expansion parameters (PEPOCH, F0..F12).
+        Returns:
+          timModParamTE (values-only dict),
+          timModFlagsTE (flags-only dict),
+          timModBothTE  (nested dict with {"value", "flag"})
         """
-        data_file = open(self.timMod, 'r+')
+        keys = ["PEPOCH"] + [f"F{i}" for i in range(0, 13)]
+        values: Dict[str, Any] = {k: np.float64(0) for k in keys}
+        flags: Dict[str, int] = {k: 0 for k in keys}
+        both: Dict[str, Dict[str, Any]] = {k: {"value": np.float64(0), "flag": 0} for k in keys}
 
-        # Reading frequency and its derivatives
-        blockF1 = ""
-        blockF2 = ""
-        blockF3 = ""
-        blockF4 = ""
-        blockF5 = ""
-        blockF6 = ""
-        blockF7 = ""
-        blockF8 = ""
-        blockF9 = ""
-        blockF10 = ""
-        blockF11 = ""
-        blockF12 = ""
+        with open(self.timMod, "r") as data_file:
+            for raw in data_file:
+                li = raw.lstrip()
+                toks = li.split()
+                if not toks:
+                    continue
+                name = toks[0]
+                if name in keys and len(toks) >= 2:
+                    val, flg = self._parse_value_and_flag(toks[1:])
+                    values[name] = val
+                    flags[name] = flg
+                    both[name] = {"value": val, "flag": flg}
 
-        # Reading lines in the .par file
-        for line in data_file:
-            # Stripping lines vertically to create a list of characters
-            li = line.lstrip()
+        timModParamTE = values
+        return timModParamTE, flags, both
 
-            if li.startswith("F0"):
-                blockF0 = line
-                F0 = np.float64((" ".join(blockF0.split('F0')[1].split())).split(' ')[0])
-
-            elif li.startswith("PEPOCH"):
-                blockt0 = line
-                PEPOCH = np.float64((" ".join(blockt0.split('PEPOCH')[1].split())).split(' ')[0])
-
-            elif li.startswith(("F1 ", "F1\t")):  # Necessary to be more specific to distinguish it from F10+
-                blockF1 = line
-
-            elif li.startswith("F2"):
-                blockF2 = line
-
-            elif li.startswith("F3"):
-                blockF3 = line
-
-            elif li.startswith("F4"):
-                blockF4 = line
-
-            elif li.startswith("F5"):
-                blockF5 = line
-
-            elif li.startswith("F6"):
-                blockF6 = line
-
-            elif li.startswith("F7"):
-                blockF7 = line
-
-            elif li.startswith("F8"):
-                blockF8 = line
-
-            elif li.startswith("F9"):
-                blockF9 = line
-
-            elif li.startswith("F10"):
-                blockF10 = line
-
-            elif li.startswith("F11"):
-                blockF11 = line
-
-            elif li.startswith("F12"):
-                blockF12 = line
-
-        # These parameters are not mandatory, and if they are not in the .par file, set to 0
-        if not blockF1:
-            F1 = 0
-        else:
-            F1 = np.float64((" ".join(blockF1.split('F1')[1].split())).split(' ')[0])
-
-        if not blockF2:
-            F2 = 0
-        else:
-            F2 = np.float64((" ".join(blockF2.split('F2')[1].split())).split(' ')[0])
-
-        if not blockF3:
-            F3 = 0
-        else:
-            F3 = np.float64((" ".join(blockF3.split('F3')[1].split())).split(' ')[0])
-
-        if not blockF4:
-            F4 = 0
-        else:
-            F4 = np.float64((" ".join(blockF4.split('F4')[1].split())).split(' ')[0])
-
-        if not blockF5:
-            F5 = 0
-        else:
-            F5 = np.float64((" ".join(blockF5.split('F5')[1].split())).split(' ')[0])
-
-        if not blockF6:
-            F6 = 0
-        else:
-            F6 = np.float64((" ".join(blockF6.split('F6')[1].split())).split(' ')[0])
-
-        if not blockF7:
-            F7 = 0
-        else:
-            F7 = np.float64((" ".join(blockF7.split('F7')[1].split())).split(' ')[0])
-
-        if not blockF8:
-            F8 = 0
-        else:
-            F8 = np.float64((" ".join(blockF8.split('F8')[1].split())).split(' ')[0])
-
-        if not blockF9:
-            F9 = 0
-        else:
-            F9 = np.float64((" ".join(blockF9.split('F9')[1].split())).split(' ')[0])
-
-        if not blockF10:
-            F10 = 0
-        else:
-            F10 = np.float64((" ".join(blockF10.split('F10')[1].split())).split(' ')[0])
-
-        if not blockF11:
-            F11 = 0
-        else:
-            F11 = np.float64((" ".join(blockF11.split('F11')[1].split())).split(' ')[0])
-
-        if not blockF12:
-            F12 = 0
-        else:
-            F12 = np.float64((" ".join(blockF12.split('F12')[1].split())).split(' ')[0])
-
-        timModParamTE = {'PEPOCH': PEPOCH, 'F0': F0, 'F1': F1, 'F2': F2, 'F3': F3, 'F4': F4,
-                         'F5': F5, 'F6': F6, 'F7': F7, 'F8': F8, 'F9': F9,
-                         'F10': F10, 'F11': F11, 'F12': F12}
-
-        return timModParamTE
-
+    # ---------- Glitches ----------
     def readglitches(self):
         """
-        Reading glitch parameters from .par file
-        :return: timModParamGlitches, dictionary of glitch parameters
-        :rtype: dict
+        Read glitch parameters.
+        Returns:
+          timModParamGlitches (values-only dict),
+          timModFlagsGlitches (flags-only dict),
+          timModBothGlitches  (nested dict with {"value", "flag"})
         """
-        data_file = open(self.timMod, 'r+')
+        # first, find glitch ids
+        glitch_ids = []
+        with open(self.timMod, "r") as f:
+            for raw in f:
+                li = raw.lstrip()
+                if li.startswith("GLEP_"):
+                    m = re.match(r"GLEP_(\S+)", li)
+                    if m:
+                        glitch_ids.append(m.group(1))
 
-        nmbrOfGlitches = np.array([])
-        for line in data_file:
-            # Stripping lines vertically to create a list of characters
-            li = line.lstrip()
-            # Glitch parameters
-            if li.startswith("GLEP"):
-                blockglep = line
-                nmbrOfGlitches = np.append(nmbrOfGlitches, blockglep.split('_')[1].split(' ')[0])
+        timModParamGlitches: Dict[str, Any] = {}
+        timModFlagsGlitches: Dict[str, int] = {}
+        timModBothGlitches: Dict[str, Dict[str, Any]] = {}
 
-        # Check if there are glitches
-        timModParamGlitches = {}  # initialize timModParamGlitches
-        if not nmbrOfGlitches.size:
-            return timModParamGlitches
+        if not glitch_ids:
+            return timModParamGlitches, timModFlagsGlitches, timModBothGlitches
 
-        # We now loop over all glitches and add them to the dictionary
-        for jj in nmbrOfGlitches:
-            data_file.seek(0)
-            # Glitch parameters
-            # no need to define glep (blockglep), glph (blockglph), and glf0 (blockglf0)
-            # These are mandatory for any glitch
-            blockglf1 = ""
-            blockglf2 = ""
-            blockglf0d = ""
-            blockgltd = ""
+        # defaults
+        bases = ["GLEP_", "GLPH_", "GLF0_", "GLF1_", "GLF2_", "GLF0D_", "GLTD_"]
+        default_vals = {
+            "GLEP_": np.float64(0),
+            "GLPH_": np.float64(0),
+            "GLF0_": np.float64(0),
+            "GLF1_": np.float64(0),
+            "GLF2_": np.float64(0),
+            "GLF0D_": np.float64(0),
+            "GLTD_": np.float64(1),  # to avoid a divide by 0
+        }
 
-            for line in data_file:
-                li = line.lstrip()
-                # Glitch parameters
-                if li.startswith(("GLEP_" + jj + " ", "GLEP_" + jj + "\t")):
-                    blockglep = line
-                    glep = np.float64((" ".join(blockglep.split("GLEP_" + jj)[1].split())).split(' ')[0])
+        # initialize
+        for jj in glitch_ids:
+            for base in bases:
+                k = f"{base}{jj}"
+                timModParamGlitches[k] = default_vals[base]
+                timModFlagsGlitches[k] = 0
+                timModBothGlitches[k] = {"value": default_vals[base], "flag": 0}
 
-                elif li.startswith(("GLPH_" + jj + " ", "GLPH_" + jj + "\t")):
-                    blockglph = line
-                    glph = np.float64((" ".join(blockglph.split("GLPH_" + jj)[1].split())).split(' ')[0])
+        # fill from file
+        with open(self.timMod, "r") as f:
+            for raw in f:
+                li = raw.lstrip()
+                toks = li.split()
+                if not toks:
+                    continue
+                name = toks[0]
+                # check any of our glitch keys
+                for jj in glitch_ids:
+                    for base in bases:
+                        key = f"{base}{jj}"
+                        if name == key and len(toks) >= 2:
+                            val, flg = self._parse_value_and_flag(toks[1:])
+                            timModParamGlitches[key] = val
+                            timModFlagsGlitches[key] = flg
+                            timModBothGlitches[key] = {"value": val, "flag": flg}
 
-                elif li.startswith(("GLF0_" + jj + " ", "GLF0_" + jj + "\t")):
-                    blockglf0 = line
-                    glf0 = np.float64((" ".join(blockglf0.split("GLF0_" + jj)[1].split())).split(' ')[0])
+        return timModParamGlitches, timModFlagsGlitches, timModBothGlitches
 
-                elif li.startswith(("GLF1_" + jj + " ", "GLF1_" + jj + "\t")):
-                    blockglf1 = line
-                    glf1 = np.float64((" ".join(blockglf1.split("GLF1_" + jj)[1].split())).split(' ')[0])
-
-                elif li.startswith(("GLF2_" + jj + " ", "GLF2_" + jj + "\t")):
-                    blockglf2 = line
-                    glf2 = np.float64((" ".join(blockglf2.split("GLF2_" + jj)[1].split())).split(' ')[0])
-
-                elif li.startswith(("GLF0D_" + jj + " ", "GLF0D_" + jj + "\t")):
-                    blockglf0d = line
-                    glf0d = np.float64((" ".join(blockglf0d.split("GLF0D_" + jj)[1].split())).split(' ')[0])
-
-                elif li.startswith(("GLTD_" + jj + " ", "GLTD_" + jj + "\t")):
-                    blockgltd = line
-                    gltd = np.float64((" ".join(blockgltd.split("GLTD_" + jj)[1].split())).split(' ')[0])
-
-                # Setting to 0 glitch parameters that are not mandatory, and are not in the glitch model in the .par file
-                if not blockglf1:
-                    glf1 = 0
-
-                if not blockglf2:
-                    glf2 = 0
-
-                if not blockglf0d:
-                    glf0d = 0
-
-                if not blockgltd:
-                    gltd = 1  # to avoid a devide by 0
-
-            timModParamGlitches["GLEP_" + jj] = glep
-            timModParamGlitches["GLPH_" + jj] = glph
-            timModParamGlitches["GLF0_" + jj] = glf0
-            timModParamGlitches["GLF1_" + jj] = glf1
-            timModParamGlitches["GLF2_" + jj] = glf2
-            timModParamGlitches["GLF0D_" + jj] = glf0d
-            timModParamGlitches["GLTD_" + jj] = gltd
-
-        return timModParamGlitches
-
+    # ---------- Waves ----------
     def readwaves(self):
         """
-        Reading wave parameters from .par file
-        :return: timModParamWaves, dictionary of glitch parameters
-        :rtype: dict
+        Read wave parameters.
+        Flags are parsed only for WAVE_OM
+        Returns:
+          timModParamWaves (values-only dict),
+          timModFlagsWaves (flags-only dict; only key present is WAVE_OM if found),
+          timModBothWaves  (nested dict; WAVE_OM has {"value","flag"}, others have flag=None)
         """
-        data_file = open(self.timMod, 'r+')
+        timModParamWaves: Dict[str, Any] = {}
+        timModFlagsWaves: Dict[str, int] = {}
+        timModBothWaves: Dict[str, Dict[str, Any]] = {}
 
-        waveHarms = np.array([])
-        for line in data_file:
-            # Stripping lines vertically to create a list of characters
-            li = line.lstrip()
-            # Wave parameters
-            if li.startswith("WAVE"):
-                waveHarms = np.append(waveHarms, line.split('WAVE')[1].split(' ')[0])
+        # Collect harmonics
+        wave_harmonics = set()
+        with open(self.timMod, "r") as f:
+            for raw in f:
+                li = raw.lstrip()
+                toks = li.split()
+                if not toks:
+                    continue
+                if toks[0].startswith("WAVE"):
+                    m = re.match(r"WAVE(\d+)$", toks[0])
+                    if m:
+                        wave_harmonics.add(int(m.group(1)))
 
-        # Check if there are waves
-        timModParamWaves = {}  # initialize timModParamWaves
-        if waveHarms.size:
-            data_file.seek(0)
-        else:
-            return timModParamWaves
+        # pass to read WAVEEPOCH and WAVE_OM
+        with open(self.timMod, "r") as f:
+            for raw in f:
+                li = raw.lstrip()
+                toks = li.split()
+                if not toks:
+                    continue
+                if toks[0] == "WAVEEPOCH" and len(toks) >= 2:
+                    val = np.float64(toks[1])
+                    timModParamWaves["WAVEEPOCH"] = val
+                    timModBothWaves["WAVEEPOCH"] = {"value": val, "flag": None}
+                elif toks[0] == "WAVE_OM" and len(toks) >= 2:
+                    val, flg = self._parse_value_and_flag(toks[1:])
+                    timModParamWaves["WAVE_OM"] = val
+                    timModFlagsWaves["WAVE_OM"] = flg
+                    timModBothWaves["WAVE_OM"] = {"value": val, "flag": flg}
 
-        for line in data_file:
-            li = line.lstrip()
-            # Wave parameters
-            if li.startswith("WAVEEPOCH "):
-                waveEpoch = np.float64((" ".join(line.split("WAVEEPOCH ")[1].split())).split(' ')[0])
+        # harmonics (value-only A/B pair, no flags)
+        for j in sorted(wave_harmonics):
+            with open(self.timMod, "r") as f:
+                for raw in f:
+                    li = raw.lstrip()
+                    if li.startswith(f"WAVE{j} ") or li.startswith(f"WAVE{j}\t"):
+                        toks = li.split()
+                        if len(toks) >= 3:
+                            A = np.float64(toks[1])
+                            B = np.float64(toks[2])
+                            timModParamWaves[f"WAVE{j}"] = {"A": A, "B": B}
+                            timModBothWaves[f"WAVE{j}"] = {"value": {"A": A, "B": B}, "flag": None}
+                        break
 
-            elif li.startswith("WAVE_OM "):
-                waveFreq = np.float64((" ".join(line.split("WAVE_OM ")[1].split())).split(' ')[0])
+        return timModParamWaves, timModFlagsWaves, timModBothWaves
 
-        timModParamWaves["WAVEEPOCH"] = waveEpoch
-        timModParamWaves["WAVE_OM"] = waveFreq
-
-        # Now we loop through the rest of the wave parameters, i.e., the harmonics
-        for jj in range(1, len(waveHarms) - 1):
-            data_file.seek(0)
-
-            for line in data_file:
-                li = line.lstrip()
-                # Wave parameters
-                if li.startswith(("WAVE" + str(jj) + " ", "WAVE" + str(jj) + "\t")):
-                    waveHarmA = np.float64((" ".join(line.split("WAVE" + str(jj))[1].split())).split(' ')[0])
-                    waveHarmB = np.float64((" ".join(line.split("WAVE" + str(jj))[1].split())).split(' ')[1])
-                    waveHarmAmp = {"A": waveHarmA, "B": waveHarmB}
-                    timModParamWaves["WAVE" + str(jj)] = waveHarmAmp
-
-        return timModParamWaves
-
+    # ---------- Full model ----------
     def readfulltimingmodel(self):
         """
-        Read full .par timing model into a dictionary
-        :return: timModParams, dictionary of timing parameters
-        :rtype: dict
-        """
-        timModParamTE = ReadTimingModel.readtaylorexpansion(self)
-        timModParamGlitches = ReadTimingModel.readglitches(self)
-        timModParamwaves = ReadTimingModel.readwaves(self)
-        timModParams = {**timModParamTE, **timModParamGlitches, **timModParamwaves}
+        Read full .par timing model.
 
-        return timModParams
+        Returns (in order):
+          timModParams : dict  # values only,
+          timModFlags  : dict  # the 0/1 flags for the same keys,
+          timModBoth   : dict  # nested {"value": ..., "flag": ...}
+        """
+        te_vals, te_flags, te_both = self.readtaylorexpansion()
+        gl_vals, gl_flags, gl_both = self.readglitches()
+        wv_vals, wv_flags, wv_both = self.readwaves()
+
+        timModParams = {**te_vals, **gl_vals, **wv_vals}
+        timModFlags = {**te_flags, **gl_flags, **wv_flags}
+        timModBoth = {**te_both, **gl_both, **wv_both}
+
+        return timModParams, timModFlags, timModBoth
+
+    # ---------- Statistics ----------
+    def readstatistics(self):
+        """
+        Read CHI2R, NTOA, and TRES values from the .par file.
+        Returns:
+            dict (with None for missing values)
+        """
+        stats = {"CHI2R": None, "CHI2R_DOF": None, "NTOA": None, "TRES": None}
+
+        with open(self.timMod, "r") as f:
+            for raw in f:
+                toks = raw.strip().split()
+                if not toks:
+                    continue
+                key = toks[0].upper()
+                if key == "CHI2R":
+                    try:
+                        stats["CHI2R"] = float(toks[1])
+                        if len(toks) > 2:
+                            stats["CHI2R_DOF"] = int(toks[2])
+                    except (ValueError, IndexError):
+                        pass
+                elif key == "NTOA":
+                    try:
+                        stats["NTOA"] = int(toks[1])
+                    except (ValueError, IndexError):
+                        pass
+                elif key == "TRES":
+                    try:
+                        stats["TRES"] = float(toks[1])
+                    except (ValueError, IndexError):
+                        pass
+        return stats
+
+
+def patch_par_values(
+    in_path: str,
+    out_path: str,
+    *,
+    new_values: Dict[str, float],
+    float_fmt: str = ".15g",
+    uncertainties: Optional[Dict[str, float]] = None,
+    uncertainty_fmt: str = ".6g",
+) -> None:
+    """
+    Write new .par file with new_values (and uncertainties) for certain parameters.
+    If an uncertainty already exists after a flag, it will be REPLACED (not duplicated).
+    Uncertainties are only written when a flag is present.
+    """
+
+    # KEY  <ws> VALUE [<ws> FLAG] [<ws> UNCERTAINTY] <tail>
+    # Capture optional FLAG and optional UNCERTAINTY separately.
+    line_re = re.compile(
+        r"""
+        ^([A-Za-z][A-Za-z0-9_]*)      # key
+        (\s+)                         # whitespace before value
+        (\S+)                         # value
+        (?:                           # optional flag group
+            (\s+)                     #   whitespace before flag
+            ([01])                    #   flag
+        )?
+        (?:                           # optional uncertainty group (a single numeric token)
+            \s+
+            ([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)
+        )?
+        (.*)$                         # tail (comments or anything else after)
+        """,
+        re.VERBOSE,
+    )
+
+    with open(in_path, "r") as f:
+        lines = f.readlines()
+
+    out_lines = []
+    for line in lines:
+        core = line.rstrip("\n")
+        m = line_re.match(core)
+        if not m:
+            out_lines.append(line)
+            continue
+
+        key, ws_val, old_val, ws_flag, flag, old_unc, tail = m.groups()
+
+        # If this key isn't being updated, write the line back unchanged
+        if key not in new_values:
+            out_lines.append(line)
+            continue
+
+        new_val = format(float(new_values[key]), float_fmt)
+
+        # No flag: just replace the value; do not add/modify uncertainty
+        if flag is None:
+            new_line = f"{key}{ws_val}{new_val}{tail}"
+            out_lines.append(new_line + "\n")
+            continue
+
+        # With flag: decide which uncertainty to write (if any)
+        if uncertainties is not None and key in uncertainties:
+            # Replace any existing uncertainty with the new one
+            unc_str = format(float(uncertainties[key]), uncertainty_fmt)
+            new_line = f"{key}{ws_val}{new_val}{ws_flag}{flag} {unc_str}{tail}"
+        else:
+            # Keep existing uncertainty if it was present; otherwise write none
+            if old_unc is not None:
+                new_line = f"{key}{ws_val}{new_val}{ws_flag}{flag} {old_unc}{tail}"
+            else:
+                new_line = f"{key}{ws_val}{new_val}{ws_flag}{flag}{tail}"
+
+        out_lines.append(new_line + "\n")
+
+    with open(out_path, "w") as f:
+        f.writelines(out_lines)
+
+
+def patch_statistics(in_path: str, out_path: str, new_stats: Dict[str, float]) -> None:
+    """
+    Update CHI2R, NTOA, and TRES lines in a .par file using new_stats dict.
+    Missing keys in new_stats are ignored. Missing lines are appended at the end.
+    """
+    with open(in_path, "r") as f:
+        lines = f.readlines()
+
+    out_lines = []
+    found = {"CHI2R": False, "NTOA": False, "TRES": False}
+
+    for line in lines:
+        toks = line.strip().split()
+        if not toks:
+            out_lines.append(line)
+            continue
+        key = toks[0].upper()
+
+        if key == "CHI2R" and "CHI2R" in new_stats:
+            chi2_str = f"{new_stats['CHI2R']}"
+            if "CHI2R_DOF" in new_stats and new_stats["CHI2R_DOF"] is not None:
+                out_lines.append(f"CHI2R          {chi2_str} {int(new_stats['CHI2R_DOF'])}\n")
+            else:
+                out_lines.append(f"CHI2R          {chi2_str}\n")
+            found["CHI2R"] = True
+        elif key == "NTOA" and "NTOA" in new_stats:
+            out_lines.append(f"NTOA           {int(new_stats['NTOA'])}\n")
+            found["NTOA"] = True
+        elif key == "TRES" and "TRES" in new_stats:
+            out_lines.append(f"TRES           {new_stats['TRES']}\n")
+            found["TRES"] = True
+        else:
+            out_lines.append(line)
+
+    # append missing ones
+    for key in ["CHI2R", "NTOA", "TRES"]:
+        if not found[key] and key in new_stats and new_stats[key] is not None:
+            if key == "CHI2R":
+                chi2_str = f"{new_stats['CHI2R']}"
+                if "CHI2R_DOF" in new_stats and new_stats["CHI2R_DOF"] is not None:
+                    out_lines.append(f"\nCHI2R          {chi2_str} {int(new_stats['CHI2R_DOF'])}")
+                else:
+                    out_lines.append(f"\nCHI2R          {chi2_str}\n")
+            elif key == "NTOA":
+                out_lines.append(f"\nNTOA           {int(new_stats['NTOA'])}")
+            elif key == "TRES":
+                out_lines.append(f"\nTRES           {new_stats['TRES']}")
+
+    with open(out_path, "w") as f:
+        f.writelines(out_lines)

@@ -1,18 +1,10 @@
-#################################################################
-# A simple script to derive the ephemerides (only frequency at
-# the moment) at a given MJD based on a timing solution. Currently,
-# this script takes into account taylor expansion of the phase
-# evolution and a random number of glitches - binary motion is
-# not included
-# 
-# Input:
-# 1- Tmjd: time at which to derive frequency
-# 2- timeMod: timing model (.par file)
-#
-# Return:
-# 1- ephemerides: dictionary of Tmjd and corresponding rotational
-# frequency
-#################################################################
+"""
+A simple script to derive the ephemerides (only frequency at
+the moment) at a given MJD based on a timing solution. Currently,
+this script takes into account taylor expansion of the phase
+evolution and a random number of glitches - binary motion is
+not included
+"""
 
 import sys
 import numpy as np
@@ -36,7 +28,7 @@ def ephemTmjd(Tmjd, timMod):
     :return: ephemerides
     :rtype: dict
     """
-    timModParam = ReadTimingModel(timMod).readfulltimingmodel()
+    timModParam = ReadTimingModel(timMod).readfulltimingmodel()[0]
     t0mjd = timModParam["PEPOCH"]
 
     #############################

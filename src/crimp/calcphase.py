@@ -1,14 +1,14 @@
-####################################################################################
-# calcphase.py is a module that calculates phases of an array of TIME (MJD) instances
-# using a .par file. It reads the .par file with the readTimMod scripts. As a reminder,
-# this script can manage glitches, wave functions and the frequency and its derivatives
-# up to F12; it does not accomodate IFUNC, proper motion, binary systems, or parallax.
-# These will be implemented in future versions, likely in that respective order
-####################################################################################
+"""
+calcphase.py is a module that calculates phases of an array of TIME (MJD) instances
+using a .par file. It reads the .par file with the readTimMod scripts. As a reminder,
+this script can manage glitches, wave functions and the frequency and its derivatives
+up to F12; it does not accomodate IFUNC, proper motion, binary systems, or parallax.
+These *may* be implemented in future versions, likely in that respective order
+"""
 
 import sys
 import numpy as np
-
+import os
 from math import factorial
 
 # Custom modules
@@ -17,7 +17,6 @@ from crimp.readtimingmodel import ReadTimingModel
 sys.dont_write_bytecode = True
 
 
-# Script that calculates pulsar rotational phases using a time array and a .par timing model
 class Phases:
     """
         A class to calcualte the phases of a time array
@@ -27,7 +26,7 @@ class Phases:
         timeMJD : float
             time array in modified julian day
         timMod : str
-            timing model, i.e., .par file
+            timing model, i.e., .par file or a dictionary
 
         Methods
         -------
@@ -48,74 +47,96 @@ class Phases:
             timeMJD : float
                 time array in modified julian day
             timMod : str
-                timing model, i.e., .par file
+                timing model, i.e., .par file or a dictionary
         """
-        self.timeMJD = timeMJD
-        self.timMod = timMod
-        self.timModParam = ReadTimingModel(timMod).readfulltimingmodel()
+        # original shape to restore later
+        self._orig_shape = np.shape(timeMJD)
+        # work internally with a flat 1-D float array
+        self.timeMJD = np.atleast_1d(timeMJD).astype(float).reshape(-1)
+        # accept either .par path or dict
+        if isinstance(timMod, dict):
+            self.timModParam = self._normalize_timdict(timMod)
+        elif isinstance(timMod, (str, os.PathLike)):
+            self.timModParam = ReadTimingModel(str(timMod)).readfulltimingmodel()[0]
+        else:
+            raise TypeError("timMod must be a dict or path to a .par file")
+
+    @staticmethod
+    def _normalize_timdict(d):
+        """
+        Make sure the dict has the expected keys and numeric types
+        """
+        out = {}
+        for k, v in d.items():
+            # try to coerce simple numeric values to float
+            if isinstance(v, (int, float, np.floating)):
+                out[k] = float(v)
+            else:
+                # keep sub-dicts (e.g., WAVE1: {'A':..., 'B':...}) as-is
+                out[k] = v
+        return out
 
     def taylorexpansion(self):
         """
         Calculates phases from the taylor expansion of the phase evolution
 
         :return: phases_te
-        :rtype: float
+        :rtype: numpy.ndarray
         """
         t0mjd = self.timModParam["PEPOCH"]
-        phases_te = 0
+        phases_te = 0.0
+        dt = (self.timeMJD - t0mjd) * 86400.0
         for nn in range(1, 14):
-            phases_te += (1 / factorial(nn)) * self.timModParam["F" + str(nn - 1)] * (
-                    (self.timeMJD - t0mjd) * 86400) ** nn
-
-        return phases_te
+            phases_te += (1.0 / factorial(nn)) * self.timModParam[f"F{nn - 1}"] * (dt ** nn)
+        return phases_te  # 1-D array
 
     def glitches(self):
         """
         Calculates phases from glitches in spin evolution
 
         :return: phases_gl_all
-        :rtype: float
+        :rtype: numpy.ndarray
         """
-        nbrGlitches = len([gg for glKey, gg in self.timModParam.items() if glKey.startswith('GLEP_')])
-        phases_gl_all = np.zeros(len(self.timeMJD))
+        nbrGlitches = sum(1 for k in self.timModParam if k.startswith('GLEP_'))
+        phases_gl_all = np.zeros(self.timeMJD.size, dtype=float)
+        time = self.timeMJD  # alias
 
         for jj in range(1, nbrGlitches + 1):
+            glep = float(self.timModParam[f"GLEP_{jj}"])
+            mask = (time >= glep)  # 1-D boolean mask
+            if not np.any(mask):
+                continue
 
-            # Epoch of glitch
-            glep = self.timModParam["GLEP_" + str(jj)]
+            # safe .get with zeros if some terms are absent
+            glph = float(self.timModParam.get(f"GLPH_{jj}", 0.0))
+            glf0 = float(self.timModParam.get(f"GLF0_{jj}", 0.0))
+            glf1 = float(self.timModParam.get(f"GLF1_{jj}", 0.0))
+            glf2 = float(self.timModParam.get(f"GLF2_{jj}", 0.0))
+            glf0d = float(self.timModParam.get(f"GLF0D_{jj}", 0.0))
+            gltd = float(self.timModParam.get(f"GLTD_{jj}", 0.0))
 
-            # Filter times after the glitch
-            mask = self.timeMJD >= glep
-            timesAfterGlitch = self.timeMJD[mask]
+            t_after = time[mask]
+            dt_sec = (t_after - glep) * 86400.0
+            # avoid division by zero in exp term
+            exp_term = 0.0 if gltd == 0.0 else (gltd * 86400.0) * (1.0 - np.exp(-(t_after - glep) / gltd))
 
-            # If any timeMJD is after the glitch,
-            # calculate phase jumps according to the glitch model
-            if timesAfterGlitch.size > 0:
-                glph = self.timModParam["GLPH_" + str(jj)]
-                glf0 = self.timModParam["GLF0_" + str(jj)]
-                glf1 = self.timModParam["GLF1_" + str(jj)]
-                glf2 = self.timModParam["GLF2_" + str(jj)]
-                glf0d = self.timModParam["GLF0D_" + str(jj)]
-                gltd = self.timModParam["GLTD_" + str(jj)]
+            phases_gl = (
+                    glph
+                    + glf0 * dt_sec
+                    + 0.5 * glf1 * dt_sec ** 2
+                    + (1.0 / 6.0) * glf2 * dt_sec ** 3
+                    + glf0d * exp_term
+            )
+            phases_gl_all[mask] += phases_gl
 
-                dt_sec = (timesAfterGlitch - glep) * 86400
-                phases_gl = (
-                        glph +
-                        glf0 * dt_sec +
-                        0.5 * glf1 * dt_sec ** 2 +
-                        (1 / 6) * glf2 * dt_sec ** 3 +
-                        glf0d * (gltd * 86400) * (1 - np.exp(-(timesAfterGlitch - glep) / gltd))
-                )
-                phases_gl_all[mask] += phases_gl
-
-        return phases_gl_all
+        return phases_gl_all  # 1-D array
 
     def waves(self):
         """
         Calculates phases from "waves", used to whiten noise and align ToAs
 
         :return: phases_waves_all
-        :rtype: float
+        :rtype: numpy.ndarray
         """
         nbrWaves = np.array([ww for wvKey, ww in self.timModParam.items() if wvKey.startswith('WAVE')])
         phases_waves_all = 0  # initializing the noise in phase due to all waves combined
@@ -125,33 +146,37 @@ class Phases:
             waveFreq = self.timModParam["WAVE_OM"]
 
             for jj in range(1, len(nbrWaves) - 1):
-                phases_waves_all += ((self.timModParam["WAVE" + str(jj)]["A"] * np.sin(
-                    jj * waveFreq * (self.timeMJD - waveEpoch))) +
-                                     (self.timModParam["WAVE" + str(jj)]["B"] * np.cos(
-                                         jj * waveFreq * (self.timeMJD - waveEpoch))))
+                A = self.timModParam[f"WAVE{jj}"]["A"]
+                B = self.timModParam[f"WAVE{jj}"]["B"]
+                arg = jj * waveFreq * (self.timeMJD - waveEpoch)
+                phases_waves_all += (A * np.sin(arg)) + (B * np.cos(arg))
 
         # Normalizing by frequency to create residuals in seconds (per tempo2)
-        return np.multiply(phases_waves_all, self.timModParam['F0'])
+        return phases_waves_all * self.timModParam['F0']  # 1-D array (or scalar broadcast)
 
 
 def calcphase(timeMJD, timMod):
     """
     Function that adds all above (taylor expansion, glitches, waves) phase calculations
-
     :param timeMJD: time array in modified julian day
     :type timeMJD: float
-    :param timMod: timing model, i.e., .par file
+    :param timMod: timing model, i.e., .par file or a dictionary
     :type timMod: str
     returns
             - totalphases (float): phases (normalised by 2pi)
             - cycleFoldedPhases (float): cycle folded phases [0,1)
     """
     phases = Phases(timeMJD, timMod)
-    phases_te = phases.taylorexpansion()
-    phases_gl_all = phases.glitches()
-    phases_waves_all = phases.waves()
+    te = phases.taylorexpansion()
+    gl = phases.glitches()
+    wav = phases.waves()
 
-    totalphases = phases_te + phases_gl_all + phases_waves_all
-    cycleFoldedPhases = totalphases - np.floor(totalphases)
+    total = te + gl + wav  # vectorized 1-D
+    folded = total - np.floor(total)
 
-    return totalphases, cycleFoldedPhases
+    # reshape back to original input shape; if scalar, return scalars
+    orig_shape = phases._orig_shape
+    if orig_shape == ():  # scalar input like np.float64
+        return total.item(), folded.item()
+    else:
+        return total.reshape(orig_shape), folded.reshape(orig_shape)

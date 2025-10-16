@@ -3,6 +3,8 @@ eventfile.py is a module to perform simple operations on X-ray event files,
 reading useful header words, filter for energy, add a phase column, etc. X-ray
 instruments that are accepted are Swift/XRT, NICER, XMM/EPIC, IXPE, Fermi/GBM,
 NuSTAR
+
+The method addPhaseColEF() can be called via command line as "addphasecolumn"
 """
 
 import sys
@@ -33,20 +35,26 @@ logger.setLevel(logging.DEBUG)
 
 class EvtFileOps:
     """
-        A class to operate on a fits event file
+    A class to operate on a fits event file
 
-        Attributes
-        ----------
-        evtFile : str
-            name of the fits event file
+    Attributes
+    ----------
+    evtFile : str
+        name of the fits event file
+    time_energy_df : pd.DataFrame
+        TIME and PI dataframe
 
-        Methods
-        -------
-        readEF(): reads essential keywords from an event file
-        readGTI(): reads GTI table from an event
-        filtEneEF(): filters the event list accoring to energy (in keV)
-        addPhaseColEF(): adds phase column to event file according to timing model (.par file)
-        """
+    Methods
+    -------
+    open_fits(): opens the fits and returns an HDUList
+    readEF(): reads essential keywords from an event file
+    read_fpmsel(): reads FPMSEL table (only valid for NICER)
+    readGTI(): reads GTI table from an event
+    build_time_energy_df(): builds ['TIME', 'PI'] dataframe from EVENT table (creates time_energy_df attribute)
+    filtenergy(eneLow: float, eneHigh: float): filter build_time_energy_df for energy range
+    filttime(self, t_start: float | None = None, t_end: float | None = None): filter build_time_energy_df for time range
+    addPhaseColEF(): adds phase column to event file according to timing model (.par file)
+    """
 
     def __init__(self, evtFile: str):
         """
@@ -56,6 +64,12 @@ class EvtFileOps:
         :type evtFile: str
         """
         self.evtFile = evtFile
+        self.time_energy_df = None
+
+    #################################################################
+    def open_fits(self):
+        hdulist = fits.open(self.evtFile)
+        return hdulist
 
     #################################################################
     def readEF(self):  # Reading fits event file from X-ray satellites
@@ -65,7 +79,7 @@ class EvtFileOps:
         :rtype: dict
         """
         # Opening the fits file
-        hdulist = fits.open(self.evtFile)
+        hdulist = self.open_fits()
 
         # Reading some essential keywords
         TELESCOPE = hdulist['EVENTS'].header['TELESCOP']
@@ -78,37 +92,37 @@ class EvtFileOps:
         # Some keywords are mission specific - check for them and move on
         evt_hd = hdulist['EVENTS'].header
 
-        if not 'TIMEZERO' in evt_hd:
+        if 'TIMEZERO' not in evt_hd:
             TIMEZERO = None
         else:
             TIMEZERO = hdulist['EVENTS'].header['TIMEZERO']
 
-        if not 'OBS_ID' in evt_hd:
+        if 'OBS_ID' not in evt_hd:
             OBS_ID = None
         else:
             OBS_ID = hdulist['EVENTS'].header['OBS_ID']
 
-        if not 'LIVETIME' in evt_hd:
+        if 'LIVETIME' not in evt_hd:
             LIVETIME = None
         else:
             LIVETIME = hdulist['EVENTS'].header['LIVETIME']
 
-        if not 'ONTIME' in evt_hd:
+        if 'ONTIME' not in evt_hd:
             ONTIME = None
         else:
             ONTIME = hdulist['EVENTS'].header['ONTIME']
 
-        if not 'DETNAME' in evt_hd:
+        if 'DETNAME' not in evt_hd:
             DETNAME = None
         else:
             DETNAME = hdulist['EVENTS'].header['DETNAME']
 
-        if not 'DATATYPE' in evt_hd:
+        if 'DATATYPE' not in evt_hd:
             DATATYPE = None
         else:
             DATATYPE = hdulist['EVENTS'].header['DATATYPE']
 
-        if not 'CCDSRC' in evt_hd:
+        if 'CCDSRC' not in evt_hd:
             CCDSRC = None
         else:
             CCDSRC = hdulist['EVENTS'].header['CCDSRC']
@@ -129,6 +143,9 @@ class EvtFileOps:
         if TIMESYS != "TDB":
             logger.warning("\n Event file is not barycentered. Proceed with care!")
 
+        # Close the HDUList
+        hdulist.close()
+
         return evtFileKeyWords
 
     #################################################################
@@ -140,13 +157,14 @@ class EvtFileOps:
         """
         evtFileKeyWords = self.readEF()
         TELESCOPE = evtFileKeyWords["TELESCOPE"]
+        MJDREF = evtFileKeyWords["MJDREF"]
 
         if TELESCOPE == 'NICER':
-            hdulist = fits.open(self.evtFile)
+            hdulist = self.open_fits()
 
             # Reading the table
             FPMSEL_table = hdulist["FPM_SEL"].data
-            TIME = FPMSEL_table['TIME']
+            TIME = FPMSEL_table['TIME'] / 86400 + MJDREF
             FPMsel = FPMSEL_table['FPM_SEL']
             FPMon = FPMSEL_table['FPM_ON']
             # Adding up all selected FPMs
@@ -158,26 +176,32 @@ class EvtFileOps:
             for k in range(len(TIME)):
                 totfpmon[k] = (np.sum(FPMon[k]))
 
-            FPMSEL_table_condensed = pd.DataFrame(np.vstack((TIME, totfpmsel, totfpmon)).T, columns=['TIME', 'TOTFPMSEL', 'TOTFPMON'])
+            FPMSEL_table_condensed = pd.DataFrame(np.vstack((TIME, totfpmsel, totfpmon)).T,
+                                                  columns=['TIME', 'TOTFPMSEL', 'TOTFPMON'])
 
         else:
             logger.error('No FPM selection is possible for non-NICER observations')
+
+        # Close the HDUList
+        hdulist.close()
 
         return FPMSEL_table, FPMSEL_table_condensed
 
     #################################################################
     def readGTI(self):  # Reading fits event file GTI lists
         """
-        Reads GTI table from an event
-        :return: gtiList
+        Reads GTI table from an event file
+        :return: gtiList as a numpy array with first column as START and second column as STOP (in MJD)
         :rtype: numpy.ndarray
         """
         # Reading EF for some necessary keywords
         evtFileKeyWords = self.readEF()
         TELESCOPE = evtFileKeyWords["TELESCOPE"]
+        MJDREF = evtFileKeyWords["MJDREF"]
+        # Open event file
+        hdulist = self.open_fits()
 
         if TELESCOPE == 'XMM':
-            hdulist = fits.open(self.evtFile)
             CCDSRC = int(evtFileKeyWords["CCDSRC"])
             if CCDSRC < 10:
                 GTIdata = hdulist["STDGTI0" + str(CCDSRC)].data
@@ -191,14 +215,12 @@ class EvtFileOps:
                 gtiList = (np.vstack((ST_GTI, ET_GTI))).T
 
         elif TELESCOPE in ['NICER', 'SWIFT', 'NuSTAR', 'IXPE']:
-            hdulist = fits.open(self.evtFile)
             GTIdata = hdulist["GTI"].data
             ST_GTI = GTIdata.field("START")
             ET_GTI = GTIdata.field("STOP")
             gtiList = (np.vstack((ST_GTI, ET_GTI))).T
 
         elif TELESCOPE == 'GLAST':
-            hdulist = fits.open(self.evtFile)
             DATATYPE = hdulist['Primary'].header['DATATYPE']
             GTIdata = hdulist["GTI"].data
             ST_GTI = GTIdata.field("START")
@@ -210,67 +232,91 @@ class EvtFileOps:
         else:
             logger.error('Check TELESCOP keyword in event file. Likely telescope not supported yet')
 
+        gtiList = gtiList / 86400 + MJDREF
+        # Close the HDUList
+        hdulist.close()
+
         return evtFileKeyWords, gtiList
 
-    ################################################################################
-    def filtenergy(self, eneLow: float, eneHigh: float):  # Filtering event file according to energy
+    def build_time_energy_df(self):
         """
-        Filters the event list according to energy (in keV)
-        :param eneLow: low energy cutoff
-        :type eneLow: float
-        :param eneHigh: high energy cutoff
-        :type eneHigh: float
-        :return: dataTP_eneFlt, pandas dataframe of TIME and PI, filtered for energy
-        :rtype: pandas.DataFrame
+        Build dataframe of TIME (MJD) and ENERGY (in keV) - column name remains PI, but it is energy in keV
         """
-        # Reading columns TIME and PI (pulse-invariant - proxy for photon energy) from binary table
-        hdulist = fits.open(self.evtFile)
+        # Open fits file and read EVENTS table
+        hdulist = self.open_fits()
         tbdata = hdulist['EVENTS'].data
-        # Telescope keyword for energy PI conversion
-        TELESCOPE = hdulist['EVENTS'].header['TELESCOP']
+        # Telescope and MJDREF keywords
+        header_keywords = self.readEF()
+        TELESCOPE = header_keywords['TELESCOPE']
+        MJDREF = header_keywords['MJDREF']
 
-        if TELESCOPE == 'NICER':
-            piLow = eneLow / 0.01
-            piHigh = eneHigh / 0.01
+        # different column names and coversion factors for different telescopes
+        if TELESCOPE in ['NICER', 'SWIFT']:
             dataTP = pd.DataFrame(np.vstack((tbdata.field('TIME'), tbdata.field('PI'))).T, columns=['TIME', 'PI'])
-            dataTP_eneFlt = dataTP.loc[((dataTP['PI'] >= piLow) & (dataTP['PI'] <= piHigh))]
-
-        elif TELESCOPE == 'SWIFT':
-            piLow = eneLow * 100
-            piHigh = eneHigh * 100
-            dataTP = pd.DataFrame(np.vstack((tbdata.field('TIME'), tbdata.field('PI'))).T, columns=['TIME', 'PI'])
-            dataTP_eneFlt = dataTP.loc[((dataTP['PI'] >= piLow) & (dataTP['PI'] <= piHigh))]
+            dataTP['PI'] *= 0.01
 
         elif TELESCOPE == 'NuSTAR':
-            piLow = (eneLow - 1.6) / 0.04
-            piHigh = (eneHigh - 1.6) / 0.04
             dataTP = pd.DataFrame(np.vstack((tbdata.field('TIME'), tbdata.field('PI'))).T, columns=['TIME', 'PI'])
-            dataTP_eneFlt = dataTP.loc[((dataTP['PI'] >= piLow) & (dataTP['PI'] <= piHigh))]
+            dataTP['PI'] = (dataTP['PI'] * 0.04) + 1.6
 
         elif TELESCOPE == 'XMM':
-            piLow = eneLow * 1000
-            piHigh = eneHigh * 1000
             dataTP = pd.DataFrame(np.vstack((tbdata.field('TIME'), tbdata.field('PI'))).T, columns=['TIME', 'PI'])
-            dataTP_eneFlt = dataTP.loc[((dataTP['PI'] >= piLow) & (dataTP['PI'] <= piHigh))]
+            dataTP['PI'] *= 0.001
 
         elif TELESCOPE == 'IXPE':
-            piLow = eneLow * 25
-            piHigh = eneHigh * 25
             dataTP = pd.DataFrame(np.vstack((tbdata.field('TIME'), tbdata.field('PI'))).T, columns=['TIME', 'PI'])
-            dataTP_eneFlt = dataTP.loc[((dataTP['PI'] >= piLow) & (dataTP['PI'] <= piHigh))]
+            dataTP['PI'] *= 0.04
 
         elif TELESCOPE == 'GLAST':
             logger.warning(
                 "GBM only provides PHAs, and their conversion to energy is non-linear, "
                 "hence, eneLow and eneHigh inputs are really PHA values. Use with care!")
             dataTP = pd.DataFrame(np.vstack((tbdata.field('TIME'), tbdata.field('PHA'))).T, columns=['TIME', 'PHA'])
-            dataTP_eneFlt = dataTP.loc[((dataTP['PHA'] >= eneLow) & (dataTP['PHA'] <= eneHigh))]
 
-        else:
-            logger.error(
-                'Check TELESCOP keyword in event file. Likely telescope not supported yet for energy filtering.')
+        # Convert TIME to MJD
+        dataTP['TIME'] = dataTP['TIME'] / 86400 + MJDREF
 
-        return dataTP_eneFlt
+        # Close the HDUList
+        hdulist.close()
+
+        self.time_energy_df = dataTP
+        return self
+
+    def filtenergy(self, eneLow: float, eneHigh: float):
+        """
+        Filters the [TIME, ENERGY] dataframe according to energy (in keV)
+        :param eneLow: low energy cutoff
+        :type eneLow: float
+        :param eneHigh: high energy cutoff
+        :type eneHigh: float
+        :return: self, updated time_energy_df attribute filtered for energy
+        :rtype: object
+        """
+        if self.time_energy_df is None:
+            raise Exception("TIME ENERGY dataframe is empty - please run build_time_energy_df method first ")
+        if 'PI' not in self.time_energy_df.columns:
+            raise Exception("NO PI column name to filter against ")
+        mask = self.time_energy_df["PI"].between(eneLow, eneHigh)
+        self.time_energy_df = self.time_energy_df.loc[mask].copy()
+        return self
+
+    def filttime(self, t_start: float | None = None, t_end: float | None = None):
+        """
+        Filters the [TIME, ENERGY] dataframe according to energy (in keV)
+        :param t_start: Filter all times earlier than t_start
+        :type t_start: float
+        :param t_end: Filter all times later than t_end
+        :type t_end: float
+        :return: self, updated time_energy_df attribute filtered for time
+        :rtype: object
+        """
+        if self.time_energy_df is None:
+            raise Exception("TIME ENERGY dataframe is empty - please run build_time_energy_df first ")
+        left = -np.inf if t_start is None else t_start
+        right = np.inf if t_end is None else t_end
+        mask = self.time_energy_df["TIME"].between(left, right)
+        self.time_energy_df = self.time_energy_df.loc[mask].copy()
+        return self
 
     ################################################################################
     def addphasecolEF(self, timMod: str, nonBaryEvtFile: str = None):  # Filtering event file according to energy
@@ -318,7 +364,6 @@ class EvtFileOps:
         # filtering are done on non-barycentered times and the merged GTIs should be valid.
         # Use with EXTREME care
         if nonBaryEvtFile is not None:
-
             nonBaryhdulEFPH = fits.open(nonBaryEvtFile, mode='update')
             nonBaryhdrEventsPH = nonBaryhdulEFPH['EVENTS'].header
 
@@ -335,14 +380,14 @@ class EvtFileOps:
 
 def main():
     """
-    Main function for eventfile.py
     This runs the method addPhaseColEF from class EvtFileOps
-    Included as a script called "addPhaseColumn"
+    Included as a script called "addphasecolumn"
     """
     parser = argparse.ArgumentParser(description="Create and append event file with Phase column")
     parser.add_argument("evtFile", help="Name of (X-ray) fits event file", type=str)
     parser.add_argument("timMod", help="Timing model for phase folding, e.g., a .par file", type=str)
-    parser.add_argument("-ne", "--nonBaryEvtFile", help="Name of non-barycentered event file", type=str, default=None)
+    parser.add_argument("-ne", "--nonBaryEvtFile", help="Name of non-barycentered event file",
+                        type=str, default=None)
     args = parser.parse_args()
 
     EvtFileOps(args.evtFile).addphasecolEF(args.timMod, args.nonBaryEvtFile)

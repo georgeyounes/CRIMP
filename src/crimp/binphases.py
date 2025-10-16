@@ -1,7 +1,7 @@
-####################################################################################
-# Function to bin a "phases" array to create a pulse profile. Phases are assumed
-# to be between [0, 1), i.e., cycle folded, e.g., from calcphase.py
-####################################################################################
+"""
+Function to bin a "phases" array to create a pulse profile. Phases are assumed
+to be between [0, 1), i.e., cycle folded, e.g., from calcphase.py
+"""
 
 import numpy as np
 

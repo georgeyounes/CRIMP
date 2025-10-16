@@ -1,21 +1,13 @@
-###############################################################################
-# A simple script that creates plots of ToA properties, i.e., ToA interval length,
-# ToA exposure (livetime), number of counts, count rate, H-test power
-# (significance of pulse detection), recduced chi2 (how well the template fit
-# the data). These are plotted as a function of ToA number and ToA MJD.
-# Plots are created with plotly, as a html file, in simple interactive mode for
-# ease of visualization and diagnostics.
-#
-# Input:
-# 1- ToAs : a .txt table of ToA properties (as built with measureToAs.py)
-# 2- outputFile : name of output interactive html file (default = "ToADiagnosticsPlot".html)
-#
-# Return:
-# ToAsProp : dictionary of ToAs properties
-#
-# Output:
-# "ToADiagnosticsPlot".html : a plotly plot for easy visualization
-################################################################################
+"""
+A simple script that creates plots of ToA properties, i.e., ToA interval length,
+ToA exposure (livetime), number of counts, count rate, H-test power
+(significance of pulse detection), recduced chi2 (how well the template fit
+the data). These are plotted as a function of ToA number and ToA MJD.
+Plots are created with plotly, and saved as a html file, in simple interactive
+mode for ease of visualization and diagnostics.
+
+Can be run from command line as diagnosetoas
+"""
 
 import sys
 import argparse
@@ -27,7 +19,6 @@ import numpy as np
 sys.dont_write_bytecode = True
 
 
-# Script to create a simple interactive plot of ToA properties
 def diagnoseToAs(ToAs, outputFile='ToADiagnosticsPlot'):
     """
     Crates an interactive html plot of ToA properties with plotly

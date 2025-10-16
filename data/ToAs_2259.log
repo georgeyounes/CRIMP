@@ -1,4 +1,4 @@
-[2025-07-29 14:18:14]     INFO 
+[2025-10-16 15:33:46]     INFO 
  Running measureToAs with input parameters: 
  evtFile: 1e2259_nicer.fits
  timMod: 1e2259.par
@@ -17,12 +17,12 @@
  plotLLs: False
  output toaFile: ToAs_2259
  output timFile: ToAs_2259
- (measureToAs.py:141)
-[2025-07-29 14:18:14]     INFO 
- Using best fit model of template fourier to measure ToAs (measureToAs.py:202)
-[2025-07-29 14:21:31]     INFO 
- Wrote ToA properties to ToAs_2259.txt (measureToAs.py:270)
-[2025-07-29 14:21:31]     INFO 
- Wrote timfile ToAs_2259.tim (measureToAs.py:276)
-[2025-07-29 14:21:32]     INFO 
- Created phase residual plot ToAs_2259_phaseResiduals.pdf (measureToAs.py:281)
+ (measureToAs.py:121)
+[2025-10-16 15:33:46]     INFO 
+ Using best fit model of template fourier to measure ToAs (measureToAs.py:178)
+[2025-10-16 15:37:08]     INFO 
+ Wrote ToA properties to ToAs_2259.txt (measureToAs.py:246)
+[2025-10-16 15:37:08]     INFO 
+ Wrote timfile ToAs_2259.tim (measureToAs.py:252)
+[2025-10-16 15:37:09]     INFO 
+ Created phase residual plot ToAs_2259_phaseResiduals.pdf (measureToAs.py:257)

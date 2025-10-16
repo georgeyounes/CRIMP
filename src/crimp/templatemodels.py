@@ -1,19 +1,15 @@
-####################################################################################
-# A script that encapsulates all the allowed models to derive a best-fit template
-# to the pulse profiles. These are Fourier, von Mises, and Cauchy. Each model has
-# its own class. Each class has three methods, (1) to calculate model curve given
-# model parameters and an array of phases, (2) a binned likelihood function  with a
-# gaussian pdf, and (3) an unbinned extended likelihood function with a poisson pdf
-#
-# Note that each model also incorporates a phaseShift which translates into a ToA,
-# and an amplitude shift that takes into account possible variation in pulsed
-# fraction of magnetars, e.g., during outbursts. When not calculating ToAs, these
-# two could be set to 0 and 1, respectively.
-#
-# Input for each class:
-# 1- theta: dictionary of input parameters
-# 2- xx: independent variable (phases)
-####################################################################################
+"""
+A module that encapsulates all the allowed models to derive a best-fit template
+to the pulse profiles. These are Fourier, von Mises, and Cauchy. Each model has
+its own class. Each class has three methods, (1) to calculate model curve given
+model parameters and an array of phases, (2) a binned likelihood function  with a
+gaussian pdf, and (3) an unbinned extended likelihood function with a poisson pdf
+
+Note that each model also incorporates a phaseShift which translates into a ToA,
+and an amplitude shift that takes into account possible variation in pulsed
+fraction of magnetars, e.g., during outbursts. When not calculating ToAs, these
+two could be set to 0 and 1, respectively.
+"""
 
 import sys
 
@@ -27,28 +23,28 @@ sys.dont_write_bytecode = True
 
 class Fourier:
     """
-        class for Fourier series
+    class for Fourier series
 
-        Attributes
-        ----------
-        theta : dict
-            model parameters, keys are **norm**, a pair of **ampShift** and **phShift** (=1, =0, respectively
-            unless a ToA is being calculated), and pairs of **amp_n** and **ph_n** for nth harmonic
-        xx : numpy.ndarray
-                rotational phases of photons
+    Attributes
+    ----------
+    theta : dict
+        model parameters, keys are **norm**, a pair of **ampShift** and **phShift** (=1, =0, respectively
+        unless a ToA is being calculated), and pairs of **amp_n** and **ph_n** for nth harmonic
+    xx : numpy.ndarray
+            rotational phases of photons
 
-        Methods
-        -------
-        fourseries():
-            calculates the total fourier series curve at each *xx* according to *theta*
-        loglikelihoodFS():
-            Binned log likelihood of the Fourier curve given *yy* and corresponding uncertainty *yy_err* at each *xx*
-            Assumes a gaussian probability density function
-        loglikelihoodFSnormalized():
-            non-binned extended log likelihood of the normalized Fourier series curve. It requires **exposure** to
-            calculate number of counts (occurrences) from rate (i.e., theta["norm"]*exposure)
-            Assumes a poisson probability density function
-        """
+    Methods
+    -------
+    fourseries():
+        calculates the total fourier series curve at each *xx* according to *theta*
+    loglikelihoodFS():
+        Binned log likelihood of the Fourier curve given *yy* and corresponding uncertainty *yy_err* at each *xx*
+        Assumes a gaussian probability density function
+    loglikelihoodFSnormalized():
+        non-binned extended log likelihood of the normalized Fourier series curve. It requires **exposure** to
+        calculate number of counts (occurrences) from rate (i.e., theta["norm"]*exposure)
+        Assumes a poisson probability density function
+    """
 
     def __init__(self, theta: dict, xx: numpy.ndarray):
         """
@@ -63,7 +59,7 @@ class Fourier:
                 rotational phases of photons
         """
         self.theta = theta
-        self.xx = np.sort(xx)
+        self.xx = np.sort(np.asarray(xx))
 
     def fourseries(self):
         """
@@ -165,7 +161,7 @@ class WrappedCauchy:
                 rotational phases of photons
         """
         self.theta = theta
-        self.xx = np.sort(xx)
+        self.xx = np.sort(np.asarray(xx))
 
     def wrapcauchy(self):
         """
@@ -269,7 +265,7 @@ class VonMises:
                 rotational phases of photons
         """
         self.theta = theta
-        self.xx = np.sort(xx)
+        self.xx = np.sort(np.asarray(xx))
 
     def vonmises(self):
         """

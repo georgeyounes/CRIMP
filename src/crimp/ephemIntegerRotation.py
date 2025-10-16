@@ -1,24 +1,15 @@
-#################################################################
-# A simple script that, given an MJD and a .par file, will provide
-# the earliest MJD that results in an integer number of rotational
-# phases from PEPOCH (epoch of timing solution) and corresponding
-# ephemerides (currently only spin frequency)
-#
-# Reminder that this script deals with taylor expansion of the phase
-# evolution and a random number of glitches. Binary motion is not
-# included
-#
-# Input:
-# 1- Tmjd: desired time for measurement of ephemerides that result
-#          in integer number of rotational phases.
-# 2- timeMod: timing model (.par file)
-# 3- printOutput: flag to print output to screen (default=False)
-#
-# output:
-# 1- ephemerides_intRotation: dictionary of Tmjd_intRotation and
-#                             corresponding rotational frequency
-#                             and phase
-#################################################################
+"""
+A simple script that, given an MJD and a .par file, will provide
+the earliest MJD that results in an integer number of rotational
+phases from PEPOCH (epoch of timing solution) and corresponding
+ephemerides (currently only spin frequency)
+
+Reminder that this script deals with taylor expansion of the phase
+evolution and a random number of glitches. Binary motion is not
+included
+
+Can be run from command line via "ephemintegerrotation"
+"""
 
 import argparse
 import sys
@@ -50,7 +41,7 @@ def ephemIntegerRotation(Tmjd, timMod, printOutput=False):
     """
 
     # Phase and frequency that correspond to Tmjd according to timing model
-    ph_Tmjd, _ = calcphase(np.array([Tmjd]), timMod)
+    ph_Tmjd, _ = calcphase(Tmjd, timMod)
     freq_Tmjd = ephemTmjd(Tmjd, timMod)["freqAtTmjd"]
 
     # Deriving the closest MJD and spin frequency with an integer number of rotations
@@ -59,7 +50,7 @@ def ephemIntegerRotation(Tmjd, timMod, printOutput=False):
 
     Tmjd_intRotation = Tmjd - FracTFromIntRotation
     freq_Tmjd_intRotation = ephemTmjd(Tmjd_intRotation, timMod)["freqAtTmjd"]
-    ph_intRotation, _ = calcphase(np.array([Tmjd_intRotation]), timMod)
+    ph_intRotation, _ = calcphase(Tmjd_intRotation, timMod)
     ph_intRotation = np.round(ph_intRotation)
 
     if printOutput is True:
