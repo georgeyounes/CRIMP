@@ -5,6 +5,9 @@ Similar to Tempo2 and PINT, a flag following each of those parameters in a .par 
 fixed (0 or missing flag) or free to vary (1)
 
 Can be called via command line as "fittoas"
+
+Note on the fitting: we optimize for the error in the timing model parameters and not the model parameters themselves,
+hence, we fit the phase-residuals
 """
 
 import matplotlib.pyplot as plt
@@ -13,8 +16,10 @@ import yaml
 import pandas as pd
 import numpy as np
 from dataclasses import dataclass
+import re
 
 from scipy.optimize import minimize
+from scipy import stats
 
 import emcee
 import corner
@@ -22,7 +27,7 @@ import corner
 import argparse
 
 from crimp.calcphase import calcphase
-from crimp.readtimingmodel import ReadTimingModel, patch_par_values, patch_statistics
+from crimp.readtimingmodel import ReadTimingModel, patch_par_values, patch_statistics, patch_miscellaneous
 from crimp.timfile import readtimfile, PulseToAs
 
 
@@ -30,7 +35,7 @@ from crimp.timfile import readtimfile, PulseToAs
 def load_toas_for_fit(tim_file: str, parfile: str, t_start: float | None = None, t_stop: float | None = None,
                       t_mjd_phasewrap: float | None = None, mode: str = "add") -> pd.DataFrame:
     """
-
+    Prepare the TOAs from a .tim file
     :param tim_file: .tim TOA file in tempo2 format
     :type tim_file: str
     :param parfile: timing solution as a .par file
@@ -61,97 +66,30 @@ def load_toas_for_fit(tim_file: str, parfile: str, t_start: float | None = None,
 
     # Build arrays (avoid index alignment issues)
     toas = pd.to_numeric(pt.df['pulse_ToA'], errors='coerce').to_numpy(dtype=float)
-
     perr = pd.to_numeric(pt.df['pulse_ToA_err'], errors='coerce').to_numpy(dtype=float)
-    phase = np.asarray(model_phases(toas, parfile), dtype=float)
+
+    # Calculate phases from TOAs and parfile
+    phases, _ = calcphase(toas, parfile)
+    phases = ((phases + 0.5) % 1.0) - 0.5  # keep things between [-0.5, 0.5)
+    # Average so that residuals align to 0,
+    # for visualization purposes and avoid adding a constant phase to the model - see also model_phases() below
+    phases -= np.mean(phases)
+
+    # Uncertainties on phases
+    phase_err_cycle = (perr / 1e6) * F0
 
     toas_to_fit = pd.DataFrame({
         'ToA': toas,
-        'phase': phase,
-        'phase_err_cycle': (perr / 1e6) * F0,  # assuming pulse_ToA_err in microseconds
+        'phase': phases,
+        'phase_err_cycle': phase_err_cycle,
     })
 
     # Add cycles if prompted
     if t_mjd_phasewrap is not None:
         toas_to_fit = add_phasewrap(toas_to_fit, t_mjd_phasewrap, mode=mode)
-        # re-calibrates things to 0 residuals which is what we compare to - see model_phases
-        toas_to_fit['phase'] -= toas_to_fit['phase'].mean()
+        toas_to_fit['phase'] -= np.mean(toas_to_fit['phase'])
 
     return toas_to_fit
-
-
-def readparfile(parfile: str):
-    """
-    Simple wrapper around ReadTimingModel which reads in a .par file as a list of dictionaries
-    :param parfile: timing solution as a .par file
-    :type parfile: str
-    :return: parameters as a dictionary without flags, and one that includes the flags
-    :rtype: list
-    """
-    parfile_params, _, parfile_params_flags = ReadTimingModel(parfile).readfulltimingmodel()
-    return parfile_params, parfile_params_flags
-
-
-# -------- Utilities --------
-def list_fit_keys(parfile: str | dict):
-    """
-    Collect keys with flag==1 in a deterministic order (e.g., F0,F1,... then glitch terms).
-    Simply to understand what is what
-    :param parfile: timing solution as a .par file
-    :type parfile: str
-    :return: list of keys items in parfile which are to be fit
-    :rtype: list
-    """
-    keys = [k for k, v in parfile.items()
-            if isinstance(v, dict) and "value" in v and "flag" in v and v["flag"] == 1]
-
-    # deterministic: sort human-friendly: F0,F1,... GLEP_1,GLF0_1, ... PEPOCH last, etc.
-    def sort_key(k):
-        # pull numeric suffix if present (e.g., 'GLEP_2' -> ('GLEP_', 2))
-        if "_" in k and k.rsplit("_", 1)[-1].isdigit():
-            base, idx = k.rsplit("_", 1)
-            return base, int(idx)
-        return k, -1
-
-    return sorted(keys, key=sort_key)
-
-
-def extract_free_params(parfile):
-    """
-    Extract free parameter vector
-    :param parfile: timing solution as a .par file
-    :type parfile: str | dict
-    :return: Array of the values of free parameters list[0], and their corresponding key names list[1]
-    :rtype: list
-    """
-    keys = list_fit_keys(parfile)
-    p0 = [parfile[k]["value"] for k in keys]
-    return np.array(p0, dtype=float), keys
-
-
-def inject_free_params(parfile, pvec, keys):
-    """
-    Return a *new* full timdict with updated 'value' for fit keys.
-    Also flatten back to the simple format expected by calcphase:
-      {"F0": 11.19, "F1": -1.2e-11, "WAVE1": {"A":..., "B":...}, ...}
-    :param parfile: timing solution as a .par file
-    :type parfile: str | dict
-    :param pvec: Array of the values of free parameters
-    :type pvec: numpy.ndarray
-    :param keys: Corresponding keys of pvec
-    :type keys: list
-    :return: *new* timdict with updated values for fit parameters
-    :rtype: dict
-    """
-    new_parfile_dict = {}
-    for k, v in parfile.items():
-        if isinstance(v, dict) and "value" in v and "flag" in v:
-            new_parfile_dict[k] = float(v["value"])  # default
-        else:
-            new_parfile_dict[k] = v  # nested structures (WAVE*, etc.)
-    for k, val in zip(keys, pvec):
-        new_parfile_dict[k] = float(val)
-    return new_parfile_dict
 
 
 def add_phasewrap(toas_to_fit, t_mjd: float, mode: str = "add") -> pd.DataFrame:
@@ -169,7 +107,7 @@ def add_phasewrap(toas_to_fit, t_mjd: float, mode: str = "add") -> pd.DataFrame:
     """
     # Normalize t_mjd to a sorted numpy array of unique thresholds
     cuts = np.atleast_1d(np.array(t_mjd, dtype=float))
-    cuts = np.unique(np.sort(cuts))
+    # cuts = np.unique(np.sort(cuts))
 
     if cuts.size == 0:
         return toas_to_fit
@@ -188,6 +126,143 @@ def add_phasewrap(toas_to_fit, t_mjd: float, mode: str = "add") -> pd.DataFrame:
     return toas_to_fit
 
 
+def readparfile(parfile: str):
+    """
+    Simple wrapper around ReadTimingModel which reads in a .par file as a list of dictionaries
+    :param parfile: timing solution as a .par file
+    :type parfile: str
+    :return: parameters as a dictionary without flags, and one that includes the flags
+    :rtype: tuple
+    """
+    parfile_params, _, parfile_params_flags = ReadTimingModel(parfile).readfulltimingmodel()
+    return parfile_params, parfile_params_flags
+
+
+# -------- Utilities --------
+def list_fit_keys(parfile: dict):
+    """
+    Collect keys with flag==1 in a deterministic order (e.g., F0,F1,... then glitch terms).
+    Simply to understand what is what
+    :param parfile: timing solution as a dictionary
+    :type parfile: dict
+    :return: list of keys items in parfile which are to be fit
+    :rtype: list
+    """
+    keys = [k for k, v in parfile.items()
+            if isinstance(v, dict) and "value" in v and "flag" in v and v["flag"] == 1]
+
+    # deterministic: sort human-friendly: F0,F1,... GLEP_1,GLF0_1, ... PEPOCH last, etc.
+    def sort_key(k):
+        # pull numeric suffix if present (e.g., 'GLEP_2' -> ('GLEP_', 2))
+        if "_" in k and k.rsplit("_", 1)[-1].isdigit():
+            base, idx = k.rsplit("_", 1)
+            return base, int(idx)
+        return k, -1
+
+    return sorted(keys, key=sort_key)
+
+
+def extract_free_params(parfile, yaml_initialguesses: str | None = None):
+    """
+    Extract free parameter vector
+    :param parfile: timing solution as a dictionary
+    :type parfile: dict
+    :param yaml_initialguesses: yaml file containing initial guesses
+    :type yaml_initialguesses: str | None
+    :return: Array of the values of free parameters return[0], and their corresponding key names return[1]
+    :rtype: tuple
+    """
+    keys = list_fit_keys(parfile)
+
+    # if yaml file provided initialize parameters from it
+    if yaml_initialguesses is not None:
+        p0 = initialize_params(keys, yaml_initialguesses)
+    else:
+        p0 = np.zeros(len(keys), dtype=float)
+
+    return p0, keys  # np.array(p0, dtype=float), keys
+
+
+def inject_free_params(parfile, pvec: np.ndarray, keys: list):
+    """
+    Build two dicts from a parsed .par timing model
+      - parfile_dict_fit: used by fitter (deltas from base .par parameter values)
+      - parfile_dict_full: absolute values after applying the 'base - delta' rule, i.e., full timing solution
+
+    Initialization rules:
+      * Zero out all scalar params in parfile_dict_fit EXCEPT:
+          - PEPOCH: keep base value
+          - GLEP_1: keep base value
+      * Nested structures pass through unchanged in BOTH outputs.
+      * parfile_dict_full starts as the base 'value' (or structure) everywhere.
+
+    Override rules (applied in order of zip(keys, pvec), i.e., for free-to-vary parameters with flag=1):
+      * Skip PEPOCH entirely (never touch).
+      * GLEP_1 = pvec[i] (base is ignored) in both parfile_dict_fit and parfile_dict_full
+      * All other keys (F0, F1, F2, ..., GLF0_n, GLF1_n, ...) are set to:
+          parfile_dict_fit[k]  = pvec[i]
+          parfile_dict_full[k] = base - pvec[i]
+
+    :param parfile: dict like {"F0": {"value": 11.19, "flag": 1}, "PEPOCH": {"value": ...}, "WAVE1": {...}, ...}
+    :param pvec: iterable of numbers (deltas)
+    :param keys: list of parameter names corresponding to pvec
+    :returns: (parfile_dict_fit, parfile_dict_full)
+    """
+    parfile_dict_fit = {}
+    parfile_dict_full = {}
+
+    def is_scalar_param(vv):
+        return isinstance(vv, dict) and "value" in vv
+
+    def is_glep(name):
+        # Match GLEP_1, GLEP_2, ...
+        return bool(re.match(r"^GLEP_\d+$", name))
+
+    def is_gltd(name):
+        # Match GLTD_1, GLTD_2, ...
+        return bool(re.match(r"^GLTD_\d+$", name))
+
+    # Seed outputs with defaults
+    for k, v in parfile.items():
+        if is_scalar_param(v):
+            base = float(v["value"])
+            # fit: zero by default except PEPOCH and GLEP_1 retain base
+            if k == "PEPOCH" or is_glep(k):
+                parfile_dict_fit[k] = base
+            else:
+                parfile_dict_fit[k] = 0.0
+            # full: always start at base
+            parfile_dict_full[k] = base
+        else:
+            # pass through nested structures unchanged
+            parfile_dict_fit[k] = v
+            parfile_dict_full[k] = v
+
+    # Apply overrides from keys/pvec (except for PEPOCH)
+    for k, val in zip(keys, pvec):
+        if k == "PEPOCH":
+            # Never modify PEPOCH, just in case by mistake a user has a 1 flag next to it
+            # (not that it ever happened to me)
+            continue
+        if k not in parfile:
+            raise KeyError(f"Parameter '{k}' not found in parfile.")  # shoud not happen but just in case
+
+        v = parfile[k]
+        base = float(v["value"])
+        delta = float(val)
+
+        # For overrides
+        parfile_dict_fit[k] = delta
+        if is_glep(k):
+            parfile_dict_full[k] = delta
+        elif is_gltd(k):
+            parfile_dict_full[k] = base + delta  # GLTD is in days (hence must be added to base)
+        else:
+            parfile_dict_full[k] = base - delta  # absolute value (base - delta)
+
+    return parfile_dict_fit, parfile_dict_full
+
+
 # -------- Validation --------
 def validate_parfile(parfile):
     """
@@ -197,7 +272,7 @@ def validate_parfile(parfile):
       - ensure at least one flag==1
     Raises ValueError with a helpful message if invalid.
     :param parfile: timing solution as a .par file
-    :type parfile: str
+    :type parfile: dict
     """
     if not isinstance(parfile, dict):
         raise ValueError("Initial timing model must be a dict")
@@ -230,22 +305,32 @@ def validate_parfile(parfile):
         raise ValueError("Template has no free parameters (flag==1). Nothing to optimize.")
 
 
-# -------- MCMC through emcee --------
+# -------- Maximum likelihood estimate --------
 # -------- Model + Likelihood --------
-def model_phases(x_mjd, parfile):
-    phases, _ = calcphase(x_mjd, parfile)
-    phases -= np.round(phases)
-    return phases - np.mean(phases)  # this calibrates things to 0 residuals which is what we compare to
+def model_phases(x_mjd, timmodel):
+    """
+    Calculate the phases according to a timing model. This is done for fitting purposes:
+    We are fitting the phase shifts, and hence our timing model is some error on the timing parameters
+    which, when corrected for, the new timing solution will result in whitened residuals
+    """
+    phases, _ = calcphase(x_mjd, timmodel)  # full phases
+    # Average so that after whitening, residuals align to 0,
+    # for visualization purposes and avoid adding a constant phase to the model
+    phases -= np.mean(phases)
+    return phases
 
 
 def gaussian_nll(y, mu, sigma):
-    sigma = np.asarray(sigma, dtype=float)
-    return 0.5 * np.sum(((y - mu) / sigma) ** 2 + np.log(2.0 * np.pi * sigma ** 2))
+    """
+    Returns the Gaussian negative log-likelihood (NLL) of the data y given the model predicted distribution (mu, sigma)
+    """
+    return -np.sum(stats.norm.logpdf(y, loc=mu, scale=sigma))
 
 
 # -------- Objective factory (closure) --------
-def make_nll(x, y_err, parfile):
+def make_nll(x, y, y_err, parfile, yaml_init=None):
     """
+    Creates the NLL
     Returns:
       nll(pvec) -> scalar NLL
       p0 (initial vector)
@@ -254,23 +339,54 @@ def make_nll(x, y_err, parfile):
     """
     validate_parfile(parfile)
 
-    p0, keys = extract_free_params(parfile)
+    p0, keys = extract_free_params(parfile, yaml_init)
 
     def nll(pvec):
-        newparfile_dict = inject_free_params(parfile, pvec, keys)
+        newparfile_dict, _ = inject_free_params(parfile, pvec, keys)
         mu = model_phases(x, newparfile_dict)
-        return gaussian_nll(np.zeros(len(mu)), np.asarray(mu), np.asarray(y_err))
+        return gaussian_nll(y, mu, y_err)
 
     return nll, p0, keys, parfile
 
 
-# -------- Reading priors --------
+def initialize_params(keys: list[str], yaml_init: str) -> tuple:
+    """
+    Given a list of parameter keys and a YAML file defining initial guesses,
+    return a 1D NumPy array of initial parameter values in the same order as keys.
+    :param keys: List of parameter names (order will be preserved)
+    :param yaml_init: Path to YAML file defining initial guesses
+    Return tuple
+        - p0 : np.ndarray 1D array of parameter values ordered as in `keys`
+        - keys : list[str] The same ordered list of parameter names
+    """
+    # Read initial guesses (unlike the name says, no need to have priors in the initial guesses -
+    # see prior_from_yaml for more info)
+    prior = initguess_prior_from_yaml(yaml_init)
+
+    if not prior.initial_guess:
+        raise ValueError("No initial guesses found in YAML file.")
+
+    # Check that all requested keys exist
+    missing = [k for k in keys if k not in prior.initial_guess]
+    if missing:
+        raise KeyError(f"Missing initial guesses for: {', '.join(missing)}")
+
+    # Preserve order of keys
+    p0 = np.array([prior.initial_guess[k] for k in keys], dtype=float)
+    return p0
+
+
+# -------- MCMC through emcee --------
+# -------- Reading initial parameters and /or priors --------
 @dataclass
 class Prior:
+    # If no bounds were supplied at all, this dict can be empty.
     bounds: dict[str, tuple[float, float]]
+    # If no guesses were supplied at all, this dict can be empty.
+    initial_guess: dict[str, float]
 
     def log_prior(self, theta: np.ndarray, keys: list[str]) -> float:
-        # Uniform box priors; missing keys -> 0 (improper prior)
+        """Uniform (box) priors. Missing key in bounds => improper (no penalty)."""
         for val, name in zip(theta, keys):
             if name in self.bounds:
                 lo, hi = self.bounds[name]
@@ -279,30 +395,87 @@ class Prior:
         return 0.0
 
 
-def prior_from_yaml(path: str) -> Prior:
+def initguess_prior_from_yaml(path: str) -> Prior:
     """
-    Read priors from a .yaml file as [low, high] - only flat priors are allowed. E.g.,
-    F0: [0.1118, 0.1120]
-    F1: [-2e-11, -1e-11]
-    GLF0_1: [1e-5, 2e-5]
+    YAML may define, for each parameter:
+      - [low, high]                      -> bounds only
+      - number                           -> guess only
+      - {low: ..., high: ..., guess: ...}-> both (guess optional but see global rule)
+
+    ENFORCED CONSISTENCY:
+      - If any param has bounds, all params must have bounds.
+      - If any param has a guess,  all params must have a guess.
     """
     data = yaml.safe_load(open(path, "r"))
     if not isinstance(data, dict):
-        raise ValueError("YAML must map parameter -> [low, high]")
+        raise ValueError("YAML must map parameter -> prior/guess")
 
-    b: dict[str, tuple[float, float]] = {}
+    params = list(data.keys())
+    bounds: dict[str, tuple[float, float]] = {}
+    guesses: dict[str, float] = {}
+
+    any_bounds = False
+    any_guess = False
+
     for k, v in data.items():
-        if not (isinstance(v, (list, tuple)) and len(v) == 2):
-            raise ValueError(f"{k}: expected [low, high]")
-        low, high = map(float, v)
-        if not (low < high):
-            raise ValueError(f"{k}: low < high required")
-        b[k] = (low, high)
-    return Prior(bounds=b)
+        if isinstance(v, (list, tuple)):
+            # [low, high]
+            if len(v) != 2:
+                raise ValueError(f"{k}: expected [low, high]")
+            low, high = map(float, v)
+            if not (low < high):
+                raise ValueError(f"{k}: low < high required")
+            bounds[k] = (low, high)
+            any_bounds = True
+
+        elif isinstance(v, dict):
+            # {low, high, (optional) guess}
+            has_low = "low" in v
+            has_high = "high" in v
+            if has_low != has_high:
+                raise ValueError(f"{k}: need both 'low' and 'high' if providing bounds")
+
+            if has_low and has_high:
+                low, high = float(v["low"]), float(v["high"])
+                if not (low < high):
+                    raise ValueError(f"{k}: low < high required")
+                bounds[k] = (low, high)
+                any_bounds = True
+
+            if "guess" in v:
+                guesses[k] = float(v["guess"])
+                any_guess = True
+
+        elif isinstance(v, (int, float)):
+            # scalar -> guess only
+            guesses[k] = float(v)
+            any_guess = True
+
+        else:
+            raise ValueError(f"{k}: unsupported value {v!r}")
+
+    # --- Global consistency checks ---
+    if any_bounds:
+        missing_bounds = [p for p in params if p not in bounds]
+        if missing_bounds:
+            raise ValueError(
+                "Bounds provided for some parameters but missing for others: "
+                + ", ".join(missing_bounds)
+            )
+
+    if any_guess:
+        missing_guesses = [p for p in params if p not in guesses]
+        if missing_guesses:
+            raise ValueError(
+                "Initial guesses provided for some parameters but missing for others: "
+                + ", ".join(missing_guesses)
+            )
+
+    return Prior(bounds=bounds, initial_guess=guesses)
 
 
 # -------- Running emcee --------
-def run_mcmc(x, yerr, init_parfile: dict, keys: list[str], prior: Prior,
+def run_mcmc(x, y, yerr, init_parfile: dict, keys: list[str], prior: Prior,
              steps: int = 10000, burn: int = 500, walkers: int = 32,
              corner_pdf: str | None = None, chain_npy: str | None = None, flat_npy: str | None = None,
              progress: bool = True):
@@ -319,10 +492,10 @@ def run_mcmc(x, yerr, init_parfile: dict, keys: list[str], prior: Prior,
         lp = prior.log_prior(theta, keys)
         if not np.isfinite(lp):
             return -np.inf
-        newparfile_dict = inject_free_params(init_parfile, theta, keys)
+        newparfile_dict, _ = inject_free_params(init_parfile, theta, keys)
         mu = model_phases(x, newparfile_dict)
         # gaussian_nll is negative hence the - sign in front (as required by emcee.EnsembleSampler)
-        return lp - gaussian_nll(np.zeros(len(mu)), np.asarray(mu), np.asarray(yerr))
+        return lp - gaussian_nll(np.asarray(y), np.asarray(mu), np.asarray(yerr))
 
     # Define sampler and run mcmc
     sampler = emcee.EnsembleSampler(walkers, ndim, log_probability)
@@ -351,7 +524,7 @@ def run_mcmc(x, yerr, init_parfile: dict, keys: list[str], prior: Prior,
                             **default_args)
         fig.tight_layout()
         fig.subplots_adjust(hspace=0.13)
-        fig.savefig(corner_pdf, format='pdf', dpi=300)
+        fig.savefig(corner_pdf+'.pdf', format='pdf', dpi=300)
         plt.close(fig)
 
     # Summary: median and 16/84 percentiles
@@ -367,20 +540,16 @@ def run_mcmc(x, yerr, init_parfile: dict, keys: list[str], prior: Prior,
 
 
 # -------- Best-fit dict reconstruction and some statistics--------
-def bestfit_timing_dict(result, keys, parfile):
-    return inject_free_params(parfile, result.x, keys)
-
-
-def rms_residual(phase_residulas):
-    F1_rms = phase_residulas
-    rms_mod_cycle = np.sqrt((1 / np.size(phase_residulas)) * np.sum(F1_rms ** 2))
+def rms_residual(phaseresid, model_phaseresid):
+    F1_rms = phaseresid - model_phaseresid
+    rms_mod_cycle = np.sqrt((1 / np.size(phaseresid)) * np.sum(F1_rms ** 2))
     return rms_mod_cycle
 
 
-def chi2_fit(phase, phase_err, freeparameters):
-    chi2 = np.sum(np.divide((phase ** 2), phase_err ** 2))
-    redchi2 = np.divide(chi2, np.size(phase) - freeparameters)
-    dof = np.size(phase) - freeparameters
+def chi2_fit(phaseresid, model_phaseresid, phase_err, freeparameters):
+    chi2 = np.sum(np.divide(((phaseresid - model_phaseresid) ** 2), phase_err ** 2))
+    redchi2 = np.divide(chi2, np.size(phaseresid) - freeparameters)
+    dof = np.size(phaseresid) - freeparameters
     model_stats = {'chi2': chi2, 'redchi2': redchi2, 'dof': dof}
     return model_stats
 
@@ -389,7 +558,7 @@ def chi2_fit(phase, phase_err, freeparameters):
 def plot_residulas(toas_pre_fit, phase_residulas_post_fit, plotname=None):
     # Creating pre- and post-fit residual plot
     fig, axs = plt.subplots(2, 1, figsize=(10, 8), dpi=80, facecolor='w', edgecolor='k', sharex=True,
-                            sharey=False, gridspec_kw={'width_ratios': [1], 'height_ratios': [1, 1]})
+                            sharey=False, gridspec_kw={'width_ratios': [1], 'height_ratios': [1, 0.7]})
     axs = axs.ravel()
 
     ##################
@@ -401,11 +570,12 @@ def plot_residulas(toas_pre_fit, phase_residulas_post_fit, plotname=None):
     axs[0].yaxis.offsetText.set_fontsize(14)
     axs[0].set_ylabel(r'$\,\mathrm{Residulas\,(cycle)}$', fontsize=14)
 
+    # Plot data
     axs[0].errorbar(toas_pre_fit['ToA'], toas_pre_fit['phase'], yerr=toas_pre_fit['phase_err_cycle'], color='k',
                     fmt='o', zorder=0, markersize=8, ls='', label='Pre-fit residuals', alpha=0.5)
-
-    # Plotting line at 0 residual
-    axs[0].axhline(0, color='k', linestyle='-', linewidth=2.0, zorder=10, markersize=2.0)
+    # Plot model
+    axs[0].plot(toas_pre_fit['ToA'], phase_residulas_post_fit, color='k', linestyle='-', markersize=8, alpha=0.5,
+                label='Best-fit model', zorder=10)
 
     axs[0].legend(fontsize=14)
 
@@ -419,11 +589,12 @@ def plot_residulas(toas_pre_fit, phase_residulas_post_fit, plotname=None):
     axs[1].set_xlabel(r'$\,\mathrm{Time\,(MJD)}$', fontsize=14)
     axs[1].set_ylabel(r'$\,\mathrm{Residulas\,(cycle)}$', fontsize=14)
 
-    axs[1].errorbar(toas_pre_fit['ToA'], phase_residulas_post_fit, yerr=toas_pre_fit['phase_err_cycle'], color='k',
-                    fmt='o', zorder=10, markersize=8, ls='', label='Post-fit residuals', alpha=0.5)
+    axs[1].errorbar(toas_pre_fit['ToA'], toas_pre_fit['phase'] - phase_residulas_post_fit,
+                    yerr=toas_pre_fit['phase_err_cycle'], color='k', fmt='o', zorder=10, markersize=8, ls='',
+                    label='Post-fit (data-model) residuals', alpha=0.5)
 
     # Plotting line at 0 residual
-    axs[1].axhline(0, color='k', linestyle='-', linewidth=2.0, zorder=10, markersize=2.0)
+    axs[1].axhline(0, color='k', linestyle='-', linewidth=2.0, zorder=10, markersize=2.0, alpha=0.5)
 
     axs[1].legend(fontsize=14)
 
@@ -465,10 +636,10 @@ def main():
     parser.add_argument("-md", "--mode", choices=["add", "subtract"], default='add',
                         help="Add or subtract 1 cycle as desired at times > each t_mjd")
 
-    # MCMC options
+    # Fitting and MCMC options
+    parser.add_argument("-iy", "--init_yaml", type=str,
+                        help="YAML file mapping parameter names to initial starting points and/or bounds")
     parser.add_argument("-mc", "--mcmc", action="store_true", help="Run emcee to sample posteriors")
-    parser.add_argument("-pr", "--prior-yaml", type=str,
-                        help="YAML file mapping parameter names to [low, high]")
     parser.add_argument("-st", "--mcmc-steps", type=int, default=10000,
                         help="Number of MCMC steps (default = 10000)")
     parser.add_argument("-bu", "--mcmc-burn", type=int, default=500,
@@ -481,40 +652,39 @@ def main():
                         help="Path to save full chain as .npy (default=None)")
     parser.add_argument("-fl", "--flat-npy", type=str, default=None,
                         help="Path to save flattened post burn-in samples as .npy (default=None)")
-
     # Plotting residuals
     parser.add_argument("-ep", "--ephem_plot", help="Plot of local ephemerides", type=str, default=None)
 
+    # Parse all provided arguments
     args = parser.parse_args()
 
+    ###########################
     # reading TOAs and par file
     toas_pre_fit = load_toas_for_fit(args.timfile_path, args.parfile, args.t_start, args.t_end, args.t_mjd, args.mode)
     _, init_parfile = readparfile(args.parfile)
     F0 = init_parfile['F0']['value']
 
+    ############################
     # Validate .par timing model
     validate_parfile(init_parfile)
 
-    # Build the objective
-    nll, p0, keys, tmpl = make_nll(toas_pre_fit["ToA"], toas_pre_fit["phase_err_cycle"], init_parfile)
+    START = toas_pre_fit["ToA"].min()
+    FINISH = toas_pre_fit["ToA"].max()
+    misc_keys = {"START": START, "FINISH": FINISH}
 
-    # MLE of above objective
-    res = minimize(nll, p0, method="Nelder-Mead", options={"maxiter": int(1e6)})
-
-    # Recover best-fit timing dict
-    timdict_best = bestfit_timing_dict(res, keys, tmpl)
-
+    ########################################################################################
     # MCMC posteriors if desired (currently only way to get uncertainties on fit parameters)
     if args.mcmc:
+        keys = list_fit_keys(init_parfile)
         # check for the prior yaml file
-        if args.mcmc and args.prior_yaml is None:
-            parser.error("-pr (or --prior-yaml) is required when -mc (or --mcmc) is used")
+        if args.mcmc and args.init_yaml is None:
+            parser.error("-iy (or --init_yaml) is required when -mc (or --mcmc) is used")
         # Initilize priors
-        prior = prior_from_yaml(args.prior_yaml)
+        prior = initguess_prior_from_yaml(args.init_yaml)
         # Run MCMC with emcee
         print("Running MCMC with emcee...")
-        sampler, flat, summaries = run_mcmc(x=toas_pre_fit["ToA"].to_numpy(),
-                                            yerr=toas_pre_fit["phase_err_cycle"].to_numpy(), init_parfile=init_parfile,
+        sampler, flat, summaries = run_mcmc(x=toas_pre_fit["ToA"], y=toas_pre_fit["phase"],
+                                            yerr=toas_pre_fit["phase_err_cycle"], init_parfile=init_parfile,
                                             keys=keys, prior=prior, steps=args.mcmc_steps, burn=args.mcmc_burn,
                                             walkers=args.mcmc_walkers, corner_pdf=args.corner_pdf,
                                             chain_npy=args.chain_npy, flat_npy=args.flat_npy, progress=True)
@@ -528,11 +698,12 @@ def main():
 
         # prepare medians in keys order
         med_vec = np.array([summaries[name]['median'] for name in keys], dtype=float)
-        post_mcmc_timdict = inject_free_params(init_parfile, med_vec, keys)
+        post_mcmc_timdict_fit, post_mcmc_timdict = inject_free_params(init_parfile, med_vec, keys)
+
         source_label = "MCMC (posterior medians)"
 
         # plot residuals after MCMC run
-        phase_residulas_post_fit = model_phases(toas_pre_fit["ToA"], post_mcmc_timdict)
+        phase_residulas_post_fit = model_phases(toas_pre_fit["ToA"], post_mcmc_timdict_fit)
         plot_residulas(toas_pre_fit, phase_residulas_post_fit, args.ephem_plot)
 
         # Write updated par file with new best-fit values
@@ -542,46 +713,66 @@ def main():
         print(f"Wrote new timing model to {args.newparfile} using {source_label} values")
 
         # Measure some statistical terms
-        rms_residual_cycle = rms_residual(phase_residulas_post_fit)
+        rms_residual_cycle = rms_residual(toas_pre_fit["phase"].to_numpy(), phase_residulas_post_fit)
         nbr_free_param = len(keys)
-        simple_stats = chi2_fit(phase_residulas_post_fit, toas_pre_fit["phase_err_cycle"].to_numpy(), nbr_free_param)
+        simple_stats = chi2_fit(toas_pre_fit["phase"].to_numpy(), phase_residulas_post_fit,
+                                toas_pre_fit["phase_err_cycle"].to_numpy(), nbr_free_param)
         print("Statistics of new best-fit:")
         print(f"RMS residual in cycle = {rms_residual_cycle}")
-        print(f"RMS residual in seconds = {rms_residual_cycle * (1/F0)} (assuming F0 = {F0} from input .par file)")
+        print(f"RMS residual in seconds = {rms_residual_cycle * (1 / F0)} (assuming F0 = {F0} from input .par file)")
         print(f"Chi2 = {simple_stats['chi2']} for {simple_stats['dof']} dof")
         print(f"reduced Chi2 = {simple_stats['redchi2']}\n")
 
         # Append statistics to par file
         stats_forparfile = {"CHI2R": simple_stats['redchi2'], "NTOA": len(toas_pre_fit["ToA"]),
-                            "TRES": rms_residual_cycle * (1/F0) * 1.0e6, "CHI2R_DOF": simple_stats['dof']}
+                            "TRES": rms_residual_cycle * (1 / F0) * 1.0e6, "CHI2R_DOF": simple_stats['dof']}
         patch_statistics(in_path=args.newparfile, out_path=args.newparfile, new_stats=stats_forparfile)
+        patch_statistics(in_path=args.newparfile, out_path=args.newparfile, new_stats=stats_forparfile)
+        patch_miscellaneous(in_path=args.newparfile, out_path=args.newparfile, new_misc=misc_keys)
         print(f"Appended best-fit statistical properties to {args.newparfile} par file\n")
 
+    # Otherwise, a simple MLE fit to the residuals
     else:
-        # Plot MLE fit residuals
-        phase_residulas_post_fit = model_phases(toas_pre_fit["ToA"], timdict_best)
+        ##############################
+        # Build the objective function
+        nll, p0, keys, tmpl_parfile = make_nll(toas_pre_fit["ToA"], toas_pre_fit["phase"],
+                                               toas_pre_fit["phase_err_cycle"], init_parfile, args.init_yaml)
+
+        ########################
+        # MLE of above objective
+        res = minimize(nll, p0, method="Nelder-Mead", options={"maxiter": int(1e6)})
+
+        ###############################################
+        # Recover best-fit timing dict according to MLE
+        timing_dict_fit, timing_dict_full = inject_free_params(tmpl_parfile, res.x, keys)
+
+        # Plot MLE fit residuals - first model residuals according to best-fit model
+        phase_residulas_post_fit = model_phases(toas_pre_fit["ToA"], timing_dict_fit)
         plot_residulas(toas_pre_fit, phase_residulas_post_fit, args.ephem_plot)
 
         source_label = "Maximum Likelihood Estimation"
         # write the MEL results into a new (or override existing one) .par file
-        patch_par_values(in_path=args.parfile, out_path=args.newparfile, new_values=timdict_best)
+        patch_par_values(in_path=args.parfile, out_path=args.newparfile, new_values=timing_dict_full)
         print("---------------------------")
         print(f"Wrote new timing model to {args.newparfile} using {source_label} values\n")
 
         # Measure some statistical terms
-        rms_residual_cycle = rms_residual(phase_residulas_post_fit)
+        rms_residual_cycle = rms_residual(toas_pre_fit["phase"].to_numpy(), phase_residulas_post_fit)
         nbr_free_param = len(keys)
-        simple_stats = chi2_fit(phase_residulas_post_fit, toas_pre_fit["phase_err_cycle"].to_numpy(), nbr_free_param)
+        simple_stats = chi2_fit(toas_pre_fit["phase"].to_numpy(), phase_residulas_post_fit,
+                                toas_pre_fit["phase_err_cycle"].to_numpy(), nbr_free_param)
+
         print("Statistics of new best-fit:")
         print(f"RMS residual in cycle = {rms_residual_cycle}")
-        print(f"RMS residual in seconds = {rms_residual_cycle * (1/F0)} (assuming F0 = {F0} from input .par file)")
+        print(f"RMS residual in seconds = {rms_residual_cycle * (1 / F0)} (assuming F0 = {F0} from input .par file)")
         print(f"Chi2 = {simple_stats['chi2']} for {simple_stats['dof']} dof")
         print(f"reduced Chi2 = {simple_stats['redchi2']}")
 
         # Append statistics to par file
         stats_forparfile = {"CHI2R": simple_stats['redchi2'], "NTOA": len(toas_pre_fit["ToA"]),
-                            "TRES": rms_residual_cycle * (1/F0) * 1.0e6, "CHI2R_DOF": simple_stats['dof']}
+                            "TRES": rms_residual_cycle * (1 / F0) * 1.0e6, "CHI2R_DOF": simple_stats['dof']}
         patch_statistics(in_path=args.newparfile, out_path=args.newparfile, new_stats=stats_forparfile)
+        patch_miscellaneous(in_path=args.newparfile, out_path=args.newparfile, new_misc=misc_keys)
         print(f"Appended best-fit statistical properties to {args.newparfile} par file\n")
 
 

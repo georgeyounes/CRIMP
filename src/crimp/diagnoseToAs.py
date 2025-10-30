@@ -50,7 +50,7 @@ def diagnoseToAs(ToAs, outputFile='ToADiagnosticsPlot'):
                         shared_xaxes=True, shared_yaxes=True, horizontal_spacing=0.02, vertical_spacing=0.02)
     # vs ToA number
     # ToA interval length and ToA exposure (livetime)
-    fig.add_trace(go.Scatter(x=ToAnumber, y=ToA_lenInt / 86400, mode="markers"), row=1, col=1)
+    fig.add_trace(go.Scatter(x=ToAnumber, y=ToA_lenInt, mode="markers"), row=1, col=1)
     fig.update_yaxes(title_text="ToA interval length (days)", row=1, col=1)
     #
     fig.add_trace(go.Scatter(x=ToAnumber, y=ToA_exp, mode="markers"), row=2, col=1)
@@ -79,7 +79,7 @@ def diagnoseToAs(ToAs, outputFile='ToADiagnosticsPlot'):
     fig.update_xaxes(title_text="ToA number", row=7, col=1)
     # vs MJD
     # ToA interval length and ToA exposure (livetime)
-    fig.add_trace(go.Scatter(x=tToA_MJD, y=ToA_lenInt / 86400, mode="markers"), row=1, col=2)
+    fig.add_trace(go.Scatter(x=tToA_MJD, y=ToA_lenInt, mode="markers"), row=1, col=2)
     #
     fig.add_trace(go.Scatter(x=tToA_MJD, y=ToA_exp, mode="markers"), row=2, col=2)
     # Number of counts and count rate

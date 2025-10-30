@@ -12,7 +12,7 @@ does not yet accomodate IFUNC, proper motion, binary systems, or parallax. These
 import sys
 import numpy as np
 import re
-from typing import Dict, Any, Tuple, Optional
+from typing import Any, Optional
 
 sys.dont_write_bytecode = True
 
@@ -34,7 +34,7 @@ class ReadTimingModel:
 
     # ---------- helpers ----------
     @staticmethod
-    def _parse_value_and_flag(tokens) -> Tuple[np.float64, int]:
+    def _parse_value_and_flag(tokens) -> tuple[np.float64, int]:
         """
         tokens: sequence of strings where tokens[0] is the numeric value,
                 tokens[1] (optional) is a 0/1 flag.
@@ -61,9 +61,9 @@ class ReadTimingModel:
           timModBothTE  (nested dict with {"value", "flag"})
         """
         keys = ["PEPOCH"] + [f"F{i}" for i in range(0, 13)]
-        values: Dict[str, Any] = {k: np.float64(0) for k in keys}
-        flags: Dict[str, int] = {k: 0 for k in keys}
-        both: Dict[str, Dict[str, Any]] = {k: {"value": np.float64(0), "flag": 0} for k in keys}
+        values: dict[str, Any] = {k: np.float64(0) for k in keys}
+        flags: dict[str, int] = {k: 0 for k in keys}
+        both: dict[str, dict[str, Any]] = {k: {"value": np.float64(0), "flag": 0} for k in keys}
 
         with open(self.timMod, "r") as data_file:
             for raw in data_file:
@@ -100,9 +100,9 @@ class ReadTimingModel:
                     if m:
                         glitch_ids.append(m.group(1))
 
-        timModParamGlitches: Dict[str, Any] = {}
-        timModFlagsGlitches: Dict[str, int] = {}
-        timModBothGlitches: Dict[str, Dict[str, Any]] = {}
+        timModParamGlitches: dict[str, Any] = {}
+        timModFlagsGlitches: dict[str, int] = {}
+        timModBothGlitches: dict[str, dict[str, Any]] = {}
 
         if not glitch_ids:
             return timModParamGlitches, timModFlagsGlitches, timModBothGlitches
@@ -157,9 +157,9 @@ class ReadTimingModel:
           timModFlagsWaves (flags-only dict; only key present is WAVE_OM if found),
           timModBothWaves  (nested dict; WAVE_OM has {"value","flag"}, others have flag=None)
         """
-        timModParamWaves: Dict[str, Any] = {}
-        timModFlagsWaves: Dict[str, int] = {}
-        timModBothWaves: Dict[str, Dict[str, Any]] = {}
+        timModParamWaves: dict[str, Any] = {}
+        timModFlagsWaves: dict[str, int] = {}
+        timModBothWaves: dict[str, dict[str, Any]] = {}
 
         # Collect harmonics
         wave_harmonics = set()
@@ -239,11 +239,11 @@ class ReadTimingModel:
         with open(self.timMod, "r") as f:
             for raw in f:
                 toks = raw.strip().split()
-                if not toks:
+                if not toks:  # empty line - simply skip
                     continue
                 key = toks[0].upper()
                 if key == "CHI2R":
-                    try:
+                    try:  # if a key is written in the file without a value - don't crah
                         stats["CHI2R"] = float(toks[1])
                         if len(toks) > 2:
                             stats["CHI2R_DOF"] = int(toks[2])
@@ -261,15 +261,54 @@ class ReadTimingModel:
                         pass
         return stats
 
+    def readmiscellaneous(self):
+        """
+        Read miscellaneous keywords in .par file - none if it doesn't existent
+        Returns:
+            dict (with None for missing values)
+        """
+        misc_schema = {
+            "PSR": str,
+            "RAJ": str,
+            "DECJ": str,
+            "POSEPOCH": float,
+            "DMEPOCH": float,
+            "START": float,
+            "FINISH": float,
+            "TZRMJD": float,
+            "TZRFRQ": float,
+            "TZRSITE": str,
+            "CLK": str,
+            "UNITS": str,
+            "EPHEM": str
+
+        }
+
+        misc_keys = {k: None for k in misc_schema}
+
+        with open(self.timMod, "r") as f:
+            for raw in f:
+                toks = raw.strip().split()
+                if not toks:
+                    continue
+                key = toks[0].upper()
+                if key in misc_schema:
+                    try:
+                        misc_keys[key] = misc_schema[key](toks[1])
+                    except (IndexError, ValueError):
+                        pass
+
+        return misc_keys
+
 
 def patch_par_values(
-    in_path: str,
-    out_path: str,
-    *,
-    new_values: Dict[str, float],
-    float_fmt: str = ".15g",
-    uncertainties: Optional[Dict[str, float]] = None,
-    uncertainty_fmt: str = ".6g",
+        in_path: str,
+        out_path: str,
+        *,
+        new_values: dict[str, float],
+        float_fmt: str = ".15g",
+        uncertainties: Optional[dict[str, float]] = None,
+        uncertainty_fmt: str = ".6g",
 ) -> None:
     """
     Write new .par file with new_values (and uncertainties) for certain parameters.
@@ -341,7 +380,7 @@ def patch_par_values(
         f.writelines(out_lines)
 
 
-def patch_statistics(in_path: str, out_path: str, new_stats: Dict[str, float]) -> None:
+def patch_statistics(in_path: str, out_path: str, new_stats: dict[str, float]) -> None:
     """
     Update CHI2R, NTOA, and TRES lines in a .par file using new_stats dict.
     Missing keys in new_stats are ignored. Missing lines are appended at the end.
@@ -388,6 +427,47 @@ def patch_statistics(in_path: str, out_path: str, new_stats: Dict[str, float]) -
                 out_lines.append(f"\nNTOA           {int(new_stats['NTOA'])}")
             elif key == "TRES":
                 out_lines.append(f"\nTRES           {new_stats['TRES']}")
+
+    with open(out_path, "w") as f:
+        f.writelines(out_lines)
+
+
+def patch_miscellaneous(in_path: str, out_path: str, new_misc: dict[str, object]) -> None:
+    """
+    Update or append miscellaneous keys in a .par file using new_misc dict.
+
+    Behavior:
+      - Existing keys are updated in place.
+      - Missing keys are appended at the end in the order they appear in new_misc.
+      - Keys with None values are skipped entirely.
+      - The original order and formatting of unrelated lines are preserved.
+    """
+    with open(in_path, "r") as f:
+        lines = f.readlines()
+
+    # Normalize keys for case-insensitive matching but preserve input order
+    new_misc_norm = {k.upper(): v for k, v in new_misc.items()}
+    found = {k.upper(): False for k, v in new_misc.items() if v is not None}
+    out_lines = []
+
+    for line in lines:
+        toks = line.strip().split()
+        if not toks:
+            out_lines.append(line)
+            continue
+
+        key = toks[0].upper()
+        if key in new_misc_norm and new_misc_norm[key] is not None:
+            val = new_misc_norm[key]
+            out_lines.append(f"{key:<15}{val}\n")
+            found[key] = True
+        else:
+            out_lines.append(line)
+
+    # Append missing ones in the same order as provided in new_misc
+    for key, val in new_misc.items():
+        if val is not None and not found.get(key.upper(), False):
+            out_lines.append(f"\n{key.upper():<15}{val}")
 
     with open(out_path, "w") as f:
         f.writelines(out_lines)

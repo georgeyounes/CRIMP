@@ -47,7 +47,6 @@ Again, hopefully, you will never have to worry about this.
 """
 
 import argparse
-import logging
 
 import numpy as np
 import pandas as pd
@@ -57,16 +56,8 @@ from crimp.eventfile import EvtFileOps
 
 # Log config
 ############
-logFormatter = logging.Formatter('[%(asctime)s] %(levelname)8s %(message)s ' +
-                                 '(%(filename)s:%(lineno)s)', datefmt='%Y-%m-%d %H:%M:%S')
-logger = logging.getLogger('crimp_log')
-logger.setLevel(logging.DEBUG)
-logger.propagate = False
-
-consoleHandler = logging.StreamHandler()
-consoleHandler.setFormatter(logFormatter)
-consoleHandler.setLevel(logging.WARNING)
-logger.addHandler(consoleHandler)
+from crimp.logging_utils import get_logger, configure_logging
+logger = get_logger(__name__)
 
 
 def timeintervalsToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.5, eneHigh=10,
@@ -97,15 +88,9 @@ def timeintervalsToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.
     """
     # Establishing max_counts and max_wait for TOA interval cleaning
     if max_counts is None:
-        max_counts = totCtsEachToA/2
+        max_counts = int(totCtsEachToA/2)
     if max_wait is None:
         max_wait = waitTimeCutoff
-
-    # Log to a file
-    fileHandler = logging.FileHandler(outputFile + '.log', mode='w')
-    fileHandler.setFormatter(logFormatter)
-    fileHandler.setLevel(logging.INFO)
-    logger.addHandler(fileHandler)
 
     logger.info('\n Running timeintervalsToAs with input parameters: \n '
                 'evtFile: ' + str(evtFile) +
@@ -341,7 +326,7 @@ def merge_adjacent_intervals(
     for i in range(1, len(df)):
         row = df.iloc[i]
         cond_events = row['Events'] < events_max
-        cond_dtstart = (row['ToA_tstart'] - cur['ToA_tstart']) < dtstart_max_days
+        cond_dtstart = (row['ToA_tstart'] - cur['ToA_tend']) < dtstart_max_days
 
         if cond_events and cond_dtstart:
             # merge into current segment
@@ -386,14 +371,25 @@ def main():
                         help="max wait < which merge time interval with previous ones, default = waitTimeCutoff",
                         type=float, default=None)
     parser.add_argument("-of", "--outputFile",
-                        help="name of .txt output GTI file that defines ToAs. Also, name of .log file (default = timIntToAs)",
+                        help="name of .txt output file that defines ToAs. Also name of .log file (default = timIntToAs)",
                         type=str,
                         default='timIntToAs')
     parser.add_argument("-ce", "--correxposure", help="Flag to correct exposure/rate according to selected FPMs, "
                                                       "default = False", type=bool, default=False,
                         action=argparse.BooleanOptionalAction)
-
+    parser.add_argument("-v", "--verbose", action="count", default=0,
+                        help="WARNING if absent, -v: INFO, -vv: DEBUG")
     args = parser.parse_args()
+
+    # Configure the log-file
+    v = min(args.verbose, 2)  # cap -vv
+    console_level = ("WARNING", "INFO", "DEBUG")[v]  # WARNING if --verbose is absent, INFO if -v, DEBUG if -vv
+
+    log_file = f"{args.outputFile}.log"
+    configure_logging(console_level=console_level, file_path=log_file, file_level="INFO", force=True)
+
+    cli_logger = get_logger(__name__)
+    cli_logger.info("\nCLI starting")
 
     timeintervalsToAs(args.evtFile, args.totCtsEachToA, args.waitTimeCutoff, args.eneLow, args.eneHigh,
                       args.max_counts, args.max_wait, args.outputFile, args.correxposure)

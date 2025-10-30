@@ -11,7 +11,6 @@ import sys
 import argparse
 import numpy as np
 import pandas as pd
-import logging
 
 from astropy.table import Table, Column
 from astropy.io import fits
@@ -23,10 +22,8 @@ sys.dont_write_bytecode = True
 
 # Log config
 ############
-logFormatter = logging.Formatter('[%(asctime)s] %(levelname)8s %(message)s ' +
-                                 '(%(filename)s:%(lineno)s)', datefmt='%Y-%m-%d %H:%M:%S')
-logger = logging.getLogger('crimp_log')
-logger.setLevel(logging.DEBUG)
+from crimp.logging_utils import get_logger
+logger = get_logger(__name__)
 
 
 ########################################################################################################

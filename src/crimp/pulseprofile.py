@@ -27,7 +27,6 @@ This module is a bit messy, try to simplify
 
 import argparse
 import sys
-import logging
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -51,16 +50,8 @@ sys.dont_write_bytecode = True
 
 # Log config
 ############
-logFormatter = logging.Formatter('[%(asctime)s] %(levelname)8s %(message)s ' +
-                                 '(%(filename)s:%(lineno)s)', datefmt='%Y-%m-%d %H:%M:%S')
-logger = logging.getLogger('crimp_log')
-logger.setLevel(logging.DEBUG)
-logger.propagate = False
-
-consoleHandler = logging.StreamHandler()
-consoleHandler.setFormatter(logFormatter)
-consoleHandler.setLevel(logging.WARNING)
-logger.addHandler(consoleHandler)
+from crimp.logging_utils import get_logger, configure_logging
+logger = get_logger(__name__)
 
 
 class PulseProfileFromEventFile:
@@ -166,12 +157,6 @@ class PulseProfileFromEventFile:
         :type calcPulsedFraction: bool
         :return: fitResultsDict (dict), bestFitModel (numpy.ndarray), pulsedProperties (dict)
         """
-        logfile = 'logfile' if templateFile is None else templateFile
-        fileHandler = logging.FileHandler(logfile + '.log', mode='w')
-        fileHandler.setFormatter(logFormatter)
-        fileHandler.setLevel(logging.INFO)
-        logger.addHandler(fileHandler)
-
         logger.info('\n Running method fitpulseprofile with input parameters: '
                     '\n evtFile: ' + str(self.evtFile) +
                     '\n Timing model: ' + str(self.timMod) +
@@ -794,7 +779,20 @@ def main():
     parser.add_argument("-cp", "--calcPulsedFraction",
                         help="Flag to calculate RMS pulsed fraction of pulse profile, default = False", type=bool,
                         default=False, action=argparse.BooleanOptionalAction)
+    parser.add_argument("-v", "--verbose", action="count", default=0,
+                        help="WARNING if absent, -v: INFO, -vv: DEBUG")
     args = parser.parse_args()
+
+    # Configure the log-file
+    v = min(args.verbose, 2)  # cap -vv
+    console_level = ("WARNING", "INFO", "DEBUG")[v]  # WARNING if --verbose is absent, INFO if -v, DEBUG if -vv
+
+    logfile = 'logfile_buildtemplate' if args.templateFile is None else args.templateFile
+    log_file = f"{logfile}.log"
+    configure_logging(console_level=console_level, file_path=log_file, file_level="INFO", force=True)
+
+    cli_logger = get_logger(__name__)
+    cli_logger.info("\nCLI starting")
 
     ppfromevt = PulseProfileFromEventFile(args.evtFile, args.timMod, args.eneLow, args.eneHigh, args.nbrBins)
     ppfromevt.fitpulseprofile(args.ppmodel, args.nbrComp, args.initTemplateMod, args.fixPhases, args.figure,

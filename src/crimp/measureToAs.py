@@ -37,7 +37,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import copy
 import pandas as pd
-import logging
 
 from scipy.stats import chi2
 
@@ -57,16 +56,8 @@ sys.dont_write_bytecode = True
 
 # Log config
 ############
-logFormatter = logging.Formatter('[%(asctime)s] %(levelname)8s %(message)s ' +
-                                 '(%(filename)s:%(lineno)s)', datefmt='%Y-%m-%d %H:%M:%S')
-logger = logging.getLogger('crimp_log')
-logger.setLevel(logging.DEBUG)
-logger.propagate = False
-
-consoleHandler = logging.StreamHandler()
-consoleHandler.setFormatter(logFormatter)
-consoleHandler.setLevel(logging.WARNING)
-logger.addHandler(consoleHandler)
+from crimp.logging_utils import get_logger, configure_logging
+logger = get_logger(__name__)
 
 
 def measureToAs(evtFile, timMod, tempModPP, toagtifile, eneLow=0.5, eneHigh=10., toaStart=0, toaEnd=None,
@@ -114,10 +105,6 @@ def measureToAs(evtFile, timMod, tempModPP, toagtifile, eneLow=0.5, eneHigh=10.,
     :return: ToAsTable
     :rtype: pandas.DataFrame
     """
-    fileHandler = logging.FileHandler(toaFile + '.log', mode='w')
-    fileHandler.setFormatter(logFormatter)
-    fileHandler.setLevel(logging.INFO)
-    logger.addHandler(fileHandler)
     logger.info('\n Running measureToAs with input parameters: '
                 '\n evtFile: ' + evtFile +
                 '\n timMod: ' + timMod +
@@ -986,16 +973,28 @@ def main():
     parser.add_argument("-bm", "--brutemin",
                         help="boolean flag to run the global minimizing running the BRUTE method, default = False",
                         type=bool, default=False, action=argparse.BooleanOptionalAction)
-    parser.add_argument("-pp", "--plotPPs", help="Flag to create pulse profile plots, default = False", type=bool,
-                        default=False, action=argparse.BooleanOptionalAction)
-    parser.add_argument("-ll", "--plotLLs", help="Flag to create LogLikelihood plots, default = False", type=bool,
-                        default=False, action=argparse.BooleanOptionalAction)
-    parser.add_argument("-tf", "--toaFile", help="name of output ToA file (default = ToAs(.txt))", type=str,
-                        default='ToAs')
+    parser.add_argument("-pp", "--plotPPs", help="Flag to create pulse profile plots, default = False",
+                        type=bool, default=False, action=argparse.BooleanOptionalAction)
+    parser.add_argument("-ll", "--plotLLs", help="Flag to create LogLikelihood plots, default = False",
+                        type=bool, default=False, action=argparse.BooleanOptionalAction)
+    parser.add_argument("-tf", "--toaFile", help="name of output ToA file (default = ToAs(.txt)) and .log file",
+                        type=str, default='ToAs')
     parser.add_argument("-mf", "--timFile",
                         help="name of output .tim file compatible with tempo2/PINT (default = None - no .tim file created)",
                         type=str, default=None)
+    parser.add_argument("-v", "--verbose", action="count", default=0,
+                        help="WARNING if absent, -v: INFO, -vv: DEBUG")
     args = parser.parse_args()
+
+    # Configure the log-file
+    v = min(args.verbose, 2)  # cap -vv
+    console_level = ("WARNING", "INFO", "DEBUG")[v]  # WARNING if --verbose is absent, INFO if -v, DEBUG if -vv
+
+    log_file = f"{args.toaFile}.log"
+    configure_logging(console_level=console_level, file_path=log_file, file_level="INFO", force=True)
+
+    cli_logger = get_logger(__name__)
+    cli_logger.info("\nCLI starting")
 
     measureToAs(args.evtFile, args.timMod, args.tempModPP, args.toagtifile, args.enelow, args.enehigh, args.toaStart,
                 args.toaEnd, args.phShiftRes, args.nbrBins, args.varyAmps, args.readvaryparam, args.brutemin,
