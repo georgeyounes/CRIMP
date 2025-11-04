@@ -344,7 +344,7 @@ def make_nll(x, y, y_err, parfile, yaml_init=None):
     def nll(pvec):
         newparfile_dict, _ = inject_free_params(parfile, pvec, keys)
         mu = model_phases(x, newparfile_dict)
-        return gaussian_nll(y, mu, y_err)
+        return gaussian_nll(y - np.mean(y), mu, y_err)
 
     return nll, p0, keys, parfile
 
@@ -495,7 +495,7 @@ def run_mcmc(x, y, yerr, init_parfile: dict, keys: list[str], prior: Prior,
         newparfile_dict, _ = inject_free_params(init_parfile, theta, keys)
         mu = model_phases(x, newparfile_dict)
         # gaussian_nll is negative hence the - sign in front (as required by emcee.EnsembleSampler)
-        return lp - gaussian_nll(np.asarray(y), np.asarray(mu), np.asarray(yerr))
+        return lp - gaussian_nll(np.asarray(y-np.mean(y)), np.asarray(mu), np.asarray(yerr))
 
     # Define sampler and run mcmc
     sampler = emcee.EnsembleSampler(walkers, ndim, log_probability)
@@ -570,7 +570,7 @@ def plot_residulas(toas_pre_fit, phase_residulas_post_fit, plotname=None):
     axs[0].yaxis.offsetText.set_fontsize(14)
     axs[0].set_ylabel(r'$\,\mathrm{Residulas\,(cycle)}$', fontsize=14)
 
-    # Plot data
+    # Plot data - first normalize given phaseshifts to mean - everything we do will be normalized to mean
     axs[0].errorbar(toas_pre_fit['ToA'], toas_pre_fit['phase'], yerr=toas_pre_fit['phase_err_cycle'], color='k',
                     fmt='o', zorder=0, markersize=8, ls='', label='Pre-fit residuals', alpha=0.5)
     # Plot model
@@ -614,6 +614,7 @@ def plot_residulas(toas_pre_fit, phase_residulas_post_fit, plotname=None):
         plt.show()
     else:
         fig.savefig(str(plotname) + '.pdf', format='pdf', dpi=300, bbox_inches="tight")
+        plt.close(fig)
     return
 
 

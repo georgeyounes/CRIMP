@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "crimp"
-version = "2.1.0"
+version = "2.1.1"
 dependencies = [
   "lmfit",
   "plotly",
@@ -43,4 +43,5 @@ ephemintegerrotation = "crimp.ephemIntegerRotation:main"
 phshifttotimfile = "crimp.timfile:main"
 fittoas = "crimp.fit_toas:main"
 localephemerides = "crimp.get_local_ephem:main"
-pulseprofile_plots = "crimp.plotting_pp:main"
+pulseprofile_plots = "crimp.plot_pps:main"
+localephemerides_plot = "crimp.plot_local_ephem:main"

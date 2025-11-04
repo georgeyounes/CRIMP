@@ -129,13 +129,12 @@ def plotting_pp(time_energy_phase_df, nbrbins=100, plotname: str | None = None):
 
 
 def plotting_phase_energy(time_energy_phase_df, nphasebins=64, nenergybins=24,
-                          smooth_sigma: float | None = 0.7,
+                          smooth_sigma: float | list | None = 0.5,
                           plotname: str | None = None):
     """
     Plot a phase-energy diagram:
-    x-axis = phase (cycles), y-axis = energy, colormap = normalized count rate
-    (each energy row is min-max scaled across phases).
-    Optionally apply a mild Gaussian smoothing to reduce noise.
+    x-axis = phase (cycles), y-axis = energy, colormap = min-max normalized count rate
+    Optionally apply a mild Gaussian smoothing to reduce noise
     """
     # Extract needed arrays
     phases = time_energy_phase_df['foldedphases'].to_numpy()
@@ -158,9 +157,11 @@ def plotting_phase_energy(time_energy_phase_df, nphasebins=64, nenergybins=24,
     rate = (H_T - row_min) / (row_max - row_min)
 
     # Optional Gaussian smoothing
-    if smooth_sigma is not None and smooth_sigma > 0:
+    if smooth_sigma is not None:
         # Apply smoothing in both phase (x) and energy (y) directions
-        # smooth_sigma can be a float or a tuple (sigma_energy, sigma_phase)
+        # smooth_sigma can be a float or a list/tuple [sigma_energy, sigma_phase]
+        if isinstance(smooth_sigma, list):
+            smooth_sigma = tuple(smooth_sigma)
         rate = gaussian_filter(rate, sigma=smooth_sigma, mode='nearest')
 
     # Plot
@@ -193,12 +194,11 @@ def plotting_phase_energy(time_energy_phase_df, nphasebins=64, nenergybins=24,
 
 
 def plotting_phase_time(time_energy_phase_df, nphasebins=32, ntimebins=12,
-                        smooth_sigma: float | None = 0.5,
+                        smooth_sigma: float | list | None = 0.5,
                         plotname: str | None = None):
     """
     Plot a phase-time diagram:
-    x-axis = phase (cycles), y-axis = time (MJD), colormap = normalized count rate
-    (each energy row is min-max scaled across phases).
+    x-axis = phase (cycles), y-axis = time (MJD), colormap = min-max normalized count rate
     Optionally apply a Gaussian smoothing to reduce noise
     """
     # Extract needed arrays
@@ -210,21 +210,25 @@ def plotting_phase_time(time_energy_phase_df, nphasebins=32, ntimebins=12,
     t_min, t_max = np.nanmin(times), np.nanmax(times)
     time_edges = np.linspace(t_min, t_max, ntimebins + 1)
 
-    # 2D histogram: counts per (phase, energy) bin
+    # 2D histogram - and transpose so that rows correspond to energy bins
     H, xedges, yedges = np.histogram2d(phases, times, bins=[phase_edges, time_edges])
-
-    # Transpose so rows correspond to energy bins
     H_T = H.T
 
-    # Min-Max normalization of each energy row
+    # Min–Max normalization per row (with NaN for flat rows)
     row_min = H_T.min(axis=1, keepdims=True)
     row_max = H_T.max(axis=1, keepdims=True)
-    rate = (H_T - row_min) / (row_max - row_min)
+    denom = row_max - row_min
+    # Initialize output as NaN
+    rate = np.full_like(H_T, np.nan, dtype=float)
+    # Compute normalized values where denom != 0 - time slice which does not have any data
+    np.divide(H_T - row_min, denom, out=rate, where=denom != 0)
 
     # Optional Gaussian smoothing
-    if smooth_sigma is not None and smooth_sigma > 0:
+    if smooth_sigma is not None:
         # Apply smoothing in both phase (x) and energy (y) directions
-        # smooth_sigma can be a float or a tuple (sigma_energy, sigma_phase)
+        # smooth_sigma can be a float or a list/tuple [sigma_energy, sigma_phase]
+        if isinstance(smooth_sigma, list):
+            smooth_sigma = tuple(smooth_sigma)
         rate = gaussian_filter(rate, sigma=smooth_sigma, mode='nearest')
 
     # Plot
@@ -353,7 +357,7 @@ def plotting_pp_grid(time_energy_phase_df,
     # Helper for neat number formatting
     def fmt_e(x):
         # compact but readable; adjust if you prefer fixed decimals
-        return f"{x:.1g}"
+        return f"{x:.2g}"
 
     # Second pass: draw + labels
     for (i, j, ppBins_plt, ct_norm_plt, ct_err_norm_plt) in panels:

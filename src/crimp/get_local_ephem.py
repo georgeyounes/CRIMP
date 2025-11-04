@@ -9,12 +9,12 @@ Logger is very thing on information - could be made more useful
 import pandas as pd
 import numpy as np
 import argparse
-import matplotlib.pyplot as plt
 
 from crimp.readtimingmodel import ReadTimingModel
 from crimp.ephemIntegerRotation import ephemIntegerRotation
 from crimp.fit_toas import (load_toas_for_fit, model_phases, inject_free_params, plot_residulas,
                             Prior, run_mcmc, list_fit_keys, chi2_fit)
+from crimp.plot_local_ephem import plot_local_ephemerides
 
 # Log config
 ############
@@ -28,7 +28,7 @@ def generate_local_ephemerides(
         jump_days=15,
         t_start=None,
         t_end=None,
-        min_interval=60,
+        min_interval=45,
         debug_with_plots=False,
         outputfile='local_ephemerides',
         ephem_plot=None,
@@ -175,6 +175,7 @@ def generate_local_ephemerides(
             else:
                 corner_plot = None
 
+            df_interval.loc[:, 'phase'] -= df_interval['phase'].mean()  # recenter things
             _, _, summaries = run_mcmc(x=df_interval['ToA'], y=df_interval['phase'],
                                        yerr=df_interval["phase_err_cycle"], init_parfile=init_par_file_dict,
                                        keys=fit_keys, prior=priors, steps=1000, burn=100, walkers=24,
@@ -221,6 +222,11 @@ def generate_local_ephemerides(
         current_start += jump_days
 
     # Normalize F0 (subtract the global linear trends)
+    if not local_ephem_final:
+        logger.warning('No interval made the criteria - try decreasing min_interval and/or increasing interval_days '
+                       'returning empty dataframe')
+        return pd.DataFrame(local_ephem_final)
+
     local_ephem_final_df = pd.DataFrame(local_ephem_final)
     F0_local_based_on_parfile = F0_global + F1_global * ((local_ephem_final_df['TOA_MJD_ref'] - PEPOCH_global) * 86400)
     local_ephem_final_df['F0'] -= F0_local_based_on_parfile
@@ -242,72 +248,6 @@ def generate_local_ephemerides(
     return local_ephem_final_df
 
 
-def plot_local_ephemerides(local_df, glitches=None, plotname=None):
-    """
-    Plot local ephemerides (F0 and F1) with uncertainties.
-    local_df must contain columns:
-    ['TOA_MJD_ref', 'TOA_MJD_ref_err', 'F0', 'F0_err', 'F1', 'F1_err']
-    """
-    fig, axs = plt.subplots(2, 1, figsize=(10, 8), dpi=80, facecolor='w', edgecolor='k',
-                            sharex=True, sharey=False,
-                            gridspec_kw={'width_ratios': [1], 'height_ratios': [1, 1]})
-    axs = axs.ravel()
-
-    ##################
-    # Formatting axs[0] (F0)
-    axs[0].tick_params(axis='both', labelsize=14)
-    axs[0].xaxis.offsetText.set_fontsize(14)
-    axs[0].ticklabel_format(style='sci', axis='y', scilimits=(0, 0))
-    axs[0].yaxis.offsetText.set_fontsize(14)
-    axs[0].set_ylabel(r'$\,\mathrm{Frequency\ (Hz)}$', fontsize=14)
-
-    axs[0].errorbar(local_df['TOA_MJD_ref'], local_df['F0'],
-                    xerr=local_df['TOA_MJD_ref_err'], yerr=local_df['F0_err'],
-                    fmt='o', color='k', ecolor='gray', elinewidth=1.5,
-                    capsize=0, markersize=6, label=r'$F$', alpha=0.7)
-
-    axs[0].grid(True, linestyle='--', alpha=0.3)
-
-    ##################
-    # Formatting axs[1] (F1)
-    axs[1].tick_params(axis='both', labelsize=14)
-    axs[1].xaxis.offsetText.set_fontsize(14)
-    axs[1].ticklabel_format(style='sci', axis='y', scilimits=(0, 0))
-    axs[1].yaxis.offsetText.set_fontsize(14)
-    axs[1].set_xlabel(r'$\,\mathrm{Time\ (MJD)}$', fontsize=14)
-    axs[1].set_ylabel(r'$\,\mathrm{\dot{F}\ (Hz\,s^{-1})}$', fontsize=14)
-
-    axs[1].errorbar(local_df['TOA_MJD_ref'], local_df['F1'],
-                    xerr=local_df['TOA_MJD_ref_err'], yerr=local_df['F1_err'],
-                    fmt='o', color='k', ecolor='gray', elinewidth=1.5,
-                    capsize=0, markersize=6, label=r'$\dot{F}$', alpha=0.7)
-
-    axs[1].grid(True, linestyle='--', alpha=0.3)
-
-    ##################
-    # Add vertical glitch lines if provided
-    if glitches is not None and len(glitches) > 0:
-        for g in glitches:
-            axs[0].axvline(g, color='red', linestyle='--', linewidth=1.5, alpha=0.7)
-            axs[1].axvline(g, color='red', linestyle='--', linewidth=1.5, alpha=0.7)
-
-    ###################
-    # Finishing touches
-    for axis in ['top', 'bottom', 'left', 'right']:
-        axs[0].spines[axis].set_linewidth(1.5)
-        axs[0].tick_params(width=1.5)
-        axs[1].spines[axis].set_linewidth(1.5)
-        axs[1].tick_params(width=1.5)
-
-    fig.tight_layout()
-
-    if plotname is None:
-        plt.show()
-    else:
-        fig.savefig(str(plotname) + '.pdf', format='pdf', dpi=300, bbox_inches="tight")
-    return
-
-
 def main():
     parser = argparse.ArgumentParser(
         description="Module to generate local [F0, F1] ephemerides in a moving average fashion")
@@ -325,7 +265,7 @@ def main():
                         type=float, default=None)
     parser.add_argument("-mi", "--min_interval",
                         help="Minimum time between first and last ToA in each interval (MJD)",
-                        type=float, default=60)
+                        type=float, default=45)
     parser.add_argument("-dp", "--debug_with_plots",
                         help="For debugging purposes - plot ToAs in each interval, and corner plot of F1, F0",
                         default=False, action=argparse.BooleanOptionalAction)
