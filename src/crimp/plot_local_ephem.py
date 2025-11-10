@@ -5,10 +5,9 @@ Simple script to plot local ephemerides
 import pandas as pd
 import matplotlib.pyplot as plt
 import argparse
-import numpy as np
 
 
-def read_local_ephemerides(localephem: str, t_start=float | None, t_end=float | None):
+def read_local_ephemerides(localephem: str, t_start: float | None = None, t_end: float | None = None):
     """
     Read local ephemerides .txt file (build with get_local_ephem.py or CLT "localephemerides")
     :param localephem: .txt file of local ephemerides
@@ -24,11 +23,11 @@ def read_local_ephemerides(localephem: str, t_start=float | None, t_end=float | 
 
     # filter between t_start and t_end
     if t_start is None:
-        t_start = np.min(localephem_df_tmp["TOA_MJD_ref"])
+        t_start = localephem_df_tmp["TOA_MJD_ref"].min()
     if t_end is None:
-        t_end = np.max(localephem_df_tmp["TOA_MJD_ref"])
+        t_end = localephem_df_tmp["TOA_MJD_ref"].max()
 
-    mask = (localephem_df_tmp["TOA_MJD_ref"] >= t_start) & (localephem_df_tmp["TOA_MJD_ref"] <= t_end)
+    mask = ((localephem_df_tmp["TOA_MJD_ref"] >= t_start) & (localephem_df_tmp["TOA_MJD_ref"] <= t_end))
     localephem_df = localephem_df_tmp.loc[mask].reset_index(drop=True)
 
     return localephem_df

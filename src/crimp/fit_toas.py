@@ -27,19 +27,20 @@ import corner
 import argparse
 
 from crimp.calcphase import calcphase
-from crimp.readtimingmodel import ReadTimingModel, patch_par_values, patch_statistics, patch_miscellaneous
+from crimp.readtimingmodel import (ReadTimingModel, patch_par_values, patch_statistics, patch_miscellaneous,
+                                   get_parameter_value)
 from crimp.timfile import readtimfile, PulseToAs
 
 
 # -------- Starting point --------
-def load_toas_for_fit(tim_file: str, parfile: str, t_start: float | None = None, t_stop: float | None = None,
+def load_toas_for_fit(tim_file_df: pd.DataFrame, parfile: dict, t_start: float | None = None, t_stop: float | None = None,
                       t_mjd_phasewrap: float | None = None, mode: str = "add") -> pd.DataFrame:
     """
     Prepare the TOAs from a .tim file
-    :param tim_file: .tim TOA file in tempo2 format
-    :type tim_file: str
-    :param parfile: timing solution as a .par file
-    :type parfile: str
+    :param tim_file_df: .tim TOA dataframe (e.g., a .tim file read with timefile.py)
+    :type tim_file_df: pd.DataFrame
+    :param parfile: dictionary of timing solution (e.g., from ReadTimingModel)
+    :type parfile: dict
     :param t_start: load TOAs from t_start (in MJD)
     :type t_start: float | None
     :param t_stop: stop TOAs at t_stop (in MJD)
@@ -52,10 +53,13 @@ def load_toas_for_fit(tim_file: str, parfile: str, t_start: float | None = None,
     :rtype: pd.DataFrame
     """
     # Reading F0 to convert time uncertainties to phase uncertainties
-    F0 = readparfile(parfile)[0]['F0']
+    # "get_parameter_value" reads in the value whether the parfile dict has:
+    # - only value 'F0': 9.8765 (i.e., first return dictionary in ReadTimingModel)
+    # - or a dict of {'value': 9.8765, 'flag': 1} keys (i.e., third return dictionary in ReadTimingModel)
+    #  In both cases, F0 = 9.8765
+    F0 = get_parameter_value(parfile['F0'])
 
-    # Reading .tim file and store as an object of PulseToAs
-    tim_file_df = readtimfile(tim_file)
+    # Store .tim pulse TOA dataframe as an object of PulseToAs
     pt = PulseToAs(tim_file_df)
 
     # Filter for time if necessary
@@ -124,18 +128,6 @@ def add_phasewrap(toas_to_fit, t_mjd: float, mode: str = "add") -> pd.DataFrame:
     toas_to_fit["phase"] += sign * counts
 
     return toas_to_fit
-
-
-def readparfile(parfile: str):
-    """
-    Simple wrapper around ReadTimingModel which reads in a .par file as a list of dictionaries
-    :param parfile: timing solution as a .par file
-    :type parfile: str
-    :return: parameters as a dictionary without flags, and one that includes the flags
-    :rtype: tuple
-    """
-    parfile_params, _, parfile_params_flags = ReadTimingModel(parfile).readfulltimingmodel()
-    return parfile_params, parfile_params_flags
 
 
 # -------- Utilities --------
@@ -309,9 +301,8 @@ def validate_parfile(parfile):
 # -------- Model + Likelihood --------
 def model_phases(x_mjd, timmodel):
     """
-    Calculate the phases according to a timing model. This is done for fitting purposes:
-    We are fitting the phase shifts, and hence our timing model is some error on the timing parameters
-    which, when corrected for, the new timing solution will result in whitened residuals
+    Calculate mean-subtracted phases according to a timing model - for fitting purposes only
+    Use the module calcphase.py for all other purposes
     """
     phases, _ = calcphase(x_mjd, timmodel)  # full phases
     # Average so that after whitening, residuals align to 0,
@@ -661,13 +652,16 @@ def main():
 
     ###########################
     # reading TOAs and par file
-    toas_pre_fit = load_toas_for_fit(args.timfile_path, args.parfile, args.t_start, args.t_end, args.t_mjd, args.mode)
-    _, init_parfile = readparfile(args.parfile)
-    F0 = init_parfile['F0']['value']
+    init_parfile_withflags = ReadTimingModel(args.parfile).readfulltimingmodel()[2]
+    F0 = get_parameter_value(init_parfile_withflags['F0'])
+
+    tim_file_df = readtimfile(args.timfile_path)
+    toas_pre_fit = load_toas_for_fit(tim_file_df, init_parfile_withflags, args.t_start,
+                                     args.t_end, args.t_mjd, args.mode)
 
     ############################
     # Validate .par timing model
-    validate_parfile(init_parfile)
+    validate_parfile(init_parfile_withflags)
 
     START = toas_pre_fit["ToA"].min()
     FINISH = toas_pre_fit["ToA"].max()
@@ -676,7 +670,7 @@ def main():
     ########################################################################################
     # MCMC posteriors if desired (currently only way to get uncertainties on fit parameters)
     if args.mcmc:
-        keys = list_fit_keys(init_parfile)
+        keys = list_fit_keys(init_parfile_withflags)
         # check for the prior yaml file
         if args.mcmc and args.init_yaml is None:
             parser.error("-iy (or --init_yaml) is required when -mc (or --mcmc) is used")
@@ -685,7 +679,7 @@ def main():
         # Run MCMC with emcee
         print("Running MCMC with emcee...")
         sampler, flat, summaries = run_mcmc(x=toas_pre_fit["ToA"], y=toas_pre_fit["phase"],
-                                            yerr=toas_pre_fit["phase_err_cycle"], init_parfile=init_parfile,
+                                            yerr=toas_pre_fit["phase_err_cycle"], init_parfile=init_parfile_withflags,
                                             keys=keys, prior=prior, steps=args.mcmc_steps, burn=args.mcmc_burn,
                                             walkers=args.mcmc_walkers, corner_pdf=args.corner_pdf,
                                             chain_npy=args.chain_npy, flat_npy=args.flat_npy, progress=True)
@@ -699,7 +693,7 @@ def main():
 
         # prepare medians in keys order
         med_vec = np.array([summaries[name]['median'] for name in keys], dtype=float)
-        post_mcmc_timdict_fit, post_mcmc_timdict = inject_free_params(init_parfile, med_vec, keys)
+        post_mcmc_timdict_fit, post_mcmc_timdict = inject_free_params(init_parfile_withflags, med_vec, keys)
 
         source_label = "MCMC (posterior medians)"
 
@@ -737,7 +731,7 @@ def main():
         ##############################
         # Build the objective function
         nll, p0, keys, tmpl_parfile = make_nll(toas_pre_fit["ToA"], toas_pre_fit["phase"],
-                                               toas_pre_fit["phase_err_cycle"], init_parfile, args.init_yaml)
+                                               toas_pre_fit["phase_err_cycle"], init_parfile_withflags, args.init_yaml)
 
         ########################
         # MLE of above objective

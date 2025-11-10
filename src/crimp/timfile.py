@@ -15,6 +15,11 @@ import pandas as pd
 
 # Custom scripts
 from crimp.ephemIntegerRotation import ephemIntegerRotation
+# Log config
+############
+from crimp.logging_utils import get_logger
+
+logger = get_logger(__name__)
 
 
 def readtimfile(timfile: str, comment: int = '#', skiprows: int = 1):
@@ -73,6 +78,7 @@ class PulseToAs(object):
     writetimfile():
         write dataframe to .tim tempo2 format TOA file
     """
+
     def __init__(self, pulsetoas: pd.DataFrame):
         """
         Constructs the necessary attribute for the PulseToAs object
@@ -112,13 +118,21 @@ class PulseToAs(object):
         else:
             return self.df.loc[mask].copy()
 
-    def writetimfile(self, timfilename: str):
+    def writetimfile(self, timfilename: str, clobber: bool = False) -> None:
         """
         Writes .tim file
         :param timfilename: name of output .tim filename
         :type timfilename: str
+        :param clobber: override existing .tim file
+        :type clobber: bool
         """
-        self.df.to_csv(timfilename + '.tim', sep=' ', index=False, header=False, mode='x')
+
+        # Create CSV of local ephemerides
+        assert isinstance(clobber, bool), "Clobber must be of type boolean"
+        if not clobber:
+            self.df.to_csv(timfilename + '.tim', sep=' ', index=False, header=False, mode='x')
+        else:
+            self.df.to_csv(timfilename + '.tim', sep=' ', index=False, header=False)
 
         # Append .tim file with the format at the start of file - no straightforward way to do this
         with open(timfilename + '.tim', 'r+') as appendtimfile:
@@ -130,7 +144,8 @@ class PulseToAs(object):
         return None
 
 
-def phshiftTotimfile(ToAs, timMod, timfile='residuals', tempModPP='ppTemplateMod', inst='Xray', addpn=False):
+def phshiftTotimfile(ToAs, timMod, timfile='residuals', tempModPP='ppTemplateMod', inst='Xray', addpn=False,
+                     clobber=False):
     """
     Convert phase shifts to a .tim file compatible with Tempo2 and PINT
     :param ToAs: text file containing phase-shifts (created with measureToAs.py)
@@ -145,6 +160,8 @@ def phshiftTotimfile(ToAs, timMod, timfile='residuals', tempModPP='ppTemplateMod
     :type inst: str
     :param addpn: flag to add pulse numbers (default = False)
     :type addpn: bool
+    :param clobber: override .tim file? (default = False)
+    :type clobber: bool
     :return: .tim file as pandas DataFrame
     :rtype: pandas.DataFrame
     """
@@ -194,7 +211,7 @@ def phshiftTotimfile(ToAs, timMod, timfile='residuals', tempModPP='ppTemplateMod
     # Convert dictionary to pandas dataframe
     ToAs_Tim = pd.DataFrame.from_dict(ToAs_Tim_dict)
 
-    PulseToAs(ToAs_Tim).writetimfile(timfile)
+    PulseToAs(ToAs_Tim).writetimfile(timfile, clobber=clobber)
 
     return ToAs_Tim
 
@@ -213,9 +230,11 @@ def main():
                         type=str, default='Xray')
     parser.add_argument("-ap", "--addpn", help="Flag to add pulse numbering, default = False", type=bool,
                         default=False, action=argparse.BooleanOptionalAction)
+    parser.add_argument("-cl", "--clobber", help="Override .tim file (default=False)",
+                        default=False, action=argparse.BooleanOptionalAction)
     args = parser.parse_args()
 
-    phshiftTotimfile(args.ToAs, args.timMod, args.timfile, args.tempModPP, args.inst, args.addpn)
+    phshiftTotimfile(args.ToAs, args.timMod, args.timfile, args.tempModPP, args.inst, args.addpn, args.clobber)
 
 
 if __name__ == '__main__':

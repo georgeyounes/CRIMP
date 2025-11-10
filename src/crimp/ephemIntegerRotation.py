@@ -1,8 +1,8 @@
 """
-A simple script that, given an MJD and a .par file, will provide
-the earliest MJD that results in an integer number of rotational
-phases from PEPOCH (epoch of timing solution) and corresponding
-ephemerides (currently only spin frequency)
+A simple module that, given an input MJD and a .par file, will provide
+the earliest MJD from the input MJD that results in an integer number
+of rotational phases from PEPOCH according to the input timing solution.
+It will also provide the ephemerides at that MJD, i.e., F0, and F1.
 
 Reminder that this script deals with taylor expansion of the phase
 evolution and a random number of glitches. Binary motion is not
@@ -14,8 +14,6 @@ Can be run from command line via "ephemintegerrotation"
 import argparse
 import sys
 
-import numpy as np
-
 # Custom modules
 from crimp.ephemTmjd import ephemTmjd
 from crimp.calcphase import calcphase
@@ -25,12 +23,12 @@ sys.dont_write_bytecode = True
 
 def ephemIntegerRotation(Tmjd, timMod, printOutput=False):
     """
-    Function that provides the earliest MJD and corresponding spin frequency
-    to input MJD, which, according to the input .par file, would result in an
-    integer number of rotational phases from PEPOCH
+    Function that provides the earliest MJD to input MJD, which,
+    according to the input .par file, would result in an integer
+    number of rotational phases from PEPOCH. It also provides the
+    corresponding F0 and F1 to the inferred MJD.
 
-    :param Tmjd: time for measurement of ephemerides that result
-                 in integer number of rotational phases.
+    :param Tmjd: time
     :type Tmjd: float
     :param timMod: .par file
     :type timMod: str
@@ -50,16 +48,16 @@ def ephemIntegerRotation(Tmjd, timMod, printOutput=False):
 
     Tmjd_intRotation = Tmjd - FracTFromIntRotation
     freq_Tmjd_intRotation = ephemTmjd(Tmjd_intRotation, timMod)["freqAtTmjd"]
+    freqdot_Tmjd_intRotation = ephemTmjd(Tmjd_intRotation, timMod)["freqdotAtTmjd"]
     ph_intRotation, _ = calcphase(Tmjd_intRotation, timMod)
-    ph_intRotation = np.round(ph_intRotation)
 
     if printOutput is True:
-        print('Input Tmjd = {} days. Corresponding spin frequency = {} Hz. Corresponding phase = {} \n'
-              'Earliest Tmjd with integer number of rotation = {}. Corresponding '
-              'frequency = {}. Corresponding phase = {}'.format(Tmjd, freq_Tmjd, ph_Tmjd, Tmjd_intRotation, freq_Tmjd_intRotation, ph_intRotation))
+        print(f"Input Tmjd = {Tmjd} days. Corresponding spin frequency = {freq_Tmjd} Hz. "
+              f"Corresponding phase = {ph_Tmjd} \n Earliest Tmjd with integer number of rotation = {Tmjd_intRotation}. "
+              f"Corresponding frequency = {freq_Tmjd_intRotation}. Corresponding phase = {ph_intRotation}")
 
     ephemerides_intRotation = {'Tmjd_intRotation': Tmjd_intRotation, 'freq_intRotation': freq_Tmjd_intRotation,
-                               'ph_intRotation': ph_intRotation}
+                               'freqdot_intRotation': freqdot_Tmjd_intRotation, 'ph_intRotation': ph_intRotation}
 
     return ephemerides_intRotation
 

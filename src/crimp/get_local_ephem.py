@@ -12,9 +12,11 @@ import argparse
 
 from crimp.readtimingmodel import ReadTimingModel
 from crimp.ephemIntegerRotation import ephemIntegerRotation
+
 from crimp.fit_toas import (load_toas_for_fit, model_phases, inject_free_params, plot_residulas,
                             Prior, run_mcmc, list_fit_keys, chi2_fit)
 from crimp.plot_local_ephem import plot_local_ephemerides
+from crimp.timfile import readtimfile
 
 # Log config
 ############
@@ -58,7 +60,7 @@ def generate_local_ephemerides(
     :type outputfile: str | None
     :param ephem_plot: name of output .pdf plot of local F0, F1 vs time
     :type outputfile: str | None
-    :param clobber: override existing .txt file ('outputfile'.txt) of local F0, F1
+    :param clobber: override existing .txt file of local F0, F1? Default: False
     :type clobber: bool
     :return: local_ephem_final_df: dataframe of F0, F1, and MJD of each time interval with uncertainties
     :rtype: pd.DataFrame
@@ -86,14 +88,13 @@ def generate_local_ephemerides(
     glitch_epochs = sorted([value for key, value in parfile_params.items() if glitch_substring in key])
 
     # Reading TOAs from .tim file
-    toa_df = load_toas_for_fit(tim_file, parfile)
-    toas = toa_df['ToA']
+    toa_df = readtimfile(tim_file)
 
     # Start and stop times
     if t_start is None:
-        t_start = np.min(toas)
+        t_start = np.min(toa_df['pulse_ToA'])
     if t_end is None:
-        t_end = np.max(toas)
+        t_end = np.max(toa_df['pulse_ToA'])
 
     local_ephem_final = []
     current_start = t_start
@@ -105,17 +106,17 @@ def generate_local_ephemerides(
         current_end = min(current_start + interval_days, t_end)
 
         # Select ToAs between current_start and current_end
-        mask = (toa_df['ToA'] >= current_start) & (toa_df['ToA'] <= current_end)
-        df_interval = toa_df.loc[mask]
+        mask = (toa_df['pulse_ToA'] >= current_start) & (toa_df['pulse_ToA'] <= current_end)
+        toa_df_interval = toa_df.loc[mask]
 
-        if df_interval.empty:
+        if toa_df_interval.empty:
             # skip interval if no data but current_start < t_end is still true (e.g., long gap)
             current_start += jump_days
             continue
 
         # redefine current_start and current_end to match the exact days of TOA
-        current_start = df_interval['ToA'].min()
-        current_end = df_interval['ToA'].max()
+        current_start = toa_df_interval['pulse_ToA'].min()
+        current_end = toa_df_interval['pulse_ToA'].max()
 
         # Check if this interval crosses a glitch
         crossing_glitch = None
@@ -124,22 +125,29 @@ def generate_local_ephemerides(
                 crossing_glitch = g
                 break
 
+        # If we crossed a glitch indeed - refilter and redefine everything
         if crossing_glitch:
             # Truncate interval before glitch
             current_end = crossing_glitch
+            # re-filter data according to glitch_epoch
+            mask = toa_df_interval['pulse_ToA'] <= current_end
+            toa_df_interval = toa_df_interval.loc[mask]
+            # Redefine end more precisely
+            current_end = toa_df_interval['pulse_ToA'].max()
 
         # Exact time of mid-interval
         interval_mid = current_start + (current_end - current_start) / 2.0
         # Number of TOAs in this interval
-        n_toa_interval = len(df_interval)
+        n_toa_interval = len(toa_df_interval)
         # Length of time interval
         span_days = (current_end - current_start) if n_toa_interval > 0 else 0.0
         # if length of time interval > min_interval and number of TOA in interval is >= 4 then continue
         if (n_toa_interval >= 4) and (span_days > min_interval):
             # ---- Fit the corresponding subset of ToAs - from fit_toas.py ----
-            # Get F0 at mid-interval (note that I am trying to maintain the same phases for ease of fitting)
+            # Get F0 at mid-interval (simply to be as close as possible to correct solution for ease of fitting)
             ephem_tmp = ephemIntegerRotation(interval_mid, parfile)
             F0_mid = ephem_tmp['freq_intRotation']
+            F1_mid = ephem_tmp['freqdot_intRotation']
             interval_mid = ephem_tmp['Tmjd_intRotation']
 
             # Build a dictionary par file that fit_toas will understand
@@ -147,7 +155,7 @@ def generate_local_ephemerides(
             # Only caveat is that F0 to F12 must be provided - fill in F0, F1, and then padd 0 afterward
             all_keys = ["PEPOCH"] + [f"F{i}" for i in range(0, 13)]
             # Define the non-zero values for the first three keys
-            base_values = [interval_mid, F0_mid, F1_global]
+            base_values = [interval_mid, F0_mid, F1_mid]  # F0_mid
             base_flags = [0, 1, 1]
             # For the remaining keys (F2–F12), fill with zeros and flag=0
             n_extra = len(all_keys) - len(base_values)
@@ -163,32 +171,33 @@ def generate_local_ephemerides(
             fit_keys = list_fit_keys(init_par_file_dict)
             # Build the priors
             bounds = {
-                'F0': (-1 / (span_days * 86400), 1 / (span_days * 86400)),
-                'F1': (-1 / (span_days * 86400) ** 2, 1 / (span_days * 86400) ** 2),
+                'F0': (-10 / (span_days * 86400), 10 / (span_days * 86400)),
+                'F1': (-100 / (span_days * 86400) ** 2, 100 / (span_days * 86400) ** 2),
             }
             # Instantiate the Prior object - from fit_toas.py
             priors = Prior(bounds=bounds, initial_guess={})
 
             if debug_with_plots is True:
                 corner_plot = f"corner_interval_{int_counter}.pdf"
-                int_counter += 1
             else:
                 corner_plot = None
 
-            df_interval.loc[:, 'phase'] -= df_interval['phase'].mean()  # recenter things
-            _, _, summaries = run_mcmc(x=df_interval['ToA'], y=df_interval['phase'],
-                                       yerr=df_interval["phase_err_cycle"], init_parfile=init_par_file_dict,
+            # Create phases according to the above initial timing model
+            toas_to_fit = load_toas_for_fit(toa_df_interval, init_par_file_dict)
+            _, _, summaries = run_mcmc(x=toas_to_fit['ToA'], y=toas_to_fit['phase'],
+                                       yerr=toas_to_fit["phase_err_cycle"], init_parfile=init_par_file_dict,
                                        keys=fit_keys, prior=priors, steps=1000, burn=100, walkers=24,
                                        progress=False, corner_pdf=corner_plot)
 
             # Recover timing dict from best mcmc fit
             med_vec = np.array([summaries[name]['median'] for name in fit_keys], dtype=float)
             post_mcmc_timdict_fit, post_mcmc_timdict = inject_free_params(init_par_file_dict, med_vec, fit_keys)
-            phase_residulas_post_fit = model_phases(df_interval['ToA'], post_mcmc_timdict_fit)
+            phase_residulas_post_fit = model_phases(toas_to_fit['ToA'], post_mcmc_timdict_fit)
 
             if debug_with_plots is True:
                 # plot residuals after MCMC run
-                plot_residulas(df_interval, phase_residulas_post_fit, plotname=f"residuals_interval_{int_counter}")
+                plot_residulas(toas_to_fit, phase_residulas_post_fit, plotname=f"residuals_interval_{int_counter}")
+                int_counter += 1
 
             # Extract best-fit F0, F1 and their uncertainties
             # For error, convert to symmetric, take max of +/- q34 around q50
@@ -199,8 +208,8 @@ def generate_local_ephemerides(
 
             # Get statistics of best-fit for interval
             nbr_free_param = 2
-            simple_stats = chi2_fit(df_interval['phase'], phase_residulas_post_fit,
-                                    df_interval["phase_err_cycle"], nbr_free_param)
+            simple_stats = chi2_fit(toas_to_fit['phase'], phase_residulas_post_fit,
+                                    toas_to_fit["phase_err_cycle"], nbr_free_param)
 
             local_ephem_final.append({
                 'TOA_MJD_ref': interval_mid,

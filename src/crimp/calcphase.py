@@ -12,7 +12,7 @@ import os
 from math import factorial
 
 # Custom modules
-from crimp.readtimingmodel import ReadTimingModel
+from crimp.readtimingmodel import ReadTimingModel, get_parameter_value
 
 sys.dont_write_bytecode = True
 
@@ -25,7 +25,7 @@ class Phases:
         ----------
         timeMJD : float
             time array in modified julian day
-        timMod : str
+        timMod : str | dict
             timing model, i.e., .par file or a dictionary
 
         Methods
@@ -46,7 +46,7 @@ class Phases:
         ----------
             timeMJD : float
                 time array in modified julian day
-            timMod : str
+            timMod : str | dict
                 timing model, i.e., .par file or a dictionary
         """
         # original shape to restore later
@@ -65,16 +65,10 @@ class Phases:
     def _normalize_timdict(d):
         """
         Make sure the dict has the expected keys and numeric types
+        - Converts numeric values to float
+        - If a sub-dict contains both {'value', 'flag'}, replaces it with float(value), for ease of phase calculation
         """
-        out = {}
-        for k, v in d.items():
-            # try to coerce simple numeric values to float
-            if isinstance(v, (int, float, np.floating)):
-                out[k] = float(v)
-            else:
-                # keep sub-dicts (e.g., WAVE1: {'A':..., 'B':...}) as-is
-                out[k] = v
-        return out
+        return {k: get_parameter_value(v) for k, v in d.items()}
 
     def taylorexpansion(self):
         """

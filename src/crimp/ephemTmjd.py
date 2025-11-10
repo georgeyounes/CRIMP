@@ -1,5 +1,5 @@
 """
-A simple script to derive the ephemerides (only frequency at
+A simple script to derive the ephemerides (F and F_dot at
 the moment) at a given MJD based on a timing solution. Currently,
 this script takes into account taylor expansion of the phase
 evolution and a random number of glitches - binary motion is
@@ -32,15 +32,20 @@ def ephemTmjd(Tmjd, timMod):
     t0mjd = timModParam["PEPOCH"]
 
     #############################
-    # Taking into account the taylor expansion terms to the frequency evolution
+    # Taking into account the taylor expansion terms to F and F_dot evolution
     freqAtTmjd_te = timModParam["F0"]
     for nn in range(1, 13):
         freqAtTmjd_te += (1 / factorial(nn)) * timModParam["F" + str(nn)] * ((Tmjd - t0mjd) * 86400) ** nn
+
+    freqdotAtTmjd_te = timModParam["F1"]
+    for nn in range(2, 13):
+        freqdotAtTmjd_te += (1 / factorial(nn-1)) * timModParam["F" + str(nn)] * ((Tmjd - t0mjd) * 86400) ** (nn-1)
 
     ##################################
     # Taking into account the glitches
     nbrGlitches = len([gg for glKey, gg in timModParam.items() if glKey.startswith('GLEP_')])
     freqAtTmjd_gl = 0  # initializing the jump in frequency due to all glitches combined
+    freqdotAtTmjd_gl = 0  # initializing the jump in frequency due to all glitches combined
 
     for jj in range(1, nbrGlitches + 1):
         glep = timModParam["GLEP_" + str(jj)]
@@ -57,12 +62,16 @@ def ephemTmjd(Tmjd, timMod):
             # Here we calculate frequency shift according to each glitch model for all time column,
             # then we multiply by 0 if times are < glep and 1 if times are > glep using the boolean list created above
             freqAtTmjd_gl += (glf0 + (glf1 * ((Tmjd - glep) * 86400)) + (0.5 * glf2 * ((Tmjd - glep) * 86400) ** 2) +
-                              (glf0d * np.exp(-((Tmjd - glep) * 86400) / (gltd * 86400)))) * timesAfterGlitch
+                              (glf0d * np.exp(-(Tmjd - glep) / gltd))) * timesAfterGlitch
+            freqdotAtTmjd_gl += ((glf1 + (glf2 * ((Tmjd - glep) * 86400)) +
+                                 (-(glf0d/(gltd*86400)) * np.exp(-((Tmjd - glep) * 86400) / (gltd * 86400))))
+                                 * timesAfterGlitch)
 
     ######################################
     # Adding all frequency-shifts together
     freqAtTmjd = freqAtTmjd_te + freqAtTmjd_gl
+    freqdotAtTmjd = freqdotAtTmjd_te + freqdotAtTmjd_gl
 
-    ephemerides = {'Tmjd': Tmjd, 'freqAtTmjd': freqAtTmjd}
+    ephemerides = {'Tmjd': Tmjd, 'freqAtTmjd': freqAtTmjd, 'freqdotAtTmjd': freqdotAtTmjd}
 
     return ephemerides

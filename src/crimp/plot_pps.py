@@ -220,16 +220,27 @@ def plotting_phase_time(time_energy_phase_df, nphasebins=32, ntimebins=12,
     denom = row_max - row_min
     # Initialize output as NaN
     rate = np.full_like(H_T, np.nan, dtype=float)
-    # Compute normalized values where denom != 0 - time slice which does not have any data
+    # Compute normalized values where denom != 0, i.e., skip time slices which do not have any data
     np.divide(H_T - row_min, denom, out=rate, where=denom != 0)
 
-    # Optional Gaussian smoothing
+    # Optional Gaussian smoothing (a little more complicated than above since we may have time gaps)
     if smooth_sigma is not None:
-        # Apply smoothing in both phase (x) and energy (y) directions
-        # smooth_sigma can be a float or a list/tuple [sigma_energy, sigma_phase]
+        # float or list, which will be mapped to tuple (sigma_time, sigma_phase)
         if isinstance(smooth_sigma, list):
             smooth_sigma = tuple(smooth_sigma)
-        rate = gaussian_filter(rate, sigma=smooth_sigma, mode='nearest')
+
+        mask = np.isfinite(rate)
+        data = np.where(mask, rate, 0.0).astype(float)
+        wts = mask.astype(float)
+
+        # Convolve data and weights separately, then divide
+        data_blur = gaussian_filter(data, sigma=smooth_sigma, mode='nearest')
+        wts_blur = gaussian_filter(wts, sigma=smooth_sigma, mode='nearest')
+
+        with np.errstate(invalid='ignore', divide='ignore'):
+            rate_smooth = data_blur / wts_blur
+        # keep NaN where there was no support
+        rate = np.where(wts_blur > 0, rate_smooth, np.nan)
 
     # Plot
     fig, ax = plt.subplots(1, figsize=(12, 6), dpi=80, facecolor='w', edgecolor='k')

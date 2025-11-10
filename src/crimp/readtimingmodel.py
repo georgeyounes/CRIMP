@@ -27,6 +27,7 @@ class ReadTimingModel:
       - readwaves():           (values, flags, both)  # flags only for WAVE_OM
       - readfulltimingmodel(): (timModParams, timModFlags, timModBoth),
       - readstatistics(): (stats)  # dict of CHI2R, NTOA, and TRES
+      - readmiscellaneous():   Miscellaneous keywords in .par file (e.g. TZRMJD, TZRSITE, etc.)
     """
 
     def __init__(self, timMod: str):
@@ -299,6 +300,21 @@ class ReadTimingModel:
                         pass
 
         return misc_keys
+
+
+def get_parameter_value(entry):
+    """
+    Return the value of a parameter in a dictionary timing model when the parameter is either:
+      - a plain numeric (int/float/np.floating)
+      - a dict containing {'value', 'flag'}. In this instance, the key 'value' is returned
+    """
+    if isinstance(entry, (int, float, np.floating)):
+        return float(entry)
+    elif isinstance(entry, dict) and set(entry.keys()) >= {"value", "flag"}:
+        val = entry.get("value")
+        return float(val) if isinstance(val, (int, float, np.floating)) else val
+    else:
+        return entry
 
 
 def patch_par_values(

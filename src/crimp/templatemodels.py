@@ -1,7 +1,7 @@
 """
 A module that encapsulates all the allowed models to derive a best-fit template
 to the pulse profiles. These are Fourier, von Mises, and Cauchy. Each model has
-its own class. Each class has three methods, (1) to calculate model curve given
+its own class. Each class has three methods, (1) to calculate best-fit model given
 model parameters and an array of phases, (2) a binned likelihood function  with a
 gaussian pdf, and (3) an unbinned extended likelihood function with a poisson pdf
 
