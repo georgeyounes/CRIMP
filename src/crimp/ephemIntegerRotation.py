@@ -66,8 +66,8 @@ def main():
     parser = argparse.ArgumentParser(description="Calculate earliest MJD (and corresponding spin frequency and "
                                                  "rotational phase) that results in an integer number of rotations")
     parser.add_argument("tMJD", help="Time in MJD at which to derive frequency and rotational phase", type=float)
-    parser.add_argument("timMod", help="Timing model in text format. A tempo2 .par file should work.", type=str)
-    parser.add_argument('-po', '--printOutput', help='Print output.', type=bool,
+    parser.add_argument("timMod", help="Timing model in text format. A tempo2 .par file should work", type=str)
+    parser.add_argument('-po', '--printOutput', help='Print output',
                         default=False, action=argparse.BooleanOptionalAction)
     args = parser.parse_args()
 

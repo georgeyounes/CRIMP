@@ -631,7 +631,8 @@ def main():
     # Fitting and MCMC options
     parser.add_argument("-iy", "--init_yaml", type=str,
                         help="YAML file mapping parameter names to initial starting points and/or bounds")
-    parser.add_argument("-mc", "--mcmc", action="store_true", help="Run emcee to sample posteriors")
+    parser.add_argument("-mc", "--mcmc", help="Run emcee to sample posteriors",
+                        default=False, action=argparse.BooleanOptionalAction)
     parser.add_argument("-st", "--mcmc-steps", type=int, default=10000,
                         help="Number of MCMC steps (default = 10000)")
     parser.add_argument("-bu", "--mcmc-burn", type=int, default=500,

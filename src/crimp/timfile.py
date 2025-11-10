@@ -228,7 +228,7 @@ def main():
                         default='ppTemplateMod')
     parser.add_argument("-in", "--inst", help="Instrument flag keyword in the .tim file, default = Xray",
                         type=str, default='Xray')
-    parser.add_argument("-ap", "--addpn", help="Flag to add pulse numbering, default = False", type=bool,
+    parser.add_argument("-ap", "--addpn", help="Flag to add pulse numbering, default = False",
                         default=False, action=argparse.BooleanOptionalAction)
     parser.add_argument("-cl", "--clobber", help="Override .tim file (default=False)",
                         default=False, action=argparse.BooleanOptionalAction)

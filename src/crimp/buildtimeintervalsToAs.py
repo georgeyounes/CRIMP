@@ -374,9 +374,9 @@ def main():
                         help="name of .txt output file that defines ToAs. Also name of .log file (default = timIntToAs)",
                         type=str,
                         default='timIntToAs')
-    parser.add_argument("-ce", "--correxposure", help="Flag to correct exposure/rate according to selected FPMs, "
-                                                      "default = False", type=bool, default=False,
-                        action=argparse.BooleanOptionalAction)
+    parser.add_argument("-ce", "--correxposure",
+                        help="Flag to correct exposure/rate according to selected FPMs, default = False",
+                        default=False, action=argparse.BooleanOptionalAction)
     parser.add_argument("-v", "--verbose", action="count", default=0,
                         help="WARNING if absent, -v: INFO, -vv: DEBUG")
     args = parser.parse_args()

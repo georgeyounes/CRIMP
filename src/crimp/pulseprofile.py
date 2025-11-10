@@ -770,14 +770,14 @@ def main():
                         type=str, default=None)
     parser.add_argument("-fp", "--fixPhases",
                         help="Flag to fix phases in input initial template model (initTemplateMod), default = False",
-                        type=bool, default=False, action=argparse.BooleanOptionalAction)
+                        default=False, action=argparse.BooleanOptionalAction)
     parser.add_argument("-fg", "--figure",
                         help="If supplied, a plot of the pulse profile will be produced, 'figure'.pdf", type=str,
                         default=None)
     parser.add_argument("-tf", "--templateFile", help="'Output' .txt file for best-fit model)", type=str,
                         default=None)
     parser.add_argument("-cp", "--calcPulsedFraction",
-                        help="Flag to calculate RMS pulsed fraction of pulse profile, default = False", type=bool,
+                        help="Flag to calculate RMS pulsed fraction of pulse profile, default = False",
                         default=False, action=argparse.BooleanOptionalAction)
     parser.add_argument("-v", "--verbose", action="count", default=0,
                         help="WARNING if absent, -v: INFO, -vv: DEBUG")

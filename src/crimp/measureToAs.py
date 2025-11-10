@@ -965,18 +965,18 @@ def main():
     parser.add_argument("-nb", "--nbrBins", help="Number of bins in PP for visualization purposes only, default = 15",
                         type=int, default=15)
     parser.add_argument("-va", "--varyAmps",
-                        help="Flag to allow the pulsed fraction of the template pulse profile to vary (not the shape!), default = False",
-                        type=bool, default=False, action=argparse.BooleanOptionalAction)
+                        help="Flag to allow the pulsed fraction of the template pulse profile to vary (not the shape!), "
+                             "default = False", default=False, action=argparse.BooleanOptionalAction)
     parser.add_argument("-rv", "--readvaryparam",
                         help="Flag to read-in the 'vary' keyword for each parameter in the template from the template "
-                             "model. default = False", type=bool, default=False, action=argparse.BooleanOptionalAction)
+                             "model. default = False", default=False, action=argparse.BooleanOptionalAction)
     parser.add_argument("-bm", "--brutemin",
                         help="boolean flag to run the global minimizing running the BRUTE method, default = False",
-                        type=bool, default=False, action=argparse.BooleanOptionalAction)
+                        default=False, action=argparse.BooleanOptionalAction)
     parser.add_argument("-pp", "--plotPPs", help="Flag to create pulse profile plots, default = False",
-                        type=bool, default=False, action=argparse.BooleanOptionalAction)
+                        default=False, action=argparse.BooleanOptionalAction)
     parser.add_argument("-ll", "--plotLLs", help="Flag to create LogLikelihood plots, default = False",
-                        type=bool, default=False, action=argparse.BooleanOptionalAction)
+                        default=False, action=argparse.BooleanOptionalAction)
     parser.add_argument("-tf", "--toaFile", help="name of output ToA file (default = ToAs(.txt)) and .log file",
                         type=str, default='ToAs')
     parser.add_argument("-mf", "--timFile",
