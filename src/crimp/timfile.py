@@ -206,7 +206,7 @@ def phshiftTotimfile(ToAs, timMod, timfile='residuals', tempModPP='ppTemplateMod
     if addpn:
         pulsenumber -= np.min(pulsenumber)
         ToAs_Tim_dict['pulsenumberflag'] = pulsenumberflag
-        ToAs_Tim_dict['pulsenumber'] = pulsenumber
+        ToAs_Tim_dict['pulsenumber'] = np.round(pulsenumber)  # round the pulse number (avoiding .99999 etc.)
 
     # Convert dictionary to pandas dataframe
     ToAs_Tim = pd.DataFrame.from_dict(ToAs_Tim_dict)
