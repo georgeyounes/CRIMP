@@ -288,7 +288,7 @@ def measureToA_fourier(tempModPP, cycleFoldedPhases, exposureInt, outFile='', ph
         return -Fourier(param, xx).loglikelihoodFSnormalized(exposure)
 
     # Run brute force minimization if requested
-    if brutemin is True:
+    if brutemin:
         results_mle_FSNormalized_bm = minimize(unbinnednllfourier, initTempModPPparam,
                                                args=(cycleFoldedPhases, exposureInt),
                                                method='brute', max_nfev=1.0e4, nan_policy='propagate')
@@ -302,7 +302,7 @@ def measureToA_fourier(tempModPP, cycleFoldedPhases, exposureInt, outFile='', ph
                                             method='nedler', max_nfev=1.0e4, nan_policy='propagate')
 
     # In case pulsed fraction should be varied
-    if varyAmps is True:
+    if varyAmps:
         initTempModPPparam_afterfit = copy.deepcopy(results_mle_FSNormalized.params)
         initTempModPPparam_afterfit.add('ampShift', 1, min=0.01, max=100, vary=True)
         results_mle_FSNormalized = minimize(unbinnednllfourier, initTempModPPparam_afterfit,
@@ -376,7 +376,7 @@ def measureToA_fourier(tempModPP, cycleFoldedPhases, exposureInt, outFile='', ph
 
     # Plotting the Log(L) distribution
     # For debugging purposes only
-    if plotLLs is True:
+    if plotLLs:
         plotLogLikelihood(phShiftDist, logLikeDist, outFile=outFile)
 
     # Measuring chi2 of each profile from model template
@@ -393,7 +393,7 @@ def measureToA_fourier(tempModPP, cycleFoldedPhases, exposureInt, outFile='', ph
 
     # Plotting pulse profile of each ToA along with the best fit template model before and after correcting the phase shift
     #######################################################################################################################
-    if plotPPs is True:
+    if plotPPs:
         initModel = Fourier(initTempModPPparam, ppBins).fourseries()
         plotPPofToAs(ppBins, ctRate, ctRateErr, bfModel, initModel, outFile=outFile)
 
@@ -440,7 +440,7 @@ def measureToA_cauchy(tempModPP, cycleFoldedPhases, exposureInt, outFile='', phS
         return -WrappedCauchy(param, xx).loglikelihoodCAnormalized(exposure)
 
     # Run brute force minimization if requested
-    if brutemin is True:
+    if brutemin:
         results_mle_CANormalized_bm = minimize(unbinnednllcauchy, initTempModPPparam,
                                                args=(cycleFoldedPhases, exposureInt),
                                                method='brute', max_nfev=1.0e4, nan_policy='propagate')
@@ -455,7 +455,7 @@ def measureToA_cauchy(tempModPP, cycleFoldedPhases, exposureInt, outFile='', phS
                                             method='nedler', max_nfev=1.0e4, nan_policy='propagate')
 
     # In case pulsed fraction should be varied
-    if varyAmps is True:
+    if varyAmps:
         initTempModPPparam_afterfit = copy.deepcopy(results_mle_CANormalized.params)
         initTempModPPparam_afterfit.add('ampShift', 1, min=0.0, max=np.inf, vary=True)
         results_mle_CANormalized = minimize(unbinnednllcauchy, initTempModPPparam_afterfit,
@@ -521,7 +521,7 @@ def measureToA_cauchy(tempModPP, cycleFoldedPhases, exposureInt, outFile='', phS
 
     # Plotting the Log(L) distribution
     # For debugging purposes only
-    if plotLLs is True:
+    if plotLLs:
         plotLogLikelihood(phShiftDist, logLikeDist, outFile=outFile)
 
     # Measuring chi2 of each profile from model template
@@ -538,7 +538,7 @@ def measureToA_cauchy(tempModPP, cycleFoldedPhases, exposureInt, outFile='', phS
 
     # Plotting pulse profile of each ToA along with the best fit template model before and after correcting the phase shift
     #######################################################################################################################
-    if plotPPs is True:
+    if plotPPs:
         initModel = WrappedCauchy(initTempModPPparam, ppBins).wrapcauchy()
         plotPPofToAs(ppBins, ctRate, ctRateErr, bfModel, initModel, outFile=outFile)
 
@@ -584,7 +584,7 @@ def measureToA_vonmises(tempModPP, cycleFoldedPhases, exposureInt, outFile='', p
     def unbinnednllvonmises(param, xx, exposure):
         return -VonMises(param, xx).loglikelihoodVMnormalized(exposure)
 
-    if brutemin is True:
+    if brutemin:
         results_mle_VMNormalized_bm = minimize(unbinnednllvonmises, initTempModPPparam,
                                                args=(cycleFoldedPhases, exposureInt),
                                                method='brute', max_nfev=1.0e4, nan_policy='propagate')
@@ -599,7 +599,7 @@ def measureToA_vonmises(tempModPP, cycleFoldedPhases, exposureInt, outFile='', p
                                             method='nedler', max_nfev=1.0e4, nan_policy='propagate')
 
     # In case pulsed fraction should be varied
-    if varyAmps is True:
+    if varyAmps:
         initTempModPPparam_afterfit = copy.deepcopy(results_mle_VMNormalized.params)
         initTempModPPparam_afterfit.add('ampShift', 1, min=0.0, max=np.inf, vary=True)
         results_mle_VMNormalized = minimize(unbinnednllvonmises, initTempModPPparam_afterfit,
@@ -665,7 +665,7 @@ def measureToA_vonmises(tempModPP, cycleFoldedPhases, exposureInt, outFile='', p
 
     # Plotting the Log(L) distribution
     # For debugging purposes only
-    if plotLLs is True:
+    if plotLLs:
         plotLogLikelihood(phShiftDist, logLikeDist, outFile=outFile)
 
     # Measuring chi2 of each profile from model template
@@ -683,7 +683,7 @@ def measureToA_vonmises(tempModPP, cycleFoldedPhases, exposureInt, outFile='', p
 
     # Plotting pulse profile of each ToA along with the best fit template model before and after correcting the phase shift
     #######################################################################################################################
-    if plotPPs is True:
+    if plotPPs:
         initModel = VonMises(initTempModPPparam, ppBins).vonmises()
         plotPPofToAs(ppBins, ctRate, ctRateErr, bfModel, initModel, outFile=outFile)
 

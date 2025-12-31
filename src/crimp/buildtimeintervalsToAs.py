@@ -19,9 +19,9 @@ each ToA, the total number of counts in each ToA, and the
 exact count rate. A log file "outFile".log is also cretead.
 
 The code will clean the output file slightly in the sense that
-it will merge any time intervals that have counts < max_counts
+it will merge any time intervals that have counts < min_counts
 **and** delta_t < max_wait with the previous one. By default,
-max_counts = totCtsEachToA/2 and max_wait = waitTimeCutoff
+min_counts = totCtsEachToA/2 and max_wait = waitTimeCutoff
 
 The code can be run from the command line as "timeintervalsfortoas"
 
@@ -57,11 +57,12 @@ from crimp.eventfile import EvtFileOps
 # Log config
 ############
 from crimp.logging_utils import get_logger, configure_logging
+
 logger = get_logger(__name__)
 
 
 def timeintervalsToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.5, eneHigh=10,
-                      max_counts: int | None = None, max_wait: float | None = None,
+                      min_counts: int | None = None, max_wait: float | None = None,
                       outputFile="timIntToAs", correxposure=False):
     """
     Calculates START and END times that will define each TOA
@@ -75,8 +76,8 @@ def timeintervalsToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.
     :type eneLow: float
     :param eneHigh: default = 10 (keV)
     :type eneHigh: float
-    :param max_counts: max counts < which merge time interval with previous ones (default = totCtsEachToA/2)
-    :type max_counts: int
+    :param min_counts: min counts < which merge time interval with previous ones (default = totCtsEachToA/2)
+    :type min_counts: int
     :param max_wait: max wait < which merge time interval with previous ones (default = waitTimeCutoff)
     :type max_wait: float
     :param outputFile: default = "timIntToAs"
@@ -86,9 +87,9 @@ def timeintervalsToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.
     :return: dataframe of TOA properties
     :rtype: pandas.DataFrame
     """
-    # Establishing max_counts and max_wait for TOA interval cleaning
-    if max_counts is None:
-        max_counts = int(totCtsEachToA/2)
+    # Establishing min_counts and max_wait for TOA interval cleaning
+    if min_counts is None:
+        min_counts = int(totCtsEachToA / 2)
     if max_wait is None:
         max_wait = waitTimeCutoff
 
@@ -98,7 +99,7 @@ def timeintervalsToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.
                 '\n waitTimeCutoff: ' + str(waitTimeCutoff) +
                 '\n eneLow: ' + str(eneLow) +
                 '\n eneHigh: ' + str(eneHigh) +
-                '\n max_counts: ' + str(max_counts) +
+                '\n min_counts: ' + str(min_counts) +
                 '\n max_wait: ' + str(max_wait) +
                 '\n outputFile: ' + str(outputFile) + '\n')
 
@@ -184,6 +185,10 @@ def timeintervalsToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.
             gtiList_fullToA_tmp[-1, -1] = timeToA[-1]
             # See below for explanation
             expToA_final = np.sum(gtiList_fullToA_tmp[:, -1] - gtiList_fullToA_tmp[:, 0])
+            if expToA_final == 0:
+                logger.warning(f"At {timeToA[0]} MJD: exposure = 0 likely caused by a single timestamp "
+                               f"in interval - skipping")
+                continue
             f.write(
                 str('{:0.9f}'.format(timeToA[0])) + '\t' + str(
                     '{:0.9f}'.format(timeToA[-1])) + '\t' + str(
@@ -212,6 +217,10 @@ def timeintervalsToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.
                 gtiList_fullToA_tmp[-1, -1] = timeToA[-1]
                 # See below for explanation
                 expToA_final = np.sum(gtiList_fullToA_tmp[:, -1] - gtiList_fullToA_tmp[:, 0])
+                if expToA_final == 0:
+                    logger.warning(f"At {timeToA[0]} MJD: exposure = 0 likely caused by a single timestamp "
+                                   f"in interval - skipping")
+                    continue
                 f.write(str('{:0.9f}'.format(timeToA[0])) + '\t' + str(
                     '{:0.9f}'.format(timeToA[-1])) + '\t' + str(
                     '{:0.9f}'.format(timeToA[-1] - timeToA[0])) + '\t' + str(
@@ -233,6 +242,10 @@ def timeintervalsToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.
                 gtiList_fullToA_tmp[-1, -1] = timeToA[-1]
                 # Sum all ToA GTI columns
                 expToA_final = np.sum(gtiList_fullToA_tmp[:, 1] - gtiList_fullToA_tmp[:, 0])
+                if expToA_final == 0:
+                    logger.warning(f"At {timeToA[0]} MJD: exposure = 0 likely caused by a single timestamp "
+                                   f"in interval - skipping")
+                    continue
                 f.write(str('{:0.9f}'.format(timeToA[0])) + '\t' + str(
                     '{:0.9f}'.format(timeToA[-1])) + '\t' + str(
                     '{:0.9f}'.format(timeToA[-1] - timeToA[0])) + '\t' + str(
@@ -244,8 +257,8 @@ def timeintervalsToAs(evtFile, totCtsEachToA=1000, waitTimeCutoff=1.0, eneLow=0.
     # reading the text file we just created as pandas table (i.e., time intervals that define each ToA)
     timInt_toas = pd.read_csv(outputFile + ".txt", sep=r'\s+')
 
-    # Row cleaning, i.e., merge TOA time intervals with counts < max_counts and waitime < max_wait
-    timInt_toas = merge_adjacent_intervals(timInt_toas, max_counts, max_wait)
+    # Row cleaning, i.e., merge TOA time intervals with counts < min_counts and waitime < max_wait
+    timInt_toas = merge_adjacent_intervals(timInt_toas, min_counts, max_wait)
 
     # Total number of TOA - this should be final after cleaning
     nbrToATOT = len(timInt_toas)
@@ -364,8 +377,8 @@ def main():
                         type=float, default=0.5)
     parser.add_argument("-eh", "--eneHigh", help="High energy filter in event file, default=10",
                         type=float, default=10)
-    parser.add_argument("-mc", "--max_counts",
-                        help="max counts < which merge time interval with previous ones, default = totCtsEachToA / 2",
+    parser.add_argument("-mc", "--min_counts",
+                        help="min counts < which merge time interval with previous ones, default = totCtsEachToA / 2",
                         type=int, default=None)
     parser.add_argument("-mw", "--max_wait",
                         help="max wait < which merge time interval with previous ones, default = waitTimeCutoff",
@@ -392,7 +405,7 @@ def main():
     cli_logger.info("\nCLI starting")
 
     timeintervalsToAs(args.evtFile, args.totCtsEachToA, args.waitTimeCutoff, args.eneLow, args.eneHigh,
-                      args.max_counts, args.max_wait, args.outputFile, args.correxposure)
+                      args.min_counts, args.max_wait, args.outputFile, args.correxposure)
 
 
 if __name__ == '__main__':

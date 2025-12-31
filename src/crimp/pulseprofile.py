@@ -8,7 +8,7 @@ It has two methods, one to simply create a pulse profile of the event file given
 with n=2 harmonics. These are optional arguments, and may be specified by the user.
 So far only a Fourier, a wrapped Gaussian (von Mises), or a wrapped Cauchy (Lorentzian)
 templates are allowed with a generic number of harmonics/components "nbrComp". The
-fitting procedure is done with a maximum likelihood using a gaussian pdf, on a binned
+fitting procedure is done with a maximum likelihood using a gaussian PDF, on a binned
 pulse profile with number of bins = 30 (could be changed as desired). An initial template
 could be provided (default=None) that would serve as initial guess to the fitting
 procedure. The output is a .txt file with the template best fit parameters and
@@ -34,6 +34,7 @@ from scipy.stats import norm
 import copy
 
 from lmfit import Parameters, minimize
+from tensorflow.python.ops.parallel_for.gradients import jacobian
 
 # Custom modules
 from crimp.eventfile import EvtFileOps
@@ -341,7 +342,7 @@ class ModelPulseProfile:
                 initParams_mle.add('ph_' + str(kk), initParams_mle_temp['ph_' + str(kk)]['value'],
                                    vary=initParams_mle_temp['ph_' + str(kk)]['vary'])
 
-                if self.fixPhases is True:  # In case component phases should be fixed
+                if self.fixPhases:  # In case component phases should be fixed
                     initParams_mle['ph_' + str(kk)].vary = False
 
                 # properly dealing with number of free parameters
@@ -357,8 +358,8 @@ class ModelPulseProfile:
         def binnednllfourier(param, xx, yy, yyErr):
             return -Fourier(param, xx).loglikelihoodFS(yy, yyErr)
 
-        results_mle_FS = minimize(binnednllfourier, initParams_mle, args=(ppBins, ctRate, ctRateErr), method='nedler',
-                                  max_nfev=1.0e6)
+        results_mle_FS = minimize(binnednllfourier, initParams_mle, args=(ppBins, ctRate, ctRateErr),
+                                  method='BFGS',max_nfev=1.0e6)
 
         # Calculating the bf Model for the data
         bfModel = Fourier(results_mle_FS.params, ppBins).fourseries()
@@ -431,7 +432,7 @@ class ModelPulseProfile:
                 initParams_mle.add('wid_' + str(kk), initParams_mle_temp['wid_' + str(kk)]['value'], min=0.0, max=np.inf,
                                    vary=initParams_mle_temp['wid_' + str(kk)]['vary'])
 
-                if self.fixPhases is True:  # In case component phases should be fixed
+                if self.fixPhases:  # In case component phases should be fixed
                     initParams_mle['cen_' + str(kk)].vary = False
 
                 # properly dealing with number of free parameters
@@ -449,7 +450,7 @@ class ModelPulseProfile:
             return -WrappedCauchy(param, xx).loglikelihoodCA(yy, yyErr)
 
         results_mle_CA = minimize(binnednllcauchy, initParams_mle, args=(ppBins, ctRate, ctRateErr),
-                                  method='nedler', max_nfev=1.0e6, nan_policy='propagate')
+                                  method='BFGS', max_nfev=1.0e6, nan_policy='propagate')
 
         # Calculating the bf Model for the data
         bfModel = WrappedCauchy(results_mle_CA.params, ppBins).wrapcauchy()
@@ -524,7 +525,7 @@ class ModelPulseProfile:
                                    max=np.inf,
                                    vary=initParams_mle_temp['wid_' + str(kk)]['vary'])
 
-                if self.fixPhases is True:  # In case component phases should be fixed
+                if self.fixPhases:  # In case component phases should be fixed
                     initParams_mle['cen_' + str(kk)].vary = False
 
                 # properly dealing with number of free parameters
@@ -542,7 +543,7 @@ class ModelPulseProfile:
 
         # Running the maximum likelihood
         results_mle_VM = minimize(binnednllvonmises, initParams_mle, args=(ppBins, ctRate, ctRateErr),
-                                  method='nedler', max_nfev=1.0e6, nan_policy='propagate')
+                                  method='BFGS', max_nfev=1.0e6, nan_policy='propagate')
 
         # Calculating the bf Model for the data
         bfModel = VonMises(results_mle_VM.params, ppBins).vonmises()
@@ -636,7 +637,7 @@ def calcuncertaintypulseproperties(pulseProfile, nbrComp):
     :return: pulsePropertiesErr
     :rtype: dict
     """
-    # Error calculation is done through a simple monte carlo simulation
+    # Error calculation is done through a simple Monte Carlo simulation
     nbrOfSimulations = 1000  # simulating 1000 pulse profiles
     simulatedPulseProfile = copy.deepcopy(pulseProfile)
 
@@ -776,9 +777,6 @@ def main():
                         default=None)
     parser.add_argument("-tf", "--templateFile", help="'Output' .txt file for best-fit model)", type=str,
                         default=None)
-    parser.add_argument("-cp", "--calcPulsedFraction",
-                        help="Flag to calculate RMS pulsed fraction of pulse profile, default = False",
-                        default=False, action=argparse.BooleanOptionalAction)
     parser.add_argument("-v", "--verbose", action="count", default=0,
                         help="WARNING if absent, -v: INFO, -vv: DEBUG")
     args = parser.parse_args()
@@ -796,7 +794,7 @@ def main():
 
     ppfromevt = PulseProfileFromEventFile(args.evtFile, args.timMod, args.eneLow, args.eneHigh, args.nbrBins)
     ppfromevt.fitpulseprofile(args.ppmodel, args.nbrComp, args.initTemplateMod, args.fixPhases, args.figure,
-                              args.templateFile, args.calcPulsedFraction)
+                              args.templateFile)
 
 
 if __name__ == '__main__':

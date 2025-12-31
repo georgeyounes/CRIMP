@@ -22,7 +22,7 @@ from crimp.logging_utils import get_logger
 logger = get_logger(__name__)
 
 
-def readtimfile(timfile: str, comment: int = '#', skiprows: int = 1):
+def readtimfile(timfile: str, comment='#', skiprows: int = 1):
     """
     Reads .tim file
     :return: ToAs_Tim - pandas dataframe of ToAs from .tim file

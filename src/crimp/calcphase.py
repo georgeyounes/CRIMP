@@ -157,7 +157,7 @@ def calcphase(timeMJD, timMod):
     :param timMod: timing model, i.e., .par file or a dictionary
     :type timMod: str
     returns
-            - totalphases (float): phases (normalised by 2pi)
+            - totalphases (float): phases (normalized by 2pi)
             - cycleFoldedPhases (float): cycle folded phases [0,1)
     """
     phases = Phases(timeMJD, timMod)

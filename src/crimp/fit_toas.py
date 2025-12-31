@@ -1,6 +1,6 @@
 """
 Simple module that performs a fit to the pulse ToAs
-Models that are allowed currently are taylor expansion (F0, F1, F2, ..., F12) and glitches
+Models that are allowed currently are taylor expansion (F0, F1, F2, ..., F12), glitches, and WAVE
 Similar to Tempo2 and PINT, a flag following each of those parameters in a .par file will indicate whether they are
 fixed (0 or missing flag) or free to vary (1)
 
@@ -11,29 +11,29 @@ hence, we fit the phase-residuals
 """
 
 import matplotlib.pyplot as plt
-
-import yaml
 import pandas as pd
-import numpy as np
-from dataclasses import dataclass
-import re
-
 from scipy.optimize import minimize
-from scipy import stats
+import argparse
 
 import emcee
 import corner
 
-import argparse
-
-from crimp.calcphase import calcphase
-from crimp.readtimingmodel import (ReadTimingModel, patch_par_values, patch_statistics, patch_miscellaneous,
-                                   get_parameter_value)
+from crimp.readtimingmodel import (patch_par_values, patch_statistics, patch_miscellaneous, get_parameter_value,
+                                   ReadTimingModel)
 from crimp.timfile import readtimfile, PulseToAs
+from crimp.utilities_fittoas import *
+from crimp.calcphase import calcphase
+
+# Log config
+############
+from crimp.logging_utils import get_logger
+
+logger = get_logger(__name__)
 
 
 # -------- Starting point --------
-def load_toas_for_fit(tim_file_df: pd.DataFrame, parfile: dict, t_start: float | None = None, t_stop: float | None = None,
+def load_toas_for_fit(tim_file_df: pd.DataFrame, parfile: dict, t_start: float | None = None,
+                      t_stop: float | None = None,
                       t_mjd_phasewrap: float | None = None, mode: str = "add") -> pd.DataFrame:
     """
     Prepare the TOAs from a .tim file
@@ -74,7 +74,13 @@ def load_toas_for_fit(tim_file_df: pd.DataFrame, parfile: dict, t_start: float |
 
     # Calculate phases from TOAs and parfile
     phases, _ = calcphase(toas, parfile)
-    phases = ((phases + 0.5) % 1.0) - 0.5  # keep things between [-0.5, 0.5)
+    # Check if TRACK exists in par input, is = -2, and if pn is part of the .tim file
+    if "TRACK" in parfile and get_parameter_value(parfile["TRACK"]) == -2 and "pn" in pt.df.columns:
+        phases -= pt.df["pn"]
+        logger.info(f"Found TRACK -2 in {parfile} and -pn (pulse number) flag in .tim file - using those")
+    else:
+        phases = ((phases + 0.5) % 1.0) - 0.5  # keep things between [-0.5, 0.5)
+        logger.info(f"Phase folding between [-0.5, 0.5)")
     # Average so that residuals align to 0,
     # for visualization purposes and avoid adding a constant phase to the model - see also model_phases() below
     phases -= np.mean(phases)
@@ -130,342 +136,7 @@ def add_phasewrap(toas_to_fit, t_mjd: float, mode: str = "add") -> pd.DataFrame:
     return toas_to_fit
 
 
-# -------- Utilities --------
-def list_fit_keys(parfile: dict):
-    """
-    Collect keys with flag==1 in a deterministic order (e.g., F0,F1,... then glitch terms).
-    Simply to understand what is what
-    :param parfile: timing solution as a dictionary
-    :type parfile: dict
-    :return: list of keys items in parfile which are to be fit
-    :rtype: list
-    """
-    keys = [k for k, v in parfile.items()
-            if isinstance(v, dict) and "value" in v and "flag" in v and v["flag"] == 1]
-
-    # deterministic: sort human-friendly: F0,F1,... GLEP_1,GLF0_1, ... PEPOCH last, etc.
-    def sort_key(k):
-        # pull numeric suffix if present (e.g., 'GLEP_2' -> ('GLEP_', 2))
-        if "_" in k and k.rsplit("_", 1)[-1].isdigit():
-            base, idx = k.rsplit("_", 1)
-            return base, int(idx)
-        return k, -1
-
-    return sorted(keys, key=sort_key)
-
-
-def extract_free_params(parfile, yaml_initialguesses: str | None = None):
-    """
-    Extract free parameter vector
-    :param parfile: timing solution as a dictionary
-    :type parfile: dict
-    :param yaml_initialguesses: yaml file containing initial guesses
-    :type yaml_initialguesses: str | None
-    :return: Array of the values of free parameters return[0], and their corresponding key names return[1]
-    :rtype: tuple
-    """
-    keys = list_fit_keys(parfile)
-
-    # if yaml file provided initialize parameters from it
-    if yaml_initialguesses is not None:
-        p0 = initialize_params(keys, yaml_initialguesses)
-    else:
-        p0 = np.zeros(len(keys), dtype=float)
-
-    return p0, keys  # np.array(p0, dtype=float), keys
-
-
-def inject_free_params(parfile, pvec: np.ndarray, keys: list):
-    """
-    Build two dicts from a parsed .par timing model
-      - parfile_dict_fit: used by fitter (deltas from base .par parameter values)
-      - parfile_dict_full: absolute values after applying the 'base - delta' rule, i.e., full timing solution
-
-    Initialization rules:
-      * Zero out all scalar params in parfile_dict_fit EXCEPT:
-          - PEPOCH: keep base value
-          - GLEP_1: keep base value
-      * Nested structures pass through unchanged in BOTH outputs.
-      * parfile_dict_full starts as the base 'value' (or structure) everywhere.
-
-    Override rules (applied in order of zip(keys, pvec), i.e., for free-to-vary parameters with flag=1):
-      * Skip PEPOCH entirely (never touch).
-      * GLEP_1 = pvec[i] (base is ignored) in both parfile_dict_fit and parfile_dict_full
-      * All other keys (F0, F1, F2, ..., GLF0_n, GLF1_n, ...) are set to:
-          parfile_dict_fit[k]  = pvec[i]
-          parfile_dict_full[k] = base - pvec[i]
-
-    :param parfile: dict like {"F0": {"value": 11.19, "flag": 1}, "PEPOCH": {"value": ...}, "WAVE1": {...}, ...}
-    :param pvec: iterable of numbers (deltas)
-    :param keys: list of parameter names corresponding to pvec
-    :returns: (parfile_dict_fit, parfile_dict_full)
-    """
-    parfile_dict_fit = {}
-    parfile_dict_full = {}
-
-    def is_scalar_param(vv):
-        return isinstance(vv, dict) and "value" in vv
-
-    def is_glep(name):
-        # Match GLEP_1, GLEP_2, ...
-        return bool(re.match(r"^GLEP_\d+$", name))
-
-    def is_gltd(name):
-        # Match GLTD_1, GLTD_2, ...
-        return bool(re.match(r"^GLTD_\d+$", name))
-
-    # Seed outputs with defaults
-    for k, v in parfile.items():
-        if is_scalar_param(v):
-            base = float(v["value"])
-            # fit: zero by default except PEPOCH and GLEP_1 retain base
-            if k == "PEPOCH" or is_glep(k):
-                parfile_dict_fit[k] = base
-            else:
-                parfile_dict_fit[k] = 0.0
-            # full: always start at base
-            parfile_dict_full[k] = base
-        else:
-            # pass through nested structures unchanged
-            parfile_dict_fit[k] = v
-            parfile_dict_full[k] = v
-
-    # Apply overrides from keys/pvec (except for PEPOCH)
-    for k, val in zip(keys, pvec):
-        if k == "PEPOCH":
-            # Never modify PEPOCH, just in case by mistake a user has a 1 flag next to it
-            # (not that it ever happened to me)
-            continue
-        if k not in parfile:
-            raise KeyError(f"Parameter '{k}' not found in parfile.")  # shoud not happen but just in case
-
-        v = parfile[k]
-        base = float(v["value"])
-        delta = float(val)
-
-        # For overrides
-        parfile_dict_fit[k] = delta
-        if is_glep(k):
-            parfile_dict_full[k] = delta
-        elif is_gltd(k):
-            parfile_dict_full[k] = base + delta  # GLTD is in days (hence must be added to base)
-        else:
-            parfile_dict_full[k] = base - delta  # absolute value (base - delta)
-
-    return parfile_dict_fit, parfile_dict_full
-
-
-# -------- Validation --------
-def validate_parfile(parfile):
-    """
-    Validate a flags-only initial timing model:
-      - every scalar param is {"value": float-like, "flag": 0 or 1}
-      - nested structures (e.g., WAVE1 dicts) are passed
-      - ensure at least one flag==1
-    Raises ValueError with a helpful message if invalid.
-    :param parfile: timing solution as a .par file
-    :type parfile: dict
-    """
-    if not isinstance(parfile, dict):
-        raise ValueError("Initial timing model must be a dict")
-
-    n_fit = 0
-    for k, v in parfile.items():
-
-        # Skip nested dicts that are NOT scalar params (e.g., WAVE1 {"A":..., "B":...})
-        if isinstance(v, dict) and not (("value" in v) and ("flag" in v)):
-            # Treat as non-scalar container → skip validation
-            continue
-
-        if not (isinstance(v, dict) and "value" in v and "flag" in v):
-            raise ValueError(f"Parameter '{k}' must be a dict with 'value' and 'flag'")
-
-        # numeric value?
-        val = v["value"]
-        if not isinstance(val, (int, float, np.floating)):
-            raise ValueError(f"Parameter '{k}': value must be numeric, got {type(val)}")
-
-        # fit flag 0/1?
-        flag = v["flag"]
-        if flag not in (0, 1):
-            raise ValueError(f"Parameter '{k}': fit flag must be 0 or 1, got {flag}")
-
-        if flag == 1:
-            n_fit += 1
-
-    if n_fit == 0:
-        raise ValueError("Template has no free parameters (flag==1). Nothing to optimize.")
-
-
-# -------- Maximum likelihood estimate --------
-# -------- Model + Likelihood --------
-def model_phases(x_mjd, timmodel):
-    """
-    Calculate mean-subtracted phases according to a timing model - for fitting purposes only
-    Use the module calcphase.py for all other purposes
-    """
-    phases, _ = calcphase(x_mjd, timmodel)  # full phases
-    # Average so that after whitening, residuals align to 0,
-    # for visualization purposes and avoid adding a constant phase to the model
-    phases -= np.mean(phases)
-    return phases
-
-
-def gaussian_nll(y, mu, sigma):
-    """
-    Returns the Gaussian negative log-likelihood (NLL) of the data y given the model predicted distribution (mu, sigma)
-    """
-    return -np.sum(stats.norm.logpdf(y, loc=mu, scale=sigma))
-
-
-# -------- Objective factory (closure) --------
-def make_nll(x, y, y_err, parfile, yaml_init=None):
-    """
-    Creates the NLL
-    Returns:
-      nll(pvec) -> scalar NLL
-      p0 (initial vector)
-      keys (fit parameter names)
-      template (the same validated template you passed in)
-    """
-    validate_parfile(parfile)
-
-    p0, keys = extract_free_params(parfile, yaml_init)
-
-    def nll(pvec):
-        newparfile_dict, _ = inject_free_params(parfile, pvec, keys)
-        mu = model_phases(x, newparfile_dict)
-        return gaussian_nll(y - np.mean(y), mu, y_err)
-
-    return nll, p0, keys, parfile
-
-
-def initialize_params(keys: list[str], yaml_init: str) -> tuple:
-    """
-    Given a list of parameter keys and a YAML file defining initial guesses,
-    return a 1D NumPy array of initial parameter values in the same order as keys.
-    :param keys: List of parameter names (order will be preserved)
-    :param yaml_init: Path to YAML file defining initial guesses
-    Return tuple
-        - p0 : np.ndarray 1D array of parameter values ordered as in `keys`
-        - keys : list[str] The same ordered list of parameter names
-    """
-    # Read initial guesses (unlike the name says, no need to have priors in the initial guesses -
-    # see prior_from_yaml for more info)
-    prior = initguess_prior_from_yaml(yaml_init)
-
-    if not prior.initial_guess:
-        raise ValueError("No initial guesses found in YAML file.")
-
-    # Check that all requested keys exist
-    missing = [k for k in keys if k not in prior.initial_guess]
-    if missing:
-        raise KeyError(f"Missing initial guesses for: {', '.join(missing)}")
-
-    # Preserve order of keys
-    p0 = np.array([prior.initial_guess[k] for k in keys], dtype=float)
-    return p0
-
-
 # -------- MCMC through emcee --------
-# -------- Reading initial parameters and /or priors --------
-@dataclass
-class Prior:
-    # If no bounds were supplied at all, this dict can be empty.
-    bounds: dict[str, tuple[float, float]]
-    # If no guesses were supplied at all, this dict can be empty.
-    initial_guess: dict[str, float]
-
-    def log_prior(self, theta: np.ndarray, keys: list[str]) -> float:
-        """Uniform (box) priors. Missing key in bounds => improper (no penalty)."""
-        for val, name in zip(theta, keys):
-            if name in self.bounds:
-                lo, hi = self.bounds[name]
-                if not (lo < val < hi):
-                    return -np.inf
-        return 0.0
-
-
-def initguess_prior_from_yaml(path: str) -> Prior:
-    """
-    YAML may define, for each parameter:
-      - [low, high]                      -> bounds only
-      - number                           -> guess only
-      - {low: ..., high: ..., guess: ...}-> both (guess optional but see global rule)
-
-    ENFORCED CONSISTENCY:
-      - If any param has bounds, all params must have bounds.
-      - If any param has a guess,  all params must have a guess.
-    """
-    data = yaml.safe_load(open(path, "r"))
-    if not isinstance(data, dict):
-        raise ValueError("YAML must map parameter -> prior/guess")
-
-    params = list(data.keys())
-    bounds: dict[str, tuple[float, float]] = {}
-    guesses: dict[str, float] = {}
-
-    any_bounds = False
-    any_guess = False
-
-    for k, v in data.items():
-        if isinstance(v, (list, tuple)):
-            # [low, high]
-            if len(v) != 2:
-                raise ValueError(f"{k}: expected [low, high]")
-            low, high = map(float, v)
-            if not (low < high):
-                raise ValueError(f"{k}: low < high required")
-            bounds[k] = (low, high)
-            any_bounds = True
-
-        elif isinstance(v, dict):
-            # {low, high, (optional) guess}
-            has_low = "low" in v
-            has_high = "high" in v
-            if has_low != has_high:
-                raise ValueError(f"{k}: need both 'low' and 'high' if providing bounds")
-
-            if has_low and has_high:
-                low, high = float(v["low"]), float(v["high"])
-                if not (low < high):
-                    raise ValueError(f"{k}: low < high required")
-                bounds[k] = (low, high)
-                any_bounds = True
-
-            if "guess" in v:
-                guesses[k] = float(v["guess"])
-                any_guess = True
-
-        elif isinstance(v, (int, float)):
-            # scalar -> guess only
-            guesses[k] = float(v)
-            any_guess = True
-
-        else:
-            raise ValueError(f"{k}: unsupported value {v!r}")
-
-    # --- Global consistency checks ---
-    if any_bounds:
-        missing_bounds = [p for p in params if p not in bounds]
-        if missing_bounds:
-            raise ValueError(
-                "Bounds provided for some parameters but missing for others: "
-                + ", ".join(missing_bounds)
-            )
-
-    if any_guess:
-        missing_guesses = [p for p in params if p not in guesses]
-        if missing_guesses:
-            raise ValueError(
-                "Initial guesses provided for some parameters but missing for others: "
-                + ", ".join(missing_guesses)
-            )
-
-    return Prior(bounds=bounds, initial_guess=guesses)
-
-
-# -------- Running emcee --------
 def run_mcmc(x, y, yerr, init_parfile: dict, keys: list[str], prior: Prior,
              steps: int = 10000, burn: int = 500, walkers: int = 32,
              corner_pdf: str | None = None, chain_npy: str | None = None, flat_npy: str | None = None,
@@ -483,10 +154,9 @@ def run_mcmc(x, y, yerr, init_parfile: dict, keys: list[str], prior: Prior,
         lp = prior.log_prior(theta, keys)
         if not np.isfinite(lp):
             return -np.inf
-        newparfile_dict, _ = inject_free_params(init_parfile, theta, keys)
-        mu = model_phases(x, newparfile_dict)
+        mu = model_phase_residuals(x, init_parfile, theta, keys)
         # gaussian_nll is negative hence the - sign in front (as required by emcee.EnsembleSampler)
-        return lp - gaussian_nll(np.asarray(y-np.mean(y)), np.asarray(mu), np.asarray(yerr))
+        return lp - gaussian_nll(np.asarray(y - np.mean(y)), np.asarray(mu), np.asarray(yerr))
 
     # Define sampler and run mcmc
     sampler = emcee.EnsembleSampler(walkers, ndim, log_probability)
@@ -515,7 +185,7 @@ def run_mcmc(x, y, yerr, init_parfile: dict, keys: list[str], prior: Prior,
                             **default_args)
         fig.tight_layout()
         fig.subplots_adjust(hspace=0.13)
-        fig.savefig(corner_pdf+'.pdf', format='pdf', dpi=300)
+        fig.savefig(corner_pdf + '.pdf', format='pdf', dpi=300)
         plt.close(fig)
 
     # Summary: median and 16/84 percentiles
@@ -639,24 +309,27 @@ def main():
                         help="Burn-in steps to discard when saving flat chain (default=500)")
     parser.add_argument("-wa", "--mcmc-walkers", type=int, default=32,
                         help="Number of walkers (default=32)")
-    parser.add_argument("-cp", "--corner-pdf", type=str, default=None,
+    parser.add_argument("-cp", "--corner_plot", type=str, default=None,
                         help="Path to save Corner plot PDF (default=None)")
     parser.add_argument("-ch", "--chain-npy", type=str, default=None,
                         help="Path to save full chain as .npy (default=None)")
     parser.add_argument("-fl", "--flat-npy", type=str, default=None,
                         help="Path to save flattened post burn-in samples as .npy (default=None)")
     # Plotting residuals
-    parser.add_argument("-ep", "--ephem_plot", help="Plot of local ephemerides", type=str, default=None)
+    parser.add_argument("-rp", "--residual_plot", help="Plot of pre- and post-fit residuals",
+                        type=str, default=None)
 
     # Parse all provided arguments
     args = parser.parse_args()
 
-    ###########################
-    # reading TOAs and par file
+    ###################################
+    # reading par file with flag values
     init_parfile_withflags = ReadTimingModel(args.parfile).readfulltimingmodel()[2]
     F0 = get_parameter_value(init_parfile_withflags['F0'])
 
-    tim_file_df = readtimfile(args.timfile_path)
+    ####################
+    # reading pulse TOAs
+    tim_file_df = readtimfile(args.timfile_path, comment='C')
     toas_pre_fit = load_toas_for_fit(tim_file_df, init_parfile_withflags, args.t_start,
                                      args.t_end, args.t_mjd, args.mode)
 
@@ -672,7 +345,7 @@ def main():
     # MCMC posteriors if desired (currently only way to get uncertainties on fit parameters)
     if args.mcmc:
         keys = list_fit_keys(init_parfile_withflags)
-        # check for the prior yaml file
+        # check for the prior .yaml file
         if args.mcmc and args.init_yaml is None:
             parser.error("-iy (or --init_yaml) is required when -mc (or --mcmc) is used")
         # Initilize priors
@@ -682,7 +355,7 @@ def main():
         sampler, flat, summaries = run_mcmc(x=toas_pre_fit["ToA"], y=toas_pre_fit["phase"],
                                             yerr=toas_pre_fit["phase_err_cycle"], init_parfile=init_parfile_withflags,
                                             keys=keys, prior=prior, steps=args.mcmc_steps, burn=args.mcmc_burn,
-                                            walkers=args.mcmc_walkers, corner_pdf=args.corner_pdf,
+                                            walkers=args.mcmc_walkers, corner_pdf=args.corner_plot,
                                             chain_npy=args.chain_npy, flat_npy=args.flat_npy, progress=True)
 
         print("Posterior summaries(median - / + 1σ approx using 16th / 84th percentiles):")
@@ -694,13 +367,13 @@ def main():
 
         # prepare medians in keys order
         med_vec = np.array([summaries[name]['median'] for name in keys], dtype=float)
-        post_mcmc_timdict_fit, post_mcmc_timdict = inject_free_params(init_parfile_withflags, med_vec, keys)
+        _, post_mcmc_timdict = inject_free_params(init_parfile_withflags, med_vec, keys)
 
         source_label = "MCMC (posterior medians)"
 
         # plot residuals after MCMC run
-        phase_residulas_post_fit = model_phases(toas_pre_fit["ToA"], post_mcmc_timdict_fit)
-        plot_residulas(toas_pre_fit, phase_residulas_post_fit, args.ephem_plot)
+        phase_residulas_post_fit = model_phase_residuals(toas_pre_fit["ToA"], init_parfile_withflags, med_vec, keys)
+        plot_residulas(toas_pre_fit, phase_residulas_post_fit, args.residual_plot)
 
         # Write updated par file with new best-fit values
         patch_par_values(in_path=args.parfile, out_path=args.newparfile, new_values=post_mcmc_timdict,
@@ -736,15 +409,22 @@ def main():
 
         ########################
         # MLE of above objective
-        res = minimize(nll, p0, method="Nelder-Mead", options={"maxiter": int(1e6)})
+        if any("wave" in s.lower() for s in keys):
+            if any("glep_" in s.lower() for s in keys):
+                logger.warning(f"Fitting for glitch epoch and waves simultaneously is discouraged. Either "
+                               f"fix any GELP in your model or make sure the initial guess is close to the "
+                               f"true value. Utilizing MCMC is reasonable but may be slow to converge.")
+            res = minimize(nll, p0, method='BFGS', options={"maxiter": int(1e5)}, tol=1.0e-16, jac='3-point')
+        else:
+            res = minimize(nll, p0, method='Nelder-Mead', options={"maxiter": int(1e5)})
 
         ###############################################
         # Recover best-fit timing dict according to MLE
         timing_dict_fit, timing_dict_full = inject_free_params(tmpl_parfile, res.x, keys)
 
         # Plot MLE fit residuals - first model residuals according to best-fit model
-        phase_residulas_post_fit = model_phases(toas_pre_fit["ToA"], timing_dict_fit)
-        plot_residulas(toas_pre_fit, phase_residulas_post_fit, args.ephem_plot)
+        phase_residulas_post_fit = model_phase_residuals(toas_pre_fit["ToA"], tmpl_parfile, res.x, keys)
+        plot_residulas(toas_pre_fit, phase_residulas_post_fit, args.residual_plot)
 
         source_label = "Maximum Likelihood Estimation"
         # write the MEL results into a new (or override existing one) .par file

@@ -4,7 +4,7 @@ a typical analysis strategy for pulsars
 
 Can be run via command line as "localephemerides"
 
-Logger is very thing on information - could be made more useful
+Logger is very thin on information - could be made more useful
 """
 import pandas as pd
 import numpy as np
@@ -13,7 +13,7 @@ import argparse
 from crimp.readtimingmodel import ReadTimingModel
 from crimp.ephemIntegerRotation import ephemIntegerRotation
 
-from crimp.fit_toas import (load_toas_for_fit, model_phases, inject_free_params, plot_residulas,
+from crimp.fit_toas import (load_toas_for_fit, model_phase_residuals, inject_free_params, plot_residulas,
                             Prior, run_mcmc, list_fit_keys, chi2_fit)
 from crimp.plot_local_ephem import plot_local_ephemerides
 from crimp.timfile import readtimfile
@@ -166,6 +166,8 @@ def generate_local_ephemerides(
                 k: {"value": np.float64(v), "flag": f}
                 for k, v, f in zip(all_keys, p0, p0_flag)
             }
+            # We add the track keyword, and if -pn in tim file, it is used automatically
+            init_par_file_dict["TRACK"] = -2
 
             # keys to fit for, list of ['F0', 'F1']
             fit_keys = list_fit_keys(init_par_file_dict)
@@ -177,7 +179,7 @@ def generate_local_ephemerides(
             # Instantiate the Prior object - from fit_toas.py
             priors = Prior(bounds=bounds, initial_guess={})
 
-            if debug_with_plots is True:
+            if debug_with_plots:
                 corner_plot = f"corner_interval_{int_counter}.pdf"
             else:
                 corner_plot = None
@@ -191,10 +193,10 @@ def generate_local_ephemerides(
 
             # Recover timing dict from best mcmc fit
             med_vec = np.array([summaries[name]['median'] for name in fit_keys], dtype=float)
-            post_mcmc_timdict_fit, post_mcmc_timdict = inject_free_params(init_par_file_dict, med_vec, fit_keys)
-            phase_residulas_post_fit = model_phases(toas_to_fit['ToA'], post_mcmc_timdict_fit)
+            _, post_mcmc_timdict = inject_free_params(init_par_file_dict, med_vec, fit_keys)
+            phase_residulas_post_fit = model_phase_residuals(toas_to_fit['ToA'], init_par_file_dict, med_vec, fit_keys)
 
-            if debug_with_plots is True:
+            if debug_with_plots:
                 # plot residuals after MCMC run
                 plot_residulas(toas_to_fit, phase_residulas_post_fit, plotname=f"residuals_interval_{int_counter}")
                 int_counter += 1

@@ -41,7 +41,7 @@ class ReadTimingModel:
                 tokens[1] (optional) is a 0/1 flag.
         Returns (value, flag) with default flag=0 if absent or unparsable.
         """
-        val = np.float64(tokens[0])
+        val = complex(tokens[0]).real
         flag = 0
         if len(tokens) > 1:
             try:
@@ -183,7 +183,7 @@ class ReadTimingModel:
                 if not toks:
                     continue
                 if toks[0] == "WAVEEPOCH" and len(toks) >= 2:
-                    val = np.float64(toks[1])
+                    val = complex(toks[1]).real
                     timModParamWaves["WAVEEPOCH"] = val
                     timModBothWaves["WAVEEPOCH"] = {"value": val, "flag": None}
                 elif toks[0] == "WAVE_OM" and len(toks) >= 2:
@@ -200,8 +200,8 @@ class ReadTimingModel:
                     if li.startswith(f"WAVE{j} ") or li.startswith(f"WAVE{j}\t"):
                         toks = li.split()
                         if len(toks) >= 3:
-                            A = np.float64(toks[1])
-                            B = np.float64(toks[2])
+                            A = complex(toks[1]).real
+                            B = complex(toks[2]).real
                             timModParamWaves[f"WAVE{j}"] = {"A": A, "B": B}
                             timModBothWaves[f"WAVE{j}"] = {"value": {"A": A, "B": B}, "flag": None}
                         break
@@ -225,6 +225,10 @@ class ReadTimingModel:
         timModParams = {**te_vals, **gl_vals, **wv_vals}
         timModFlags = {**te_flags, **gl_flags, **wv_flags}
         timModBoth = {**te_both, **gl_both, **wv_both}
+
+        # Add important TRACK parameter to full timing model - for pulse numbering tracking
+        add_pntrack_parfile(timModParams, self.timMod)
+        add_pntrack_parfile(timModBoth, self.timMod)
 
         return timModParams, timModFlags, timModBoth
 
@@ -281,8 +285,8 @@ class ReadTimingModel:
             "TZRSITE": str,
             "CLK": str,
             "UNITS": str,
-            "EPHEM": str
-
+            "EPHEM": str,
+            "TRACK": float
         }
 
         misc_keys = {k: None for k in misc_schema}
@@ -309,32 +313,42 @@ def get_parameter_value(entry):
       - a dict containing {'value', 'flag'}. In this instance, the key 'value' is returned
     """
     if isinstance(entry, (int, float, np.floating)):
-        return float(entry)
+        return entry
     elif isinstance(entry, dict) and set(entry.keys()) >= {"value", "flag"}:
         val = entry.get("value")
-        return float(val) if isinstance(val, (int, float, np.floating)) else val
+        return val if isinstance(val, (int, float, np.floating)) else val
     else:
         return entry
 
 
-def patch_par_values(
-        in_path: str,
-        out_path: str,
-        *,
-        new_values: dict[str, float],
-        float_fmt: str = ".15g",
-        uncertainties: Optional[dict[str, float]] = None,
-        uncertainty_fmt: str = ".6g",
-) -> None:
-    """
-    Write new .par file with new_values (and uncertainties) for certain parameters.
-    If an uncertainty already exists after a flag, it will be REPLACED (not duplicated).
-    Uncertainties are only written when a flag is present.
-    """
+def add_pntrack_parfile(pardict, parfile):
+    # Check for TRACK parameter in parfile, if it exists and = -2 add to the .par dictionary
+    TRACK_val = ReadTimingModel(parfile).readmiscellaneous().get("TRACK")
+    if TRACK_val == -2:
+        # Check if existing values are dict-style or plain values
+        if pardict and isinstance(next(iter(pardict.values())), dict):
+            pardict["TRACK"] = {"value": TRACK_val, "flag": 0}
+        else:
+            pardict["TRACK"] = TRACK_val
 
-    # KEY  <ws> VALUE [<ws> FLAG] [<ws> UNCERTAINTY] <tail>
-    # Capture optional FLAG and optional UNCERTAINTY separately.
-    line_re = re.compile(
+
+def patch_par_values(
+    in_path: str,
+    out_path: str,
+    *,
+    new_values: dict,
+    float_fmt: str = ".15g",
+    uncertainties: Optional[dict[str, float]] = None,
+    uncertainty_fmt: str = ".6g",
+) -> None:
+
+    def unwrap_value(var):
+        # If v looks like {"value": X, "flag": ...}, return X; else return v
+        if isinstance(var, dict) and "value" in var:
+            return var["value"]
+        return var
+
+    std_re = re.compile(
         r"""
         ^([A-Za-z][A-Za-z0-9_]*)      # key
         (\s+)                         # whitespace before value
@@ -343,11 +357,23 @@ def patch_par_values(
             (\s+)                     #   whitespace before flag
             ([01])                    #   flag
         )?
-        (?:                           # optional uncertainty group (a single numeric token)
+        (?:                           # optional uncertainty
             \s+
             ([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)
         )?
-        (.*)$                         # tail (comments or anything else after)
+        (.*)$                         # tail (kept for standard lines)
+        """,
+        re.VERBOSE,
+    )
+
+    wave_re = re.compile(
+        r"""
+        ^(WAVE\d+)                    # WAVE key
+        \s+
+        (\S+)                         # A
+        \s+
+        (\S+)                         # B
+        (?:\s+.*)?$                   # optional remainder (ignored)
         """,
         re.VERBOSE,
     )
@@ -358,39 +384,49 @@ def patch_par_values(
     out_lines = []
     for line in lines:
         core = line.rstrip("\n")
-        m = line_re.match(core)
+
+        # ---- WAVEk A B lines ----
+        mw = wave_re.match(core)
+        if mw:
+            key, old_a, old_b = mw.groups()
+
+            v = unwrap_value(new_values.get(key))
+            # Accept either {"A":..., "B":...} OR {"value": {"A":..., "B":...}, "flag": ...}
+            if isinstance(v, dict) and ("A" in v) and ("B" in v):
+                new_a = format(float(v["A"]), float_fmt)
+                new_b = format(float(v["B"]), float_fmt)
+                out_lines.append(f"{key} {new_a} {new_b}\n")  # no tail
+            else:
+                out_lines.append(line)
+            continue
+
+        # ---- Standard lines ----
+        m = std_re.match(core)
         if not m:
             out_lines.append(line)
             continue
 
         key, ws_val, old_val, ws_flag, flag, old_unc, tail = m.groups()
 
-        # If this key isn't being updated, write the line back unchanged
-        if key not in new_values:
+        v = unwrap_value(new_values.get(key))
+        if v is None or isinstance(v, dict):
             out_lines.append(line)
             continue
 
-        new_val = format(float(new_values[key]), float_fmt)
+        new_val = format(float(v), float_fmt)
 
-        # No flag: just replace the value; do not add/modify uncertainty
         if flag is None:
-            new_line = f"{key}{ws_val}{new_val}{tail}"
-            out_lines.append(new_line + "\n")
+            out_lines.append(f"{key}{ws_val}{new_val}{tail}\n")
             continue
 
-        # With flag: decide which uncertainty to write (if any)
         if uncertainties is not None and key in uncertainties:
-            # Replace any existing uncertainty with the new one
             unc_str = format(float(uncertainties[key]), uncertainty_fmt)
-            new_line = f"{key}{ws_val}{new_val}{ws_flag}{flag} {unc_str}{tail}"
+            out_lines.append(f"{key}{ws_val}{new_val}{ws_flag}{flag} {unc_str}{tail}\n")
         else:
-            # Keep existing uncertainty if it was present; otherwise write none
             if old_unc is not None:
-                new_line = f"{key}{ws_val}{new_val}{ws_flag}{flag} {old_unc}{tail}"
+                out_lines.append(f"{key}{ws_val}{new_val}{ws_flag}{flag} {old_unc}{tail}\n")
             else:
-                new_line = f"{key}{ws_val}{new_val}{ws_flag}{flag}{tail}"
-
-        out_lines.append(new_line + "\n")
+                out_lines.append(f"{key}{ws_val}{new_val}{ws_flag}{flag}{tail}\n")
 
     with open(out_path, "w") as f:
         f.writelines(out_lines)

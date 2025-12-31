@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "crimp"
-version = "2.1.2"
+version = "2.2.0"
 dependencies = [
   "lmfit",
   "plotly",
@@ -38,10 +38,11 @@ timeintervalsfortoas = "crimp.buildtimeintervalsToAs:main"
 templatepulseprofile = "crimp.pulseprofile:main"
 measuretoas = "crimp.measureToAs:main"
 diagnosetoas = "crimp.diagnoseToAs:main"
-addphasecolumn = "crimp.eventfile:main"
-ephemintegerrotation = "crimp.ephemIntegerRotation:main"
+addphasecolumn = "crimp.eventfile:main"  # No documentation yet
+ephemintegerrotation = "crimp.ephemIntegerRotation:main"  # No documentation yet
 phshifttotimfile = "crimp.timfile:main"
 fittoas = "crimp.fit_toas:main"
-localephemerides = "crimp.get_local_ephem:main"
-pulseprofile_plots = "crimp.plot_pps:main"
-localephemerides_plot = "crimp.plot_local_ephem:main"
+localephemerides = "crimp.get_local_ephem:main"  # No documentation yet
+pulseprofile_plots = "crimp.plot_pps:main"  # No documentation yet
+localephemerides_plot = "crimp.plot_local_ephem:main"  # No documentation yet
+mergeoverlappingtims = "crimp.merge_overlapping_timfiles:main"  # No documentation yet

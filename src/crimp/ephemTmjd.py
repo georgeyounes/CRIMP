@@ -1,5 +1,5 @@
 """
-A simple script to derive the ephemerides (F and F_dot at
+A simple script to derive the ephemerides (F0 and F1 at
 the moment) at a given MJD based on a timing solution. Currently,
 this script takes into account taylor expansion of the phase
 evolution and a random number of glitches - binary motion is

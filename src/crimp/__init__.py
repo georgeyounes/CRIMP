@@ -4,4 +4,4 @@ CRIMP analysis software
 """
 
 __author__ = "George Younes"
-__version__ = "2.1.2"
+__version__ = "2.2.0"

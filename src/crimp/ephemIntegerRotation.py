@@ -16,7 +16,7 @@ import sys
 
 # Custom modules
 from crimp.ephemTmjd import ephemTmjd
-from crimp.calcphase import calcphase
+from crimp.calcphase import Phases
 
 sys.dont_write_bytecode = True
 
@@ -39,7 +39,11 @@ def ephemIntegerRotation(Tmjd, timMod, printOutput=False):
     """
 
     # Phase and frequency that correspond to Tmjd according to timing model
-    ph_Tmjd, _ = calcphase(Tmjd, timMod)
+    # (only consider taylor expansion and glitches, ignore waves)
+    phases = Phases(Tmjd, timMod)
+    ph_Tmjd = phases.taylorexpansion() + phases.glitches()
+
+    # Frequency at Tmjd
     freq_Tmjd = ephemTmjd(Tmjd, timMod)["freqAtTmjd"]
 
     # Deriving the closest MJD and spin frequency with an integer number of rotations
@@ -49,7 +53,10 @@ def ephemIntegerRotation(Tmjd, timMod, printOutput=False):
     Tmjd_intRotation = Tmjd - FracTFromIntRotation
     freq_Tmjd_intRotation = ephemTmjd(Tmjd_intRotation, timMod)["freqAtTmjd"]
     freqdot_Tmjd_intRotation = ephemTmjd(Tmjd_intRotation, timMod)["freqdotAtTmjd"]
-    ph_intRotation, _ = calcphase(Tmjd_intRotation, timMod)
+
+    # Phase at interger rotation
+    phases_intRotation = Phases(Tmjd_intRotation, timMod)
+    ph_intRotation = phases_intRotation.taylorexpansion() + phases_intRotation.glitches()
 
     if printOutput is True:
         print(f"Input Tmjd = {Tmjd} days. Corresponding spin frequency = {freq_Tmjd} Hz. "
