@@ -1,4 +1,4 @@
-# ignore all .a files
+# ignore all files ending in
 *.idea
 *.egg-info
 
