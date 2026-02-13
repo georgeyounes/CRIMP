@@ -1,0 +1,6 @@
+# ignore all .a files
+*.idea
+*.egg-info
+
+# ignore this folder
+__pycache__

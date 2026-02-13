@@ -22,40 +22,54 @@ from crimp.logging_utils import get_logger
 logger = get_logger(__name__)
 
 
-def readtimfile(timfile: str, comment='#', skiprows: int = 1):
-    """
-    Reads .tim file
-    :return: ToAs_Tim - pandas dataframe of ToAs from .tim file
-    :rtype: pandas.DataFrame
-    """
-    # Read everything into a DataFrame (start with the first 5 required columns, and go from there)
-    ToAs_Tim = pd.read_csv(timfile, sep=r'\s+', comment=comment, skiprows=skiprows, header=None, engine='python')
-    ToAs_Tim = ToAs_Tim.rename(
-        columns={0: 'template', 1: 'frequency', 2: 'pulse_ToA', 3: 'pulse_ToA_err', 4: 'time_ref'})
+def readtimfile(timfile: str, comment: str = "C", skiprows: int = 1) -> pd.DataFrame:
+    # Read all whitespace-separated tokens
+    df = pd.read_csv(timfile, sep=r"\s+", comment=comment, skiprows=skiprows, header=None, engine="python", dtype=str)
 
+    # Name the first 5 "fixed" columns
+    fixed_cols = {0: "template", 1: "frequency", 2: "pulse_ToA", 3: "pulse_ToA_err", 4: "time_ref"}
+    df = df.rename(columns=fixed_cols)
+
+    # Convert known numeric fixed columns
     for c in ["frequency", "pulse_ToA", "pulse_ToA_err"]:
-        ToAs_Tim[c] = pd.to_numeric(ToAs_Tim[c], errors="coerce")
+        df[c] = pd.to_numeric(df[c], errors="coerce")
 
-    # If there are no trailing columns, we're done
-    if ToAs_Tim.shape[1] <= 5:
-        return ToAs_Tim
+    # If no trailing columns, done
+    if df.shape[1] <= 5:
+        return df[list(fixed_cols.values())]
 
-    # Parse trailing flag-value pairs
-    extra = ToAs_Tim.iloc[:, 5:].fillna("")
-    for idx, row in extra.iterrows():
-        toks = row.tolist()
-        for j in range(0, len(toks), 2):
-            flag, val = toks[j], toks[j + 1] if j + 1 < len(toks) else None  # just in case a flag doesn't have a value
-            if not flag or not str(flag).startswith(
-                    "-"):  # in case of no flag, or the expected flag does not start with a - sign
-                continue
-            key = str(flag).lstrip("-")
-            try:
-                ToAs_Tim.loc[idx, key] = pd.to_numeric(val)
-            except Exception:
-                ToAs_Tim.loc[idx, key] = val
+    # Parse trailing tokens into flag/value columns
+    extras_dicts = []
+    extra_tokens = df.iloc[:, 5:]  # raw trailing tokens (still strings)
 
-    return ToAs_Tim
+    for _, row in extra_tokens.iterrows():
+        toks = [t for t in row.tolist() if pd.notna(t)]  # drop NaNs
+        d = {}
+
+        j = 0
+        while j < len(toks):
+            flag = toks[j]
+            if isinstance(flag, str) and flag.startswith("-"):
+                key = flag.lstrip("-")
+                val = toks[j + 1] if (j + 1) < len(toks) else None
+                d[f"{key}_flag"] = flag
+                d[f"{key}"] = val
+                j += 2
+            else:
+                # unexpected token (not a -flag): skip it
+                j += 1
+
+        extras_dicts.append(d)
+    extras = pd.DataFrame(extras_dicts, index=df.index)
+
+    # Force "pn" to be integer if present
+    if "pn" in extras.columns:
+        extras["pn"] = (pd.to_numeric(extras["pn"], errors="coerce").astype("Int64"))
+
+    # Keep only the fixed columns + the parsed extras (no raw 5,6,7,... columns)
+    out = pd.concat([df[list(fixed_cols.values())], extras], axis=1)
+
+    return out
 
 
 class PulseToAs(object):
@@ -136,10 +150,13 @@ class PulseToAs(object):
 
         # Append .tim file with the format at the start of file - no straightforward way to do this
         with open(timfilename + '.tim', 'r+') as appendtimfile:
-            lines = appendtimfile.readlines()  # lines is list of line, each element '...\n'
-            lines.insert(0, "FORMAT 1\n")  # you can use any index if you know the line index
-            appendtimfile.seek(0)  # file pointer locates at the beginning to write the whole file again
-            appendtimfile.writelines(lines)  # write whole lists again to the same file
+            lines = appendtimfile.readlines()  # existing data lines (no FORMAT yet)
+            appendtimfile.seek(0)
+            appendtimfile.truncate()
+            # Write header with NO leading space
+            appendtimfile.write("FORMAT 1\n")
+            # Write all data lines with ONE leading space
+            appendtimfile.writelines(f" {line}" for line in lines)
 
         return None
 
@@ -206,11 +223,11 @@ def phshiftTotimfile(ToAs, timMod, timfile='residuals', tempModPP='ppTemplateMod
     if addpn:
         pulsenumber -= np.min(pulsenumber)
         ToAs_Tim_dict['pulsenumberflag'] = pulsenumberflag
-        ToAs_Tim_dict['pulsenumber'] = np.round(pulsenumber)  # round the pulse number (avoiding .99999 etc.)
+        # round pulse number first (avoiding .99999 etc.)
+        ToAs_Tim_dict["pulsenumber"] = np.round(pulsenumber).astype(np.int64)
 
     # Convert dictionary to pandas dataframe
     ToAs_Tim = pd.DataFrame.from_dict(ToAs_Tim_dict)
-
     PulseToAs(ToAs_Tim).writetimfile(timfile, clobber=clobber)
 
     return ToAs_Tim

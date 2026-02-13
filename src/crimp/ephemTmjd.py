@@ -53,7 +53,7 @@ def ephemTmjd(Tmjd, timMod):
         timesAfterGlitch = (Tmjd >= glep)
 
         # If Tmjd is after the glitch, calculate frequency shift according to the glitch model
-        if timesAfterGlitch.any():
+        if np.any(timesAfterGlitch):
             glf0 = timModParam["GLF0_" + str(jj)]
             glf1 = timModParam["GLF1_" + str(jj)]
             glf2 = timModParam["GLF2_" + str(jj)]

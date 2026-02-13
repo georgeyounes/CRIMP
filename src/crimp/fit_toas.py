@@ -169,8 +169,7 @@ def run_mcmc(x, y, yerr, init_parfile: dict, keys: list[str], prior: Prior,
 
     # Flatten after burn + thinning
     discard = max(0, burn)
-    thin = 1
-    flat = sampler.get_chain(discard=discard, thin=thin, flat=True)
+    flat = sampler.get_chain(discard=discard, flat=True)
     # Save flattened chain if prompted - don't by default
     if flat_npy:
         np.save(flat_npy, flat)
