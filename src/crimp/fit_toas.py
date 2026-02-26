@@ -258,8 +258,6 @@ def plot_residulas(toas_pre_fit, phase_residulas_post_fit, plotname=None):
 
     axs[1].legend(fontsize=14)
 
-    # ax1.set_xlim(-0.5e7, -0.4e7);  # ax1.set_ylim(-1.0, 0.5)
-
     ###################
     # Finishing touches
     for axis in ['top', 'bottom', 'left', 'right']:

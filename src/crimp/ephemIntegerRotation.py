@@ -58,7 +58,7 @@ def ephemIntegerRotation(Tmjd, timMod, printOutput=False):
     phases_intRotation = Phases(Tmjd_intRotation, timMod)
     ph_intRotation = phases_intRotation.taylorexpansion() + phases_intRotation.glitches()
 
-    if printOutput is True:
+    if printOutput:
         print(f"Input Tmjd = {Tmjd} days. Corresponding spin frequency = {freq_Tmjd} Hz. "
               f"Corresponding phase = {ph_Tmjd} \n Earliest Tmjd with integer number of rotation = {Tmjd_intRotation}. "
               f"Corresponding frequency = {freq_Tmjd_intRotation}. Corresponding phase = {ph_intRotation}")

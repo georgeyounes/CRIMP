@@ -96,12 +96,17 @@ def generate_local_ephemerides(
     if t_end is None:
         t_end = np.max(toa_df['pulse_ToA'])
 
-    local_ephem_final = []
     current_start = t_start
+    local_ephem_final = []
     eps = 1e-5  # small offset to move past glitch
     int_counter = 0  # interval counter for bookkeeping
 
     while current_start < t_end:
+
+        # Redifining current_start so that it is the first TOA MJD of the interval
+        valid_times = toa_df.loc[toa_df['pulse_ToA'] >= current_start, 'pulse_ToA']
+        current_start = valid_times.min() if not valid_times.empty else None
+
         # current end according to user defined criteria
         current_end = min(current_start + interval_days, t_end)
 
@@ -114,8 +119,7 @@ def generate_local_ephemerides(
             current_start += jump_days
             continue
 
-        # redefine current_start and current_end to match the exact days of TOA
-        current_start = toa_df_interval['pulse_ToA'].min()
+        # redefine current_end to match last TOA MJD of the interval
         current_end = toa_df_interval['pulse_ToA'].max()
 
         # Check if this interval crosses a glitch
@@ -137,18 +141,20 @@ def generate_local_ephemerides(
 
         # Exact time of mid-interval
         interval_mid = current_start + (current_end - current_start) / 2.0
+
         # Number of TOAs in this interval
         n_toa_interval = len(toa_df_interval)
         # Length of time interval
         span_days = (current_end - current_start) if n_toa_interval > 0 else 0.0
+
         # if length of time interval > min_interval and number of TOA in interval is >= 4 then continue
         if (n_toa_interval >= 4) and (span_days > min_interval):
             # ---- Fit the corresponding subset of ToAs - from fit_toas.py ----
             # Get F0 at mid-interval (simply to be as close as possible to correct solution for ease of fitting)
             ephem_tmp = ephemIntegerRotation(interval_mid, parfile)
-            F0_mid = ephem_tmp['freq_intRotation']
-            F1_mid = ephem_tmp['freqdot_intRotation']
-            interval_mid = ephem_tmp['Tmjd_intRotation']
+            F0_mid = ephem_tmp['freq_intRotation'].item()
+            F1_mid = ephem_tmp['freqdot_intRotation'].item()
+            interval_mid = ephem_tmp['Tmjd_intRotation'].item()
 
             # Build a dictionary par file that fit_toas will understand
             # Pretty simple {key_name: {value, flag}}
@@ -173,7 +179,7 @@ def generate_local_ephemerides(
             fit_keys = list_fit_keys(init_par_file_dict)
             # Build the priors
             bounds = {
-                'F0': (-10 / (span_days * 86400), 10 / (span_days * 86400)),
+                'F0': (-100 / (span_days * 86400), 100 / (span_days * 86400)),
                 'F1': (-100 / (span_days * 86400) ** 2, 100 / (span_days * 86400) ** 2),
             }
             # Instantiate the Prior object - from fit_toas.py

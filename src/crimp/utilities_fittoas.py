@@ -92,6 +92,24 @@ def inject_free_params(parfile, pvec: np.ndarray, keys: list):
     def is_wave_ab(name):
         return bool(re.match(r"^WAVE\d+_[AB]$", name))
 
+    # Edge case where GLTD is provided but the frequency jump (GLF0D) at GLTD is set to 0
+    # recovery timescale (GLTD) is irrelevant in this case and should be set to 0
+    def check_gltd_vals(d):
+        for gltd_key, gltd_entry in d.items():
+            if not gltd_key.startswith("GLTD_"):  # separate GLTD
+                continue
+            # get suffix (glitch number)
+            suffix = gltd_key.split("_", 1)[1]
+            glf0d_key = f"GLF0D_{suffix}"
+            # get corresponding GLF0D value (pair of "value", "flag" dict)
+            glf0d_entry = d.get(glf0d_key)
+            # If GLF0D["value"] is 0, set GLTD to 0
+            if glf0d_entry and glf0d_entry.get("value") == 0:
+                gltd_entry["value"] = 0
+
+    # First and formost, let's deal with this edge case
+    check_gltd_vals(parfile)
+
     # Seed outputs with defaults
     for k, v in parfile.items():
         if is_scalar_param(v):
@@ -137,6 +155,9 @@ def inject_free_params(parfile, pvec: np.ndarray, keys: list):
             parfile_dict_full[k] = base + delta
         else:  # Same as above for the frequency terms (note the negative sign since we work in phase space)
             parfile_dict_full[k] = base - delta
+
+    #print(parfile_dict_fit["GLTD_2"])
+    #print(parfile_dict_full["GLTD_2"])
 
     return parfile_dict_fit, parfile_dict_full
 
