@@ -156,9 +156,6 @@ def inject_free_params(parfile, pvec: np.ndarray, keys: list):
         else:  # Same as above for the frequency terms (note the negative sign since we work in phase space)
             parfile_dict_full[k] = base - delta
 
-    #print(parfile_dict_fit["GLTD_2"])
-    #print(parfile_dict_full["GLTD_2"])
-
     return parfile_dict_fit, parfile_dict_full
 
 

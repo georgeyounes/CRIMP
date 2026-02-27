@@ -34,7 +34,6 @@ from scipy.stats import norm
 import copy
 
 from lmfit import Parameters, minimize
-from tensorflow.python.ops.parallel_for.gradients import jacobian
 
 # Custom modules
 from crimp.eventfile import EvtFileOps
@@ -359,7 +358,7 @@ class ModelPulseProfile:
             return -Fourier(param, xx).loglikelihoodFS(yy, yyErr)
 
         results_mle_FS = minimize(binnednllfourier, initParams_mle, args=(ppBins, ctRate, ctRateErr),
-                                  method='BFGS',max_nfev=1.0e6)
+                                  method='BFGS', max_nfev=1.0e6)
 
         # Calculating the bf Model for the data
         bfModel = Fourier(results_mle_FS.params, ppBins).fourseries()
