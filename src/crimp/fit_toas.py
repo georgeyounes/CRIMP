@@ -170,6 +170,8 @@ def run_mcmc(x, y, yerr, init_parfile: dict, keys: list[str], prior: Prior,
     # Flatten after burn + thinning
     discard = max(0, burn)
     flat = sampler.get_chain(discard=discard, flat=True)
+    flat_logprob = sampler.get_log_prob(discard=discard, flat=True)
+    ibf = np.argmax(flat_logprob)
     # Save flattened chain if prompted - don't by default
     if flat_npy:
         np.save(flat_npy, flat)
@@ -195,6 +197,7 @@ def run_mcmc(x, y, yerr, init_parfile: dict, keys: list[str], prior: Prior,
             "median": float(q50),
             "minus": float(q50 - q16),
             "plus": float(q84 - q50),
+            "bestfit": float(flat[ibf,i])
         }
     return sampler, flat, summaries
 
@@ -258,6 +261,8 @@ def plot_residulas(toas_pre_fit, phase_residulas_post_fit, plotname=None):
 
     axs[1].legend(fontsize=14)
 
+    # ax1.set_xlim(-0.5e7, -0.4e7);  # ax1.set_ylim(-1.0, 0.5)
+
     ###################
     # Finishing touches
     for axis in ['top', 'bottom', 'left', 'right']:
@@ -313,6 +318,8 @@ def main():
     parser.add_argument("-fl", "--flat-npy", type=str, default=None,
                         help="Path to save flattened post burn-in samples as .npy (default=None)")
     # Plotting residuals
+    parser.add_argument("-fv", "--rp_fit_values", help="Fit values to use for residuals plot",
+                        type=str, default="median")
     parser.add_argument("-rp", "--residual_plot", help="Plot of pre- and post-fit residuals",
                         type=str, default=None)
 
@@ -362,15 +369,18 @@ def main():
             # convert to 1-sided uncertainty - choose max (conservative approach)
             uncertainties_max[name] = max(s["minus"], s["plus"])
 
-        # prepare medians in keys order
-        med_vec = np.array([summaries[name]['median'] for name in keys], dtype=float)
-        _, post_mcmc_timdict = inject_free_params(init_parfile_withflags, med_vec, keys)
-
         source_label = "MCMC (posterior medians)"
 
-        # plot residuals after MCMC run
-        phase_residulas_post_fit = model_phase_residuals(toas_pre_fit["ToA"], init_parfile_withflags, med_vec, keys)
-        plot_residulas(toas_pre_fit, phase_residulas_post_fit, args.residual_plot)
+        # prepare medians in keys order
+        for fv in args.rp_fit_values.split(","):
+            
+            med_vec = np.array([summaries[name][fv] for name in keys], dtype=float)
+            _, post_mcmc_timdict = inject_free_params(init_parfile_withflags, med_vec, keys)
+
+            # plot residuals after MCMC run
+            phase_residulas_post_fit = model_phase_residuals(toas_pre_fit["ToA"], init_parfile_withflags, med_vec, keys)
+            plot_residulas(toas_pre_fit, phase_residulas_post_fit, args.residual_plot+"_"+fv if args.residual_plot 
+                           is not None else args.residual_plot)
 
         # Write updated par file with new best-fit values
         patch_par_values(in_path=args.parfile, out_path=args.newparfile, new_values=post_mcmc_timdict,
