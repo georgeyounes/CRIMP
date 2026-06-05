@@ -41,18 +41,30 @@ def simulatemodulatedlc(freq, srcrate: float = 1,
     :return: dictionary of two time arrays {'assigned_t_wBgr', 'assigned_t_nobgr'} with and without background counts
     :rtype: dict
     """
+    # Truncating down to the nearest number of exact rotational phases covered by exposure given frequency
     nbrRotPh = int(exposure * freq)
-    # here there should be a warning or even an error if nbrRotPh is not > 100, i.e., exposure > 100*P
-    # if not, and the desirved exposure is not a perfect integer multiplied by period, this approximation will lead to inaccurate results
+    # Calculating the exposure that covers an integer number of rotations
+    exposure_norm = nbrRotPh / freq
+    print(f"Requested exposure (s): {exposure:.6f}")
+    print(f"Simulation exposure (s): {exposure_norm:.6f} "
+          f"({nbrRotPh} complete cycles at f = {freq:.6f} Hz)")
+
+    # Amplitude of the sinusoidal modulation
     amp = np.sqrt(2) * pulsedfraction * srcrate
+
+    if amp > srcrate:
+        raise ValueError("RMS pulse fraction cannot be larger than 1/sqrt(2)")
 
     # Establishing the number of phase bins in pulse profile to draw counts from
     if nbrPhaseBins is None:
         nbrPhaseBins = int(np.floor(1 / (resolution * freq)))
+    if nbrPhaseBins < 4:
+        raise ValueError("nbrPhaseBins is very small. Increase time resolution or set nbrPhaseBins manually")
 
     sim_p = np.linspace(0, 1, nbrPhaseBins, endpoint=False)
+
     sim_cts = (srcrate + (amp * np.cos(2 * np.pi * sim_p + np.pi))) * (
-            exposure / nbrPhaseBins)  # Peak is in the middle of a cycle
+            exposure_norm / nbrPhaseBins)  # Peak is in the middle of a cycle
 
     # Simulated light curve
     # Producing the phases of all events in initial pulse profile
@@ -60,11 +72,12 @@ def simulatemodulatedlc(freq, srcrate: float = 1,
     assigned_phase_all = []
 
     for k in range(0, nbrPhaseBins):
-        nbrRot = np.random.uniform(0, nbrRotPh, int(sim_cts[k]))
-        assigned_phase = nbrRot.astype(int) + np.random.uniform(phaseBin, phaseBin + (1 / nbrPhaseBins),
-                                                                int(sim_cts[k]))
-        assigned_phase_all = np.append(assigned_phase_all, assigned_phase)
+        n_events = np.random.poisson(sim_cts[k])
+        nbrRot = np.random.uniform(0, nbrRotPh, n_events)
+        assigned_phase = nbrRot.astype(int) + np.random.uniform(phaseBin, phaseBin + (1 / nbrPhaseBins), n_events)
+        assigned_phase_all.append(assigned_phase)
         phaseBin += (1 / nbrPhaseBins)
+    assigned_phase_all = np.concatenate(assigned_phase_all)
     assigned_phase_all.sort()
 
     # Assigning times to the simulated phases above
@@ -72,13 +85,8 @@ def simulatemodulatedlc(freq, srcrate: float = 1,
     assigned_t_nobgr = np.sort(assigned_t_nobgr)
 
     # Adding background to Simulated light curve
-    # Calculating total number of backgrond counts
-    totBackCts = int(bgrrate * exposure)
-
-    # Assigning times to background counts
-    assignedBgr_t_tmp = np.cumsum(
-        np.random.exponential(1 / bgrrate, totBackCts))  # Simulate waiting times for a poisson process
-    assignedBgr_t = assignedBgr_t_tmp[assignedBgr_t_tmp < exposure]
+    n_bkg = np.random.poisson(bgrrate * exposure_norm)
+    assignedBgr_t = np.sort(np.random.uniform(0, exposure_norm, n_bkg))
 
     # Adding the background counts to the source counts and sorting
     assigned_t_wBgr = np.sort(np.hstack((assigned_t_nobgr, assignedBgr_t)))
