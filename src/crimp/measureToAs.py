@@ -29,6 +29,7 @@ This module is a bit messy (to say the least :)). It can benefit from some clean
 - Create a class with three methods which measure ToAs for each template (fourier, cauchy, vonmises)
 - Eliminate repetitive code in each method (e.g. ToA error calculation could be its own small function)
 - I keep track of the number of free parameters manually; could be directly read from lmfit output
+- etc. etc.
 """
 
 import sys
@@ -601,10 +602,10 @@ def measureToA_vonmises(tempModPP, cycleFoldedPhases, exposureInt, outFile='', p
     # In case pulsed fraction should be varied
     if varyAmps:
         initTempModPPparam_afterfit = copy.deepcopy(results_mle_VMNormalized.params)
-        initTempModPPparam_afterfit.add('ampShift', 1, min=0.0, max=np.inf, vary=True)
+        initTempModPPparam_afterfit.add('ampShift', 1, min=0.0, max=500, vary=True)
         results_mle_VMNormalized = minimize(unbinnednllvonmises, initTempModPPparam_afterfit,
                                             args=(cycleFoldedPhases, exposureInt),
-                                            method='nelder', max_nfev=1.0e3, nan_policy='propagate')
+                                            method='nelder', max_nfev=1.0e4, nan_policy='propagate')
         nbrFreeParams += 1  # In this case we varied another parameter
 
     phShiBF = results_mle_VMNormalized.params.valuesdict()['phShift']  # Best fit phase shift
@@ -709,9 +710,9 @@ def defineinitialfitparam(tempModPP, readvaryparam=False):
     if tempModPP["model"] == 'fourier':
 
         if not readvaryparam:
-            initTempModPPparam = Parameters()  # Initializing an instance of Parameters based on the best-fit template model
-            initTempModPPparam.add('norm', tempModPP['norm']['value'], min=tempModPP['norm']['value']/5,
-                                   max=tempModPP['norm']['value']*5, vary=True)
+            # Initializing an instance of Parameters based on the best-fit template model
+            initTempModPPparam = Parameters()
+            initTempModPPparam.add('norm', tempModPP['norm']['value'], min=0, max=500, vary=True)
             # Number of components in template model
             nbrComp = len(np.array([ww for harmKey, ww in tempModPP.items() if harmKey.startswith('amp_')]))
             for kk in range(1, nbrComp + 1):  # Adding the amplitudes and phases of the harmonics, they are fixed
@@ -752,8 +753,7 @@ def defineinitialfitparam(tempModPP, readvaryparam=False):
 
         if not readvaryparam:
             initTempModPPparam = Parameters()  # Initializing an instance of Parameters based on the best-fit template model
-            initTempModPPparam.add('norm', tempModPP['norm']['value'], min=tempModPP['norm']['value']/5,
-                                   max=tempModPP['norm']['value']*5, vary=True)  # Adding the normalization - this is free to vary
+            initTempModPPparam.add('norm', tempModPP['norm']['value'], min=0, max=500, vary=True)
 
             # Number of components in template model
             nbrComp = len(np.array([ww for harmKey, ww in tempModPP.items() if harmKey.startswith('amp_')]))
