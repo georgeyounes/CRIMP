@@ -13,7 +13,7 @@ import argparse
 from crimp.readtimingmodel import ReadTimingModel
 from crimp.ephemIntegerRotation import ephemIntegerRotation
 
-from crimp.fit_toas import (load_toas_for_fit, model_phase_residuals, inject_free_params, plot_residulas,
+from crimp.fit_toas import (load_toas_for_fit, model_phase_residuals, inject_free_params, plot_residuals,
                             Prior, run_mcmc, list_fit_keys, chi2_fit)
 from crimp.plot_local_ephem import plot_local_ephemerides
 from crimp.timfile import readtimfile
@@ -204,7 +204,7 @@ def generate_local_ephemerides(
 
             if debug_with_plots:
                 # plot residuals after MCMC run
-                plot_residulas(toas_to_fit, phase_residulas_post_fit, plotname=f"residuals_interval_{int_counter}")
+                plot_residuals(toas_to_fit, phase_residulas_post_fit, plotname=f"residuals_interval_{int_counter}")
                 int_counter += 1
 
             # Extract best-fit F0, F1 and their uncertainties

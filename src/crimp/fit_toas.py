@@ -197,7 +197,7 @@ def run_mcmc(x, y, yerr, init_parfile: dict, keys: list[str], prior: Prior,
             "median": float(q50),
             "minus": float(q50 - q16),
             "plus": float(q84 - q50),
-            "bestfit": float(flat[ibf,i])
+            "map": float(flat[ibf, i])
         }
     return sampler, flat, summaries
 
@@ -218,7 +218,7 @@ def chi2_fit(phaseresid, model_phaseresid, phase_err, freeparameters):
 
 
 # -------- Pre- and post-fit residual plots --------
-def plot_residulas(toas_pre_fit, phase_residulas_post_fit, plotname=None):
+def plot_residuals(toas_pre_fit, phase_residuals_post_fit, plotname=None):
     # Creating pre- and post-fit residual plot
     fig, axs = plt.subplots(2, 1, figsize=(10, 8), dpi=80, facecolor='w', edgecolor='k', sharex=True,
                             sharey=False, gridspec_kw={'width_ratios': [1], 'height_ratios': [1, 0.7]})
@@ -237,7 +237,7 @@ def plot_residulas(toas_pre_fit, phase_residulas_post_fit, plotname=None):
     axs[0].errorbar(toas_pre_fit['ToA'], toas_pre_fit['phase'], yerr=toas_pre_fit['phase_err_cycle'], color='k',
                     fmt='o', zorder=0, markersize=8, ls='', label='Pre-fit residuals', alpha=0.5)
     # Plot model
-    axs[0].plot(toas_pre_fit['ToA'], phase_residulas_post_fit, color='k', linestyle='-', markersize=8, alpha=0.5,
+    axs[0].plot(toas_pre_fit['ToA'], phase_residuals_post_fit, color='k', linestyle='-', markersize=8, alpha=0.5,
                 label='Best-fit model', zorder=10)
 
     axs[0].legend(fontsize=14)
@@ -252,7 +252,7 @@ def plot_residulas(toas_pre_fit, phase_residulas_post_fit, plotname=None):
     axs[1].set_xlabel(r'$\,\mathrm{Time\,(MJD)}$', fontsize=14)
     axs[1].set_ylabel(r'$\,\mathrm{Residulas\,(cycle)}$', fontsize=14)
 
-    axs[1].errorbar(toas_pre_fit['ToA'], toas_pre_fit['phase'] - phase_residulas_post_fit,
+    axs[1].errorbar(toas_pre_fit['ToA'], toas_pre_fit['phase'] - phase_residuals_post_fit,
                     yerr=toas_pre_fit['phase_err_cycle'], color='k', fmt='o', zorder=10, markersize=8, ls='',
                     label='Post-fit (data-model) residuals', alpha=0.5)
 
@@ -318,8 +318,8 @@ def main():
     parser.add_argument("-fl", "--flat-npy", type=str, default=None,
                         help="Path to save flattened post burn-in samples as .npy (default=None)")
     # Plotting residuals
-    parser.add_argument("-fv", "--rp_fit_values", help="Fit values to use for residuals plot",
-                        type=str, default="median")
+    parser.add_argument('-bf', '—-best_fit', help="Which values to use for residual plot",
+                        choices=['median', 'map'], type=str, default="map")
     parser.add_argument("-rp", "--residual_plot", help="Plot of pre- and post-fit residuals",
                         type=str, default=None)
 
@@ -369,29 +369,27 @@ def main():
             # convert to 1-sided uncertainty - choose max (conservative approach)
             uncertainties_max[name] = max(s["minus"], s["plus"])
 
-        source_label = "MCMC (posterior medians)"
+        # prepare medians or mode (depending on best_fit) in keys order
+        fv = args.best_fit
+        med_vec = np.array([summaries[name][fv] for name in keys], dtype=float)
+        _, post_mcmc_timdict = inject_free_params(init_parfile_withflags, med_vec, keys)
 
-        # prepare medians in keys order
-        for fv in args.rp_fit_values.split(","):
-            
-            med_vec = np.array([summaries[name][fv] for name in keys], dtype=float)
-            _, post_mcmc_timdict = inject_free_params(init_parfile_withflags, med_vec, keys)
-
-            # plot residuals after MCMC run
-            phase_residulas_post_fit = model_phase_residuals(toas_pre_fit["ToA"], init_parfile_withflags, med_vec, keys)
-            plot_residulas(toas_pre_fit, phase_residulas_post_fit, args.residual_plot+"_"+fv if args.residual_plot 
-                           is not None else args.residual_plot)
+        # plot residuals after MCMC run
+        phase_residuals_post_fit = model_phase_residuals(toas_pre_fit["ToA"], init_parfile_withflags, med_vec, keys)
+        plot_residuals(toas_pre_fit, phase_residuals_post_fit,
+                       args.residual_plot + "_" + fv if args.residual_plot is not None else args.residual_plot)
 
         # Write updated par file with new best-fit values
         patch_par_values(in_path=args.parfile, out_path=args.newparfile, new_values=post_mcmc_timdict,
                          uncertainties=uncertainties_max)
+        source_label = f"MCMC (posterior {fv})"
         print("---------------------------")
         print(f"Wrote new timing model to {args.newparfile} using {source_label} values")
 
         # Measure some statistical terms
-        rms_residual_cycle = rms_residual(toas_pre_fit["phase"].to_numpy(), phase_residulas_post_fit)
+        rms_residual_cycle = rms_residual(toas_pre_fit["phase"].to_numpy(), phase_residuals_post_fit)
         nbr_free_param = len(keys)
-        simple_stats = chi2_fit(toas_pre_fit["phase"].to_numpy(), phase_residulas_post_fit,
+        simple_stats = chi2_fit(toas_pre_fit["phase"].to_numpy(), phase_residuals_post_fit,
                                 toas_pre_fit["phase_err_cycle"].to_numpy(), nbr_free_param)
         print("Statistics of new best-fit:")
         print(f"RMS residual in cycle = {rms_residual_cycle}")
@@ -430,8 +428,8 @@ def main():
         timing_dict_fit, timing_dict_full = inject_free_params(tmpl_parfile, res.x, keys)
 
         # Plot MLE fit residuals - first model residuals according to best-fit model
-        phase_residulas_post_fit = model_phase_residuals(toas_pre_fit["ToA"], tmpl_parfile, res.x, keys)
-        plot_residulas(toas_pre_fit, phase_residulas_post_fit, args.residual_plot)
+        phase_residuals_post_fit = model_phase_residuals(toas_pre_fit["ToA"], tmpl_parfile, res.x, keys)
+        plot_residuals(toas_pre_fit, phase_residuals_post_fit, args.residual_plot)
 
         source_label = "Maximum Likelihood Estimation"
         # write the MEL results into a new (or override existing one) .par file
@@ -440,9 +438,9 @@ def main():
         print(f"Wrote new timing model to {args.newparfile} using {source_label} values\n")
 
         # Measure some statistical terms
-        rms_residual_cycle = rms_residual(toas_pre_fit["phase"].to_numpy(), phase_residulas_post_fit)
+        rms_residual_cycle = rms_residual(toas_pre_fit["phase"].to_numpy(), phase_residuals_post_fit)
         nbr_free_param = len(keys)
-        simple_stats = chi2_fit(toas_pre_fit["phase"].to_numpy(), phase_residulas_post_fit,
+        simple_stats = chi2_fit(toas_pre_fit["phase"].to_numpy(), phase_residuals_post_fit,
                                 toas_pre_fit["phase_err_cycle"].to_numpy(), nbr_free_param)
 
         print("Statistics of new best-fit:")
