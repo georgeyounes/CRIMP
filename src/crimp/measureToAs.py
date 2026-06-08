@@ -712,7 +712,8 @@ def defineinitialfitparam(tempModPP, readvaryparam=False):
         if not readvaryparam:
             # Initializing an instance of Parameters based on the best-fit template model
             initTempModPPparam = Parameters()
-            initTempModPPparam.add('norm', tempModPP['norm']['value'], min=0, max=500, vary=True)
+            initTempModPPparam.add('norm', tempModPP['norm']['value'], min=tempModPP['norm']['value']/100,
+                                   max=500, vary=True)
             # Number of components in template model
             nbrComp = len(np.array([ww for harmKey, ww in tempModPP.items() if harmKey.startswith('amp_')]))
             for kk in range(1, nbrComp + 1):  # Adding the amplitudes and phases of the harmonics, they are fixed
@@ -753,7 +754,8 @@ def defineinitialfitparam(tempModPP, readvaryparam=False):
 
         if not readvaryparam:
             initTempModPPparam = Parameters()  # Initializing an instance of Parameters based on the best-fit template model
-            initTempModPPparam.add('norm', tempModPP['norm']['value'], min=0, max=500, vary=True)
+            initTempModPPparam.add('norm', tempModPP['norm']['value'], min=tempModPP['norm']['value']/100,
+                                   max=500, vary=True)
 
             # Number of components in template model
             nbrComp = len(np.array([ww for harmKey, ww in tempModPP.items() if harmKey.startswith('amp_')]))
