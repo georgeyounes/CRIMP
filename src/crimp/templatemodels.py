@@ -3,7 +3,7 @@ A module that encapsulates all the allowed models to derive a best-fit template
 to the pulse profiles. These are Fourier, von Mises, and Cauchy. Each model has
 its own class. Each class has three methods, (1) to calculate best-fit model given
 model parameters and an array of phases, (2) a binned likelihood function  with a
-gaussian pdf, and (3) an unbinned extended likelihood function with a poisson pdf
+gaussian PDF, and (3) an unbinned extended likelihood function with a poisson PDF
 
 Note that each model also incorporates a phaseShift which translates into a ToA,
 and an amplitude shift that takes into account possible variation in pulsed
@@ -221,8 +221,9 @@ class WrappedCauchy:
             # in case of a 0/negative in the Cauchy series estimate - results in undefined
             return -np.inf
         else:
-            return (-np.mean(modelWrapCauchyCurve) * exposure + len(self.xx) *
-                    np.log(np.mean(modelWrapCauchyCurve) * exposure) + np.sum(np.log(modelWrapCauchyCurveNormalized)))
+
+            return (-normalizingFactor*exposure/(2*np.pi) + len(self.xx) *
+                    np.log(normalizingFactor*exposure/(2*np.pi)) + np.sum(np.log(modelWrapCauchyCurveNormalized)))
 
 
 class VonMises:
@@ -324,5 +325,5 @@ class VonMises:
             # in case of a 0/negative in the Fourier series estimate - results in undefined
             return -np.inf
         else:
-            return (-np.mean(modelVonMisesCurve) * exposure + len(self.xx) *
-                    np.log(np.mean(modelVonMisesCurve) * exposure) + np.sum(np.log(modelVonMisesCurveNormalized)))
+            return (-normalizingFactor*exposure/(2*np.pi) + len(self.xx) *
+                    np.log(normalizingFactor*exposure/(2*np.pi)) + np.sum(np.log(modelVonMisesCurveNormalized)))
