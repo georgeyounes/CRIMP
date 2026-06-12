@@ -119,7 +119,7 @@ class PeriodSearch:
             for kk in range(0, self.nbrHarm):
                 Z2nHarm[kk] = ((np.sum(np.cos(2 * (kk + 1) * np.pi * self.freq[jj] * (self.time-self.t0)))) ** 2 +
                                (np.sum(np.sin(2 * (kk + 1) * np.pi * self.freq[jj] * (self.time-self.t0)))) ** 2) * (2.0 / n)
-            Z2nHarm.cumsum()
-            Hpow[jj] = np.amax([(Z2nHarm[ll] - 4 * ll + 4) for ll in range(0, self.nbrHarm)])
+            Z2nHarm_tot = Z2nHarm.cumsum()
+            Hpow[jj] = np.max(Z2nHarm_tot - 4 * np.arange(self.nbrHarm))
 
         return Hpow
