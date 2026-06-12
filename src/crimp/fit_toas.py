@@ -318,7 +318,7 @@ def main():
     parser.add_argument("-fl", "--flat-npy", type=str, default=None,
                         help="Path to save flattened post burn-in samples as .npy (default=None)")
     # Plotting residuals
-    parser.add_argument('-bf', '—-best_fit', help="Which values to use for residual plot",
+    parser.add_argument('-bf', '--best_fit', help="Which values to use for residual plot",
                         choices=['median', 'map'], type=str, default="map")
     parser.add_argument("-rp", "--residual_plot", help="Plot of pre- and post-fit residuals",
                         type=str, default=None)
