@@ -12,6 +12,7 @@ import argparse
 
 import numpy as np
 import pandas as pd
+from io import StringIO
 
 # Custom scripts
 from crimp.ephemIntegerRotation import ephemIntegerRotation
@@ -22,9 +23,38 @@ from crimp.logging_utils import get_logger
 logger = get_logger(__name__)
 
 
-def readtimfile(timfile: str, comment: str = "C", skiprows: int = 1) -> pd.DataFrame:
-    # Read all whitespace-separated tokens
-    df = pd.read_csv(timfile, sep=r"\s+", comment=comment, skiprows=skiprows, header=None, engine="python", dtype=str)
+def readtimfile(timfile: str, skiprows: int = 1) -> pd.DataFrame:
+    """
+    Function to read a tim file into a pandas dataframe
+    :param timfile: Name of .tim file
+    :type timfile: str
+    :param skiprows: number of rows to skip (depending on tim file format)
+    :type skiprows: int
+    :return: timfile_pd, tim file entries as pandas dataframe
+    :rtype: pandas.DataFrame
+    """
+    # Taking care of commented lines first, which start with a capital "C"
+    # If using Pandas, anything after a capital "C" will be ignored, wherever "C" lands
+    # Dealing with it in a traditional way
+    with open(timfile, encoding="utf-8") as f:
+        lines = f.readlines()
+
+    lines = lines[skiprows:]
+
+    lines = [
+        line
+        for line in lines
+        if not line.lstrip().startswith("C")
+    ]
+
+    # Now read file as a dataframe
+    df = pd.read_csv(
+        StringIO("".join(lines)),
+        sep=r"\s+",
+        header=None,
+        engine="python",
+        dtype=str,
+    )
 
     # Name the first 5 "fixed" columns
     fixed_cols = {0: "template", 1: "frequency", 2: "pulse_ToA", 3: "pulse_ToA_err", 4: "time_ref"}
@@ -67,9 +97,9 @@ def readtimfile(timfile: str, comment: str = "C", skiprows: int = 1) -> pd.DataF
         extras["pn"] = (pd.to_numeric(extras["pn"], errors="coerce").astype("Int64"))
 
     # Keep only the fixed columns + the parsed extras (no raw 5,6,7,... columns)
-    out = pd.concat([df[list(fixed_cols.values())], extras], axis=1)
+    timfile_pd = pd.concat([df[list(fixed_cols.values())], extras], axis=1)
 
-    return out
+    return timfile_pd
 
 
 class PulseToAs(object):

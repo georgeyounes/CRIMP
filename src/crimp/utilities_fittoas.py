@@ -180,6 +180,10 @@ def validate_parfile(parfile):
             # Skip WAVEEPOCH
             continue
 
+        if k == "JUMP":
+            # Skip JUMP
+            continue
+
         if not (isinstance(v, dict) and "value" in v and "flag" in v):
             raise ValueError(f"Parameter '{k}' must be a dict with 'value' and 'flag'")
 

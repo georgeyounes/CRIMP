@@ -73,7 +73,7 @@ def load_toas_for_fit(tim_file_df: pd.DataFrame, parfile: dict, t_start: float |
     perr = pd.to_numeric(pt.df['pulse_ToA_err'], errors='coerce').to_numpy(dtype=float)
 
     # Calculate phases from TOAs and parfile
-    phases, _ = calcphase(toas, parfile)
+    phases, _ = calcphase(toas, parfile, toaData=tim_file_df, apply_jumps=True)
     # Check if TRACK exists in par input, is = -2, and if pn is part of the .tim file
     if "TRACK" in parfile and get_parameter_value(parfile["TRACK"]) == -2 and "pn" in pt.df.columns:
         phases -= pt.df["pn"]
@@ -85,7 +85,7 @@ def load_toas_for_fit(tim_file_df: pd.DataFrame, parfile: dict, t_start: float |
     # for visualization purposes and avoid adding a constant phase to the model - see also model_phases() below
     phases -= np.mean(phases)
 
-    # Uncertainties on phases
+    # Calculate uncertainties on phases
     phase_err_cycle = (perr / 1e6) * F0
 
     toas_to_fit = pd.DataFrame({
@@ -333,7 +333,7 @@ def main():
 
     ####################
     # reading pulse TOAs
-    tim_file_df = readtimfile(args.timfile_path, comment='C')
+    tim_file_df = readtimfile(args.timfile_path)
     toas_pre_fit = load_toas_for_fit(tim_file_df, init_parfile_withflags, args.t_start,
                                      args.t_end, args.t_mjd, args.mode)
 

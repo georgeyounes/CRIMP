@@ -84,6 +84,7 @@ def generate_local_ephemerides(
     PEPOCH_global = parfile_params["PEPOCH"]
     F0_global = parfile_params["F0"]
     F1_global = parfile_params["F1"]
+    JUMP = parfile_params.get("JUMP", [])
     glitch_substring = "GLEP_"
     glitch_epochs = sorted([value for key, value in parfile_params.items() if glitch_substring in key])
 
@@ -174,6 +175,9 @@ def generate_local_ephemerides(
             }
             # We add the track keyword, and if -pn in tim file, it is used automatically
             init_par_file_dict["TRACK"] = -2
+            # We add the JUMP keywords as well
+            if JUMP:
+                init_par_file_dict["JUMP"] = JUMP
 
             # keys to fit for, list of ['F0', 'F1']
             fit_keys = list_fit_keys(init_par_file_dict)

@@ -230,6 +230,16 @@ class ReadTimingModel:
         add_pntrack_parfile(timModParams, self.timMod)
         add_pntrack_parfile(timModBoth, self.timMod)
 
+        # Add JUMP parameters - these cannot yet be fitted in CRIMP!
+        jumps = self.readjumps()
+
+        if jumps:
+            timModParams["JUMP"] = jumps
+            timModBoth["JUMP"] = {
+                "value": jumps,
+                "flag": None,
+            }
+
         return timModParams, timModFlags, timModBoth
 
     # ---------- Statistics ----------
@@ -266,6 +276,63 @@ class ReadTimingModel:
                         pass
         return stats
 
+    # ---------- Jumps ----------
+    def readjumps(self):
+        """
+        Read supported JUMP lines.
+
+        Supported formats:
+          JUMP MJD v1 v2 jump_value
+          JUMP flag value jump_value
+
+        jump_value is read in seconds and converted to phase cycles
+        using F0.
+        """
+        jumps = []
+
+        F0 = self.readtaylorexpansion()[0].get("F0", 0)
+
+        if F0 == 0:
+            return jumps
+
+        with open(self.timMod, "r") as f:
+            for raw in f:
+                toks = raw.strip().split()
+
+                if not toks or toks[0].upper() != "JUMP":
+                    continue
+
+                try:
+                    # JUMP MJD v1 v2 jump_value
+                    if toks[1].upper() == "MJD" and len(toks) >= 5:
+                        jump_seconds = float(toks[4])
+
+                        jumps.append({
+                            "type": "MJD",
+                            "mjd_start": float(toks[2]),
+                            "mjd_end": float(toks[3]),
+                            "jump_seconds": jump_seconds,
+                            "jump_phase": jump_seconds * F0,
+                        })
+
+                    # JUMP flag value jump_value
+                    elif len(toks) >= 4:
+                        jump_seconds = float(toks[3])
+
+                        jumps.append({
+                            "type": "flag",
+                            "flag": toks[1],
+                            "value": toks[2],
+                            "jump_seconds": jump_seconds,
+                            "jump_phase": jump_seconds * F0,
+                        })
+
+                except (ValueError, IndexError):
+                    continue
+
+        return jumps
+
+    # ---------- Miscellaneous ----------
     def readmiscellaneous(self):
         """
         Read miscellaneous keywords in .par file - none if it doesn't existent
@@ -385,6 +452,11 @@ def patch_par_values(
     for line in lines:
         core = line.rstrip("\n")
 
+        # JUMP is not a scalar parameter; preserve it unchanged
+        if core.lstrip().upper().startswith("JUMP "):
+            out_lines.append(line)
+            continue
+
         # ---- WAVEk A B lines ----
         mw = wave_re.match(core)
         if mw:
@@ -409,7 +481,7 @@ def patch_par_values(
         key, ws_val, old_val, ws_flag, flag, old_unc, tail = m.groups()
 
         v = unwrap_value(new_values.get(key))
-        if v is None or isinstance(v, dict):
+        if v is None or not isinstance(v, (int, float, np.floating)):
             out_lines.append(line)
             continue
 

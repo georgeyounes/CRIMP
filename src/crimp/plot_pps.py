@@ -72,6 +72,7 @@ def update_gti(GTI, tstart, tend):
         if tend < GTI[-1, -1]:
             GTI[-1, -1] = tend
         return GTI
+    return None
 
 
 def plotting_pp(time_energy_phase_df, nbrbins=100, plotname: str | None = None):
