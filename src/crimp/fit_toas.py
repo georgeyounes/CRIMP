@@ -215,6 +215,23 @@ def chi2_fit(phaseresid, model_phaseresid, phase_err, freeparameters):
     dof = np.size(phaseresid) - freeparameters
     model_stats = {'chi2': chi2, 'redchi2': redchi2, 'dof': dof}
     return model_stats
+    
+    
+def aic(k, logprob):
+    """Compute the Akaike information criterion (AIC).
+    :param k: number of free parameters in the model.
+    :param logprob: log of the maximum value for the model.
+    """
+    return 2 * k - 2 * logprob
+    
+    
+def bic(k, logprob, N):
+    """Compute the Bayesian information criterion (BIC).
+    :param k: number of free parameters in the model.
+    :param logprob: log of the maximum value for the model.
+    :param N: number of data points.
+    """
+    return k * np.log(N) - 2 * logprob
 
 
 # -------- Pre- and post-fit residual plots --------
@@ -395,7 +412,9 @@ def main():
         print(f"RMS residual in cycle = {rms_residual_cycle}")
         print(f"RMS residual in seconds = {rms_residual_cycle * (1 / F0)} (assuming F0 = {F0} from input .par file)")
         print(f"Chi2 = {simple_stats['chi2']} for {simple_stats['dof']} dof")
-        print(f"reduced Chi2 = {simple_stats['redchi2']}\n")
+        print(f"reduced Chi2 = {simple_stats['redchi2']}")
+        print(f"AIC: {aic(nbr_free_param, np.max(sampler.get_log_prob(discard=max(0, args.mcmc_burn), flat=True)))}")
+        print(f"BIC: {bic(nbr_free_param, np.max(sampler.get_log_prob(discard=max(0, args.mcmc_burn), flat=True)), np.size(toas_pre_fit['phase'].to_numpy()))}\n")
 
         # Append statistics to par file
         stats_forparfile = {"CHI2R": simple_stats['redchi2'], "NTOA": len(toas_pre_fit["ToA"]),
